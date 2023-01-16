@@ -1,25 +1,24 @@
-mod attestations;
-mod utils;
-
-use crate::attestations::{compare_attestations, save_local_attestation, Attestation};
-use crate::utils::process_messages;
-use attestations::attestation_handler;
 use colored::*;
 use ethers::types::Block;
 use ethers::{
     providers::{Http, Middleware, Provider},
     types::U64,
 };
-use graphcast_sdk::gossip_agent::{GossipAgent, NETWORK_SUBGRAPH};
+use graphcast_sdk::gossip_agent::GossipAgent;
 use graphcast_sdk::graphql::client_network::query_network_subgraph;
+use poi_radio::{
+    attestation_handler, compare_attestations, process_messages, save_local_attestation,
+    Attestation, LocalAttestationsMap, GOSSIP_AGENT, MESSAGES, NETWORK_SUBGRAPH, REGISTRY_SUBGRAPH,
+};
 use std::collections::HashMap;
 use std::env;
 use std::sync::{Arc, Mutex};
 use std::{thread::sleep, time::Duration};
-use utils::{LocalAttestationsMap, GOSSIP_AGENT, MESSAGES};
 
+use dotenv::dotenv;
 /// Radio specific query function to fetch Proof of Indexing for each allocated subgraph
 use graphql::query_graph_node_poi;
+
 mod graphql;
 
 #[macro_use]
@@ -27,7 +26,10 @@ extern crate partial_application;
 
 #[tokio::main]
 async fn main() {
-    let graph_node_endpoint = env::var("GRAPH_NODE_STATUS_ENDPOINT").expect("No private key provided.");
+    dotenv().ok();
+
+    let graph_node_endpoint =
+        env::var("GRAPH_NODE_STATUS_ENDPOINT").expect("No Graph node status endpoint provided.");
     let private_key = env::var("PRIVATE_KEY").expect("No private key provided.");
     let eth_node = env::var("ETH_NODE").expect("No ETH URL provided.");
 
@@ -39,11 +41,20 @@ async fn main() {
     let wait_block_duration = 2;
 
     let provider: Provider<Http> = Provider::<Http>::try_from(eth_node.clone()).unwrap();
-    let radio_name: &str = "poi-crosschecker";
+    let radio_name: &str = "poi-radio";
 
-    let gossip_agent = GossipAgent::new(private_key, eth_node, radio_name, waku_host, waku_port)
-        .await
-        .unwrap();
+    let gossip_agent = GossipAgent::new(
+        private_key,
+        eth_node,
+        radio_name,
+        REGISTRY_SUBGRAPH,
+        NETWORK_SUBGRAPH,
+        None,
+        waku_host,
+        waku_port,
+    )
+    .await
+    .unwrap();
 
     _ = GOSSIP_AGENT.set(gossip_agent);
     _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
@@ -152,6 +163,135 @@ async fn main() {
                     Err(e) => println!("{}: {}", "Failed to query message".red(), e),
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hex::encode;
+    use rand::{thread_rng, Rng};
+    use secp256k1::SecretKey;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    #[ignore]
+    async fn regression_test() {
+        dotenv().ok();
+
+        let is_display;
+        match std::env::args().nth(1) {
+            Some(x) if x == *"display" => {
+                is_display = true;
+            }
+            _ => {
+                is_display = false;
+            }
+        }
+
+        let mut rng = thread_rng();
+        let mut private_key = [0u8; 32];
+        rng.fill(&mut private_key[..]);
+
+        let private_key = SecretKey::from_slice(&private_key).expect("Error parsing secret key");
+        let private_key_hex = encode(private_key.secret_bytes());
+        env::set_var("PRIVATE_KEY", &private_key_hex);
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/gossip-registry-test"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"{
+                    "data": {
+                        "graphAccount": {
+                            "gossipOperatorOf": {
+                                "id": "0x54f4cdc1ac7cd3377f43834fbde09a7ffe6fe337"
+                            }
+                        }
+                    },
+                    "errors": null
+                }"#,
+            ))
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/network-subgraph"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"{
+                    "data": {
+                        "indexer" : {
+                            "stakedTokens": "100000000000000000000000",
+                            "allocations": [{
+                                "subgraphDeployment": {
+                                    "ipfsHash": "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u"
+                                }
+                            }]
+                        },
+                        "graphNetwork": {
+                            "minimumIndexerStake": "100000000000000000000000"
+                        }
+                    },
+                    "errors": null
+                }"#,
+            ))
+            .mount(&mock_server)
+            .await;
+
+        let private_key = env::var("PRIVATE_KEY").expect("No private key provided.");
+        let eth_node = env::var("ETH_NODE").expect("No ETH URL provided.");
+
+        // TODO: Add something random and unique here to avoid noise form other operators
+        let radio_name: &str = "test-poi-crosschecker-radio";
+
+        let gossip_agent = GossipAgent::new(
+            private_key,
+            eth_node,
+            radio_name,
+            &(mock_server.uri() + "/gossip-registry-test"),
+            &(mock_server.uri() + "/network-subgraph"),
+            Some(vec!["some-hash"]),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        _ = GOSSIP_AGENT.set(gossip_agent);
+        _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
+
+        let radio_handler = Arc::new(Mutex::new(attestation_handler()));
+        GOSSIP_AGENT.get().unwrap().register_handler(radio_handler);
+
+        // Just to introduce sender and skip first time check
+        GOSSIP_AGENT
+            .get()
+            .unwrap()
+            .send_message("some-hash".to_string(), 0, "poi".to_string())
+            .await
+            .unwrap();
+
+        sleep(Duration::from_secs(1));
+
+        let mut block = 1;
+
+        loop {
+            GOSSIP_AGENT
+                .get()
+                .unwrap()
+                .send_message("some-hash".to_string(), block, "poi".to_string())
+                .await
+                .unwrap();
+
+            if is_display && MESSAGES.get().unwrap().lock().unwrap().len() > 4 {
+                break;
+            }
+
+            block += 1;
+            sleep(Duration::from_secs(1));
         }
     }
 }
