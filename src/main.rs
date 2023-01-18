@@ -8,7 +8,8 @@ use graphcast_sdk::gossip_agent::GossipAgent;
 use graphcast_sdk::graphql::client_network::query_network_subgraph;
 use poi_radio::{
     attestation_handler, compare_attestations, process_messages, save_local_attestation,
-    Attestation, LocalAttestationsMap, GOSSIP_AGENT, MESSAGES, NETWORK_SUBGRAPH, REGISTRY_SUBGRAPH,
+    Attestation, LocalAttestationsMap, RadioPayloadMessage, GOSSIP_AGENT, MESSAGES,
+    NETWORK_SUBGRAPH, REGISTRY_SUBGRAPH,
 };
 use std::collections::HashMap;
 use std::env;
@@ -150,10 +151,11 @@ async fn main() {
                             block_number,
                         );
 
+                        let radio_message = RadioPayloadMessage::new(id.clone(), content.clone());
                         match GOSSIP_AGENT
                             .get()
                             .unwrap()
-                            .send_message(id.clone(), block_number, content)
+                            .send_message(id.clone(), block_number, Some(radio_message))
                             .await
                         {
                             Ok(sent) => println!("{}: {}", "Sent message id:".green(), sent),
@@ -181,16 +183,7 @@ mod tests {
     async fn regression_test() {
         dotenv().ok();
 
-        let is_display;
-        match std::env::args().nth(1) {
-            Some(x) if x == *"display" => {
-                is_display = true;
-            }
-            _ => {
-                is_display = false;
-            }
-        }
-
+        let is_display = matches!(std::env::args().nth(1), Some(x) if x == *"display");
         let mut rng = thread_rng();
         let mut private_key = [0u8; 32];
         rng.fill(&mut private_key[..]);
@@ -265,12 +258,15 @@ mod tests {
 
         let radio_handler = Arc::new(Mutex::new(attestation_handler()));
         GOSSIP_AGENT.get().unwrap().register_handler(radio_handler);
+        let hash = "some-hash".to_string();
+        let content = "poi".to_string();
 
+        let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
         // Just to introduce sender and skip first time check
         GOSSIP_AGENT
             .get()
             .unwrap()
-            .send_message("some-hash".to_string(), 0, "poi".to_string())
+            .send_message("some-hash".to_string(), 0, Some(radio_msg.clone()))
             .await
             .unwrap();
 
@@ -282,7 +278,7 @@ mod tests {
             GOSSIP_AGENT
                 .get()
                 .unwrap()
-                .send_message("some-hash".to_string(), block, "poi".to_string())
+                .send_message("some-hash".to_string(), block, Some(radio_msg.clone()))
                 .await
                 .unwrap();
 
