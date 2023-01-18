@@ -1,0 +1,6 @@
+version: "3"
+services:
+  poi-radio:
+    build: .
+    ports:
+      - 8030:8030
