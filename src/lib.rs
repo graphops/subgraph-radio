@@ -13,6 +13,38 @@ use once_cell::sync::OnceCell;
 
 use anyhow::anyhow;
 use colored::*;
+use ethers_contract::EthAbiType;
+use ethers_core::types::transaction::eip712::Eip712;
+use ethers_derive_eip712::*;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+
+#[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize)]
+#[eip712(
+    name = "Graphcast Ping-Pong Radio",
+    version = "0",
+    chain_id = 1,
+    verifying_contract = "0xc944e90c64b2c07662a292be6244bdf05cda44a7"
+)]
+pub struct RadioPayloadMessage {
+    #[prost(string, tag = "1")]
+    pub identifier: String,
+    #[prost(string, tag = "2")]
+    pub content: String,
+}
+
+impl RadioPayloadMessage {
+    pub fn new(identifier: String, content: String) -> Self {
+        RadioPayloadMessage {
+            identifier,
+            content,
+        }
+    }
+
+    pub fn payload_content(&self) -> String {
+        self.content.clone()
+    }
+}
 
 pub type RemoteAttestationsMap = HashMap<String, HashMap<u64, Vec<Attestation>>>;
 pub type LocalAttestationsMap = HashMap<String, HashMap<u64, Attestation>>;
@@ -25,7 +57,8 @@ pub static GOSSIP_AGENT: OnceCell<GossipAgent> = OnceCell::new();
 /// It is used to save incoming messages after they've been validated, in order
 /// defer their processing for later, because async code is required for the processing but
 /// it is not allowed in the handler itself.
-pub static MESSAGES: OnceCell<Arc<Mutex<Vec<GraphcastMessage>>>> = OnceCell::new();
+pub static MESSAGES: OnceCell<Arc<Mutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>> =
+    OnceCell::new();
 
 /// A constant defining the goerli registry subgraph endpoint.
 pub const REGISTRY_SUBGRAPH: &str =
@@ -55,12 +88,13 @@ pub fn update_blocks(
 /// messages are being received. It constructs the remote attestations
 /// map and returns it if the processing succeeds.
 pub async fn process_messages(
-    messages: Arc<Mutex<Vec<GraphcastMessage>>>,
+    messages: Arc<Mutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>,
 ) -> Result<RemoteAttestationsMap, anyhow::Error> {
     let mut remote_attestations: RemoteAttestationsMap = HashMap::new();
     let messages = AsyncMutex::new(messages.lock().unwrap());
 
     for msg in messages.lock().await.iter() {
+        let radio_msg = &msg.payload.clone().unwrap();
         let sender = msg.recover_sender_address()?;
         let sender_stake = get_indexer_stake(sender.clone(), NETWORK_SUBGRAPH).await?;
 
@@ -70,7 +104,9 @@ pub async fn process_messages(
             .or_default();
         let attestations = blocks.entry(msg.block_number).or_default();
 
-        let existing_attestation = attestations.iter_mut().find(|a| a.npoi == msg.content);
+        let existing_attestation = attestations
+            .iter_mut()
+            .find(|a| a.npoi == radio_msg.payload_content());
 
         match existing_attestation {
             Some(existing_attestation) => {
@@ -81,7 +117,7 @@ pub async fn process_messages(
             }
             None => {
                 attestations.push(Attestation::new(
-                    msg.content.to_string(),
+                    radio_msg.payload_content().to_string(),
                     sender_stake,
                     vec![sender],
                 ));
@@ -155,8 +191,9 @@ pub fn save_local_attestation(
 /// Custom callback for handling the validated GraphcastMessage, in this case we only save the messages to a local store
 /// to process them at a later time. This is required because for the processing we use async operations which are not allowed
 /// in the handler.
-pub fn attestation_handler() -> impl Fn(Result<GraphcastMessage, anyhow::Error>) {
-    |msg: Result<GraphcastMessage, anyhow::Error>| match msg {
+pub fn attestation_handler() -> impl Fn(Result<GraphcastMessage<RadioPayloadMessage>, anyhow::Error>)
+{
+    |msg: Result<GraphcastMessage<RadioPayloadMessage>, anyhow::Error>| match msg {
         Ok(msg) => {
             MESSAGES.get().unwrap().lock().unwrap().push(msg);
         }
@@ -256,8 +293,11 @@ mod tests {
         let nonce: i64 = 123321;
         let block_number: i64 = 0;
         let block_hash: String = "0xblahh".to_string();
+
+        let radio_msg = RadioPayloadMessage::new(hash.clone(), content);
         let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
-        let msg = GraphcastMessage::new(hash, content, nonce, block_number, block_hash, sig);
+        let msg =
+            GraphcastMessage::new(hash, Some(radio_msg), nonce, block_number, block_hash, sig);
 
         assert!(messages.is_empty());
 
@@ -304,9 +344,10 @@ mod tests {
         let block_number: i64 = 0;
         let block_hash: String = "0xblahh".to_string();
         let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
+        let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
         let msg1 = GraphcastMessage::new(
             hash,
-            content.clone(),
+            Some(radio_msg),
             nonce,
             block_number,
             block_hash.clone(),
@@ -319,10 +360,11 @@ mod tests {
         let nonce: i64 = 123321;
         let block_number: i64 = 0;
         let block_hash: String = "0xblahh".to_string();
+        let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
         let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
         let msg2 = GraphcastMessage::new(
             hash,
-            content.clone(),
+            Some(radio_msg),
             nonce,
             block_number,
             block_hash.clone(),
@@ -345,8 +387,10 @@ mod tests {
         let nonce: i64 = 123321;
         let block_number: i64 = 0;
         let block_hash: String = "0xblahh".to_string();
+        let radio_msg = RadioPayloadMessage::new(hash.clone(), content);
         let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
-        let msg = GraphcastMessage::new(hash, content, nonce, block_number, block_hash, sig);
+        let msg =
+            GraphcastMessage::new(hash, Some(radio_msg), nonce, block_number, block_hash, sig);
 
         messages.push(msg);
         assert!(!messages.is_empty());
