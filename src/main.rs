@@ -53,6 +53,7 @@ async fn main() {
         None,
         waku_host,
         waku_port,
+        None,
     )
     .await
     .unwrap();
@@ -247,6 +248,7 @@ mod tests {
             &(mock_server.uri() + "/gossip-registry-test"),
             &(mock_server.uri() + "/network-subgraph"),
             Some(vec!["some-hash"]),
+            None,
             None,
             None,
         )
