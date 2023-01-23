@@ -6,6 +6,7 @@ use ethers::{
 };
 use graphcast_sdk::gossip_agent::GossipAgent;
 use graphcast_sdk::graphql::client_network::query_network_subgraph;
+use graphcast_sdk::init_tracing;
 use poi_radio::{
     attestation_handler, compare_attestations, process_messages, save_local_attestation,
     Attestation, LocalAttestationsMap, RadioPayloadMessage, GOSSIP_AGENT, MESSAGES,
@@ -15,6 +16,7 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::{Arc, Mutex};
 use std::{thread::sleep, time::Duration};
+use tracing::{debug, error, info};
 
 use dotenv::dotenv;
 /// Radio specific query function to fetch Proof of Indexing for each allocated subgraph
@@ -28,6 +30,7 @@ extern crate partial_application;
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    init_tracing();
 
     let graph_node_endpoint =
         env::var("GRAPH_NODE_STATUS_ENDPOINT").expect("No Graph node status endpoint provided.");
@@ -79,11 +82,11 @@ async fn main() {
             continue;
         }
 
-        println!("{} {}", "🔗 Block number:".cyan(), block_number);
+        debug!("{} {}", "🔗 Block number:".cyan(), block_number);
         curr_block = block_number;
 
         if block_number == compare_block {
-            println!("{}", "Comparing attestations".magenta());
+            debug!("{}", "Comparing attestations".magenta());
 
             let remote_attestations = process_messages(Arc::clone(MESSAGES.get().unwrap())).await;
             match remote_attestations {
@@ -95,17 +98,17 @@ async fn main() {
                         Arc::clone(&local_attestations),
                     ) {
                         Ok(msg) => {
-                            println!("{}", msg.green().bold());
+                            debug!("{}", msg.green().bold());
                             messages.clear();
                         }
                         Err(err) => {
-                            println!("{}", err);
+                            error!("{}", err);
                             messages.clear();
                         }
                     }
                 }
                 Err(err) => {
-                    println!(
+                    error!(
                         "{}{}",
                         "An error occured while parsing messages: {}".red().bold(),
                         err
@@ -159,11 +162,11 @@ async fn main() {
                             .send_message(id.clone(), block_number, Some(radio_message))
                             .await
                         {
-                            Ok(sent) => println!("{}: {}", "Sent message id:".green(), sent),
-                            Err(e) => println!("{}: {}", "Failed to send message".red(), e),
+                            Ok(sent) => info!("{}: {}", "Sent message id:".green(), sent),
+                            Err(e) => error!("{}: {}", "Failed to send message".red(), e),
                         };
                     }
-                    Err(e) => println!("{}: {}", "Failed to query message".red(), e),
+                    Err(e) => error!("{}: {}", "Failed to query message".red(), e),
                 }
             }
         }

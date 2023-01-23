@@ -18,6 +18,7 @@ use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
 use prost::Message;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize)]
 #[eip712(
@@ -198,7 +199,7 @@ pub fn attestation_handler() -> impl Fn(Result<GraphcastMessage<RadioPayloadMess
             MESSAGES.get().unwrap().lock().unwrap().push(msg);
         }
         Err(err) => {
-            println!("{}", err);
+            error!("{}", err);
         }
     }
 }
