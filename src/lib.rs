@@ -1,12 +1,16 @@
 use std::{
     collections::HashMap,
+    error::Error,
     sync::{Arc, Mutex},
 };
 use tokio::sync::Mutex as AsyncMutex;
 
-use graphcast_sdk::gossip_agent::{
-    message_typing::{get_indexer_stake, GraphcastMessage},
-    GossipAgent,
+use graphcast_sdk::{
+    gossip_agent::{
+        message_typing::{get_indexer_stake, GraphcastMessage},
+        GossipAgent,
+    },
+    graphql::{client_network::query_network_subgraph, client_registry::query_registry_indexer},
 };
 use num_bigint::BigUint;
 use once_cell::sync::OnceCell;
@@ -18,7 +22,7 @@ use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tracing::error;
+use tracing::{debug, error};
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize)]
 #[eip712(
@@ -83,6 +87,26 @@ pub fn update_blocks(
         vec![Attestation::new(npoi, stake, vec![address])],
     );
     blocks_clone
+}
+
+/// Generate default topics that is operator address resolved to indexer address
+/// and then its active on-chain allocations
+pub async fn active_allocation_hashes(
+    operator_address: String,
+) -> Result<Vec<String>, Box<dyn Error>> {
+    let indexer_address =
+        query_registry_indexer(REGISTRY_SUBGRAPH.to_string(), operator_address).await?;
+
+    debug!(
+        "Default topics from indexer address: {:#?}",
+        indexer_address
+    );
+
+    Ok(
+        query_network_subgraph(NETWORK_SUBGRAPH.to_string(), indexer_address.clone())
+            .await?
+            .indexer_allocations(),
+    )
 }
 
 /// This function processes the global messages map that we populate when
@@ -236,13 +260,11 @@ pub fn compare_attestations(
                     let most_attested_npoi = &remote_attestations.last().unwrap().npoi;
                     if most_attested_npoi == &local_attestation.npoi {
                         return Ok(format!(
-                            "POIs match for subgraph {} on block {}!",
-                            ipfs_hash, attestation_block
+                            "POIs match for subgraph {ipfs_hash} on block {attestation_block}!"
                         ));
                     } else {
                         return Err(anyhow!(format!(
-                            "POIs don't match for subgraph {} on block {}!",
-                            ipfs_hash, attestation_block
+                            "POIs don't match for subgraph {ipfs_hash} on block {attestation_block}!"
                         )
                         .red()
                         .bold()));
@@ -250,8 +272,7 @@ pub fn compare_attestations(
                             },
                             None => {
                                 return Err(anyhow!(format!(
-                                    "No record for subgraph {} on block {} found in remote attestations",
-                                    ipfs_hash, attestation_block
+                                    "No record for subgraph {ipfs_hash} on block {attestation_block} found in remote attestations"
                                 )
                                 .yellow()
                                ));
@@ -259,19 +280,18 @@ pub fn compare_attestations(
                         }
                     }
                     None => {
-                        return Err(anyhow!(format!("No attestations for subgraph {} on block {} found in remote attestations store. Continuing...", ipfs_hash, attestation_block, ).yellow()))
+                        return Err(anyhow!(format!("No attestations for subgraph {ipfs_hash} on block {attestation_block} found in remote attestations store. Continuing...", ).yellow()))
                     }
                 }
             }
             None => {
-                return Err(anyhow!(format!("No attestation for subgraph {} on block {} found in local attestations store. Continuing...", ipfs_hash, attestation_block, ).yellow()))
+                return Err(anyhow!(format!("No attestation for subgraph {ipfs_hash} on block {attestation_block} found in local attestations store. Continuing...", ).yellow()))
             }
         }
     }
 
     Err(anyhow!(format!(
-        "The comparison did not execute successfully for on block {}. Continuing...",
-        attestation_block,
+        "The comparison did not execute successfully for on block {attestation_block}. Continuing...",
     )
     .yellow()))
 }
