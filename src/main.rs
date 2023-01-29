@@ -162,7 +162,7 @@ async fn main() {
                             .send_message(id.clone(), block_number, Some(radio_message))
                             .await
                         {
-                            Ok(sent) => info!("{}: {}", "Sent message id:".green(), sent),
+                            Ok(sent) => info!("{}: {}", "Sent message id".green(), sent),
                             Err(e) => error!("{}: {}", "Failed to send message".red(), e),
                         };
                     }
