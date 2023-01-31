@@ -88,6 +88,23 @@ async fn main() {
 
     let local_attestations: Arc<Mutex<LocalAttestationsMap>> = Arc::new(Mutex::new(HashMap::new()));
 
+    let my_address =
+        query_registry_indexer(registry_subgraph.to_string(), operator_address(&wallet))
+            .await
+            .ok();
+    let my_stake = if let Some(addr) = my_address.clone() {
+        query_network_subgraph(network_subgraph.to_string(), addr)
+            .await
+            .unwrap()
+            .indexer_stake()
+    } else {
+        BigUint::zero()
+    };
+    info!(
+        "Acting on behave of indexer {:#?} with stake {}",
+        my_address, my_stake
+    );
+
     // Main loop for sending messages, can factor out
     // and take radio specific query and parsing for radioPayload
     loop {
@@ -132,23 +149,6 @@ async fn main() {
                 }
             }
         }
-
-        let my_address =
-            query_registry_indexer(registry_subgraph.to_string(), operator_address(&wallet))
-                .await
-                .ok();
-        let my_stake = if let Some(addr) = my_address.clone() {
-            query_network_subgraph(network_subgraph.to_string(), addr)
-                .await
-                .unwrap()
-                .indexer_stake()
-        } else {
-            BigUint::zero()
-        };
-        info!(
-            "Acting on behave of indexer {:#?} with stake {}",
-            my_address, my_stake
-        );
 
         // Send POI message at a fixed frequency
         if block_number % examination_frequency == 0 {
