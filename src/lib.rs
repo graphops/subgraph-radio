@@ -22,7 +22,7 @@ use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error};
+use tracing::error;
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize)]
 #[eip712(
@@ -65,13 +65,6 @@ pub static GOSSIP_AGENT: OnceCell<GossipAgent> = OnceCell::new();
 pub static MESSAGES: OnceCell<Arc<Mutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>> =
     OnceCell::new();
 
-/// A constant defining the goerli registry subgraph endpoint.
-pub const REGISTRY_SUBGRAPH: &str =
-    "https://api.thegraph.com/subgraphs/name/hopeyen/gossip-registry-test";
-
-/// A constant defining the goerli network subgraph endpoint.
-pub const NETWORK_SUBGRAPH: &str = "https://gateway.testnet.thegraph.com/network";
-
 /// Updates the `blocks` HashMap to include the new attestation.
 pub fn update_blocks(
     block_number: u64,
@@ -92,18 +85,11 @@ pub fn update_blocks(
 /// Generate default topics that is operator address resolved to indexer address
 /// and then its active on-chain allocations
 pub async fn active_allocation_hashes(
-    operator_address: String,
+    network_subgraph: &str,
+    indexer_address: String,
 ) -> Result<Vec<String>, Box<dyn Error>> {
-    let indexer_address =
-        query_registry_indexer(REGISTRY_SUBGRAPH.to_string(), operator_address).await?;
-
-    debug!(
-        "Default topics from indexer address: {:#?}",
-        indexer_address
-    );
-
     Ok(
-        query_network_subgraph(NETWORK_SUBGRAPH.to_string(), indexer_address.clone())
+        query_network_subgraph(network_subgraph.to_string(), indexer_address.clone())
             .await?
             .indexer_allocations(),
     )
@@ -114,6 +100,8 @@ pub async fn active_allocation_hashes(
 /// map and returns it if the processing succeeds.
 pub async fn process_messages(
     messages: Arc<Mutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>,
+    registry_subgraph: &str,
+    network_subgraph: &str,
 ) -> Result<RemoteAttestationsMap, anyhow::Error> {
     let mut remote_attestations: RemoteAttestationsMap = HashMap::new();
     let messages = AsyncMutex::new(messages.lock().unwrap());
@@ -121,7 +109,11 @@ pub async fn process_messages(
     for msg in messages.lock().await.iter() {
         let radio_msg = &msg.payload.clone().unwrap();
         let sender = msg.recover_sender_address()?;
-        let sender_stake = get_indexer_stake(sender.clone(), NETWORK_SUBGRAPH).await?;
+        let sender_stake = get_indexer_stake(
+            query_registry_indexer(registry_subgraph.to_string(), sender.clone()).await?,
+            network_subgraph,
+        )
+        .await?;
 
         // Check if there are existing attestations for the block
         let blocks = remote_attestations
@@ -358,13 +350,18 @@ mod tests {
     async fn test_process_messages() {
         dotenv().ok();
 
-        let hash: String = "QmWECgZdP2YMcV9RtKU41GxcdW8EGYqMNoG98ubu5RGN6U".to_string();
+        const REGISTRY_SUBGRAPH: &str =
+            "https://api.thegraph.com/subgraphs/name/hopeyen/gossip-registry-test";
+        const NETWORK_SUBGRAPH: &str = "https://gateway.testnet.thegraph.com/network";
+
+        let hash: String = "QmaCRFCJX3f1LACgqZFecDphpxrqMyJw1r2DCBHXmQRYY8".to_string();
         let content: String =
             "0xa6008cea5905b8b7811a68132feea7959b623188e2d6ee3c87ead7ae56dd0eae".to_string();
-        let nonce: i64 = 123321;
-        let block_number: i64 = 0;
-        let block_hash: String = "0xblahh".to_string();
-        let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
+        let nonce: i64 = 1675177418;
+        let block_number: i64 = 8409882;
+        let block_hash: String =
+            "0x62123a0b03c6edd2a7db5ef69e10ad091fb1bf1b2235ea64e784abb3aadac7b5".to_string();
+        let sig: String = "cdab6aea7d78126d3f5c0193800f8d305c70505622437484abeede64432d61c554883dd7b1f8a0d6f84b63da97501da207194652f77711949d1a4acfc0ce4d5f1b".to_string();
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
         let msg1 = GraphcastMessage::new(
             hash,
@@ -375,14 +372,15 @@ mod tests {
             sig,
         );
 
-        let hash: String = "QmWECgZdP2YMcV9RtKU41GxcdW8EGYqMNoG98ubu5RGN6U".to_string();
+        let hash: String = "QmaCRFCJX3f1LACgqZFecDphpxrqMyJw1r2DCBHXmQRYY8".to_string();
         let content: String =
             "0xa6008cea5905b8b7811a68132feea7959b623188e2d6ee3c87ead7ae56dd0eae".to_string();
-        let nonce: i64 = 123321;
-        let block_number: i64 = 0;
-        let block_hash: String = "0xblahh".to_string();
+        let nonce: i64 = 1675177457;
+        let block_number: i64 = 8409885;
+        let block_hash: String =
+            "0xfb1925bbdc924f6e756c7802dbb973a4593e94dd7c0fb4b4ec7968a7755198b2".to_string();
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
-        let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
+        let sig: String = "cdab6aea7d78126d3f5c0193800f8d305c70505622437484abeede64432d61c554883dd7b1f8a0d6f84b63da97501da207194652f77711949d1a4acfc0ce4d5f1b".to_string();
         let msg2 = GraphcastMessage::new(
             hash,
             Some(radio_msg),
@@ -392,7 +390,12 @@ mod tests {
             sig,
         );
 
-        let parsed = process_messages(Arc::new(Mutex::new(vec![msg1, msg2]))).await;
+        let parsed = process_messages(
+            Arc::new(Mutex::new(vec![msg1, msg2])),
+            REGISTRY_SUBGRAPH,
+            NETWORK_SUBGRAPH,
+        )
+        .await;
         assert!(parsed.is_ok());
     }
 
