@@ -41,15 +41,15 @@ async fn main() {
     let private_key = env::var("PRIVATE_KEY").expect("No private key provided.");
     let eth_node = env::var("ETH_NODE").expect("No ETH URL provided.");
 
-    // Option for where to host the waku node instance
-    let waku_host = env::var("WAKU_HOST").ok();
-    let waku_port = env::var("WAKU_PORT").ok();
-
     // Subgraph endpoints
     let registry_subgraph =
         env::var("REGISTRY_SUBGRAPH").expect("No registry subgraph endpoint provided.");
     let network_subgraph =
         env::var("NETWORK_SUBGRAPH").expect("No network subgraph endpoint provided.");
+
+    // Option for where to host the waku node instance
+    let waku_host = env::var("WAKU_HOST").ok();
+    let waku_port = env::var("WAKU_PORT").ok();
 
     // Send message every x blocks for which wait y blocks before attestations
     let examination_frequency = 3;
@@ -58,9 +58,17 @@ async fn main() {
     let provider: Provider<Http> = Provider::<Http>::try_from(eth_node.clone()).unwrap();
     let wallet = private_key.parse::<LocalWallet>().unwrap();
     let radio_name: &str = "poi-radio";
-    let topics = active_allocation_hashes(operator_address(&wallet))
-        .await
-        .ok();
+
+    let my_address =
+        query_registry_indexer(registry_subgraph.to_string(), operator_address(&wallet))
+            .await
+            .ok();
+
+    let topics = if let Some(addr) = my_address.clone() {
+        active_allocation_hashes(&network_subgraph, addr).await.ok()
+    } else {
+        None
+    };
 
     let gossip_agent = GossipAgent::new(
         private_key,
@@ -88,10 +96,6 @@ async fn main() {
 
     let local_attestations: Arc<Mutex<LocalAttestationsMap>> = Arc::new(Mutex::new(HashMap::new()));
 
-    let my_address =
-        query_registry_indexer(registry_subgraph.to_string(), operator_address(&wallet))
-            .await
-            .ok();
     let my_stake = if let Some(addr) = my_address.clone() {
         query_network_subgraph(network_subgraph.to_string(), addr)
             .await
@@ -121,7 +125,12 @@ async fn main() {
         if block_number == compare_block {
             debug!("{}", "Comparing attestations".magenta());
 
-            let remote_attestations = process_messages(Arc::clone(MESSAGES.get().unwrap())).await;
+            let remote_attestations = process_messages(
+                Arc::clone(MESSAGES.get().unwrap()),
+                &registry_subgraph,
+                &network_subgraph,
+            )
+            .await;
             match remote_attestations {
                 Ok(remote_attestations) => {
                     let mut messages = MESSAGES.get().unwrap().lock().unwrap();
