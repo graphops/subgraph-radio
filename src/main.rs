@@ -1,4 +1,5 @@
 use colored::*;
+use ethers::signers::LocalWallet;
 use ethers::types::Block;
 use ethers::{
     providers::{Http, Middleware, Provider},
@@ -6,11 +7,14 @@ use ethers::{
 };
 use graphcast_sdk::gossip_agent::GossipAgent;
 use graphcast_sdk::graphql::client_network::query_network_subgraph;
-use graphcast_sdk::init_tracing;
+use graphcast_sdk::graphql::client_registry::query_registry_indexer;
+use graphcast_sdk::{init_tracing, operator_address, read_boot_node_addresses};
+use num_bigint::BigUint;
+use num_traits::Zero;
 use poi_radio::{
-    attestation_handler, compare_attestations, process_messages, save_local_attestation,
-    Attestation, LocalAttestationsMap, RadioPayloadMessage, GOSSIP_AGENT, MESSAGES,
-    NETWORK_SUBGRAPH, REGISTRY_SUBGRAPH,
+    active_allocation_hashes, attestation_handler, compare_attestations, process_messages,
+    save_local_attestation, Attestation, LocalAttestationsMap, RadioPayloadMessage, GOSSIP_AGENT,
+    MESSAGES,
 };
 use std::collections::HashMap;
 use std::env;
@@ -40,20 +44,32 @@ async fn main() {
     // Option for where to host the waku node instance
     let waku_host = env::var("WAKU_HOST").ok();
     let waku_port = env::var("WAKU_PORT").ok();
+
+    // Subgraph endpoints
+    let registry_subgraph =
+        env::var("REGISTRY_SUBGRAPH").expect("No registry subgraph endpoint provided.");
+    let network_subgraph =
+        env::var("NETWORK_SUBGRAPH").expect("No network subgraph endpoint provided.");
+
     // Send message every x blocks for which wait y blocks before attestations
     let examination_frequency = 3;
     let wait_block_duration = 2;
 
     let provider: Provider<Http> = Provider::<Http>::try_from(eth_node.clone()).unwrap();
+    let wallet = private_key.parse::<LocalWallet>().unwrap();
     let radio_name: &str = "poi-radio";
+    let topics = active_allocation_hashes(operator_address(&wallet))
+        .await
+        .ok();
 
     let gossip_agent = GossipAgent::new(
         private_key,
         eth_node,
         radio_name,
-        REGISTRY_SUBGRAPH,
-        NETWORK_SUBGRAPH,
-        None,
+        &registry_subgraph,
+        &network_subgraph,
+        read_boot_node_addresses(),
+        topics,
         waku_host,
         waku_port,
         None,
@@ -117,6 +133,23 @@ async fn main() {
             }
         }
 
+        let my_address =
+            query_registry_indexer(registry_subgraph.to_string(), operator_address(&wallet))
+                .await
+                .ok();
+        let my_stake = if let Some(addr) = my_address.clone() {
+            query_network_subgraph(network_subgraph.to_string(), addr)
+                .await
+                .unwrap()
+                .indexer_stake()
+        } else {
+            BigUint::zero()
+        };
+        info!(
+            "Acting on behave of indexer {:#?} with stake {}",
+            my_address, my_stake
+        );
+
         // Send POI message at a fixed frequency
         if block_number % examination_frequency == 0 {
             compare_block = block_number + wait_block_duration;
@@ -130,14 +163,6 @@ async fn main() {
             // Then the function gets sent to agent for making identifier independent queries
             let poi_query = partial!( query_graph_node_poi => graph_node_endpoint.clone(), _, block_hash.to_string(),block_number.try_into().unwrap());
             let identifiers = GOSSIP_AGENT.get().unwrap().content_identifiers();
-
-            let my_stake = query_network_subgraph(
-                NETWORK_SUBGRAPH.to_string(),
-                GOSSIP_AGENT.get().unwrap().indexer_address.clone(),
-            )
-            .await
-            .unwrap()
-            .indexer_stake();
 
             for id in identifiers {
                 match poi_query(id.clone()).await {
@@ -250,7 +275,8 @@ mod tests {
             radio_name,
             &(mock_server.uri() + "/gossip-registry-test"),
             &(mock_server.uri() + "/network-subgraph"),
-            Some(vec!["some-hash"]),
+            [].to_vec(),
+            Some(vec!["some-hash".to_string()]),
             None,
             None,
             None,
