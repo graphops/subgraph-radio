@@ -26,7 +26,7 @@ use tracing::error;
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize)]
 #[eip712(
-    name = "Graphcast Ping-Pong Radio",
+    name = "Graphcast POI Radio",
     version = "0",
     chain_id = 1,
     verifying_contract = "0xc944e90c64b2c07662a292be6244bdf05cda44a7"
@@ -357,14 +357,14 @@ mod tests {
         let hash: String = "QmaCRFCJX3f1LACgqZFecDphpxrqMyJw1r2DCBHXmQRYY8".to_string();
         let content: String =
             "0xa6008cea5905b8b7811a68132feea7959b623188e2d6ee3c87ead7ae56dd0eae".to_string();
-        let nonce: i64 = 1675177418;
-        let block_number: i64 = 8409882;
+        let nonce: i64 = 1675908856;
+        let block_number: i64 = 8459496;
         let block_hash: String =
-            "0x62123a0b03c6edd2a7db5ef69e10ad091fb1bf1b2235ea64e784abb3aadac7b5".to_string();
-        let sig: String = "cdab6aea7d78126d3f5c0193800f8d305c70505622437484abeede64432d61c554883dd7b1f8a0d6f84b63da97501da207194652f77711949d1a4acfc0ce4d5f1b".to_string();
+            "0x2f3ac7506db33d57a58bf3bcd9b2f6a8b04d8566e50f3a3656eb07e763640882".to_string();
+        let sig: String = "907f863a74da1c5e42e2dab66eeb3f617ff3d8ace160ef48b298f28bdc6b7140156be33709c8a5ceec8346e9e02601359ad2d45a6e38bce75a7af8d5f7b170881b".to_string();
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
         let msg1 = GraphcastMessage::new(
-            hash,
+            hash.clone(),
             Some(radio_msg),
             nonce,
             block_number,
@@ -372,15 +372,22 @@ mod tests {
             sig,
         );
 
-        let hash: String = "QmaCRFCJX3f1LACgqZFecDphpxrqMyJw1r2DCBHXmQRYY8".to_string();
+        let parsed = process_messages(
+            Arc::new(Mutex::new(vec![msg1.clone()])),
+            REGISTRY_SUBGRAPH,
+            NETWORK_SUBGRAPH,
+        )
+        .await;
+        assert!(parsed.is_ok());
+
         let content: String =
             "0xa6008cea5905b8b7811a68132feea7959b623188e2d6ee3c87ead7ae56dd0eae".to_string();
-        let nonce: i64 = 1675177457;
-        let block_number: i64 = 8409885;
+        let nonce: i64 = 1675908903;
+        let block_number: i64 = 8459499;
         let block_hash: String =
-            "0xfb1925bbdc924f6e756c7802dbb973a4593e94dd7c0fb4b4ec7968a7755198b2".to_string();
+            "0xf48f240aa359a5750f5b47e748718b70bb010d234e17ee935d65fd3f1503d3ae".to_string();
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
-        let sig: String = "cdab6aea7d78126d3f5c0193800f8d305c70505622437484abeede64432d61c554883dd7b1f8a0d6f84b63da97501da207194652f77711949d1a4acfc0ce4d5f1b".to_string();
+        let sig: String = "907f863a74da1c5e42e2dab66eeb3f617ff3d8ace160ef48b298f28bdc6b7140156be33709c8a5ceec8346e9e02601359ad2d45a6e38bce75a7af8d5f7b170881b".to_string();
         let msg2 = GraphcastMessage::new(
             hash,
             Some(radio_msg),

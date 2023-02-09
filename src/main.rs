@@ -50,6 +50,7 @@ async fn main() {
     // Option for where to host the waku node instance
     let waku_host = env::var("WAKU_HOST").ok();
     let waku_port = env::var("WAKU_PORT").ok();
+    let waku_node_key = env::var("WAKU_NODE_KEY").ok();
 
     // Send message every x blocks for which wait y blocks before attestations
     let examination_frequency = 3;
@@ -78,6 +79,7 @@ async fn main() {
         &network_subgraph,
         read_boot_node_addresses(),
         topics,
+        waku_node_key,
         waku_host,
         waku_port,
         None,
@@ -286,6 +288,7 @@ mod tests {
             &(mock_server.uri() + "/network-subgraph"),
             [].to_vec(),
             Some(vec!["some-hash".to_string()]),
+            None,
             None,
             None,
             None,
