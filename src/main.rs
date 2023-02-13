@@ -34,7 +34,7 @@ extern crate partial_application;
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    init_tracing();
+    init_tracing().expect("Could not set up global default subscriber");
 
     let graph_node_endpoint =
         env::var("GRAPH_NODE_STATUS_ENDPOINT").expect("No Graph node status endpoint provided.");
@@ -91,7 +91,11 @@ async fn main() {
     _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
 
     let radio_handler = Arc::new(Mutex::new(attestation_handler()));
-    GOSSIP_AGENT.get().unwrap().register_handler(radio_handler);
+    GOSSIP_AGENT
+        .get()
+        .unwrap()
+        .register_handler(radio_handler)
+        .expect("Could not register handler");
 
     let mut curr_block = 0;
     let mut compare_block: u64 = 0;
@@ -300,7 +304,11 @@ mod tests {
         _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
 
         let radio_handler = Arc::new(Mutex::new(attestation_handler()));
-        GOSSIP_AGENT.get().unwrap().register_handler(radio_handler);
+        GOSSIP_AGENT
+            .get()
+            .unwrap()
+            .register_handler(radio_handler)
+            .expect("Could not register handler (Should not get here)");
         let hash = "some-hash".to_string();
         let content = "poi".to_string();
 

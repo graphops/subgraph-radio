@@ -310,7 +310,10 @@ mod tests {
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content);
         let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
         let msg =
-            GraphcastMessage::new(hash, Some(radio_msg), nonce, block_number, block_hash, sig);
+            GraphcastMessage::new(hash, Some(radio_msg), nonce, block_number, block_hash, sig)
+                .expect(
+                    "Shouldn't get here since the message is purposefully constructed for testing",
+                );
 
         assert!(messages.is_empty());
 
@@ -370,7 +373,8 @@ mod tests {
             block_number,
             block_hash.clone(),
             sig,
-        );
+        )
+        .expect("Shouldn't get here since the message is purposefully constructed for testing");
 
         let parsed = process_messages(
             Arc::new(Mutex::new(vec![msg1.clone()])),
@@ -395,7 +399,8 @@ mod tests {
             block_number,
             block_hash.clone(),
             sig,
-        );
+        )
+        .expect("Shouldn't get here since the message is purposefully constructed for testing");
 
         let parsed = process_messages(
             Arc::new(Mutex::new(vec![msg1, msg2])),
@@ -421,7 +426,10 @@ mod tests {
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content);
         let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
         let msg =
-            GraphcastMessage::new(hash, Some(radio_msg), nonce, block_number, block_hash, sig);
+            GraphcastMessage::new(hash, Some(radio_msg), nonce, block_number, block_hash, sig)
+                .expect(
+                    "Shouldn't get here since the message is purposefully constructed for testing",
+                );
 
         messages.push(msg);
         assert!(!messages.is_empty());
@@ -490,7 +498,9 @@ mod tests {
         assert!(updated_attestation.is_err());
         assert_eq!(
             updated_attestation.unwrap_err().to_string(),
-            "There is already an attestation from this address. Skipping...".to_string()
+            "There is already an attestation from this address. Skipping..."
+                .yellow()
+                .to_string()
         );
     }
 
@@ -502,6 +512,7 @@ mod tests {
         assert_eq!(
             res.unwrap_err().to_string(),
             "The comparison did not execute successfully for on block 42. Continuing..."
+                .yellow()
                 .to_string()
         );
     }
@@ -539,7 +550,7 @@ mod tests {
         );
 
         assert!(res.is_err());
-        assert_eq!(res.unwrap_err().to_string(),"No attestations for subgraph different-awesome-hash on block 42 found in remote attestations store. Continuing...".to_string());
+        assert_eq!(res.unwrap_err().to_string(),"No attestations for subgraph different-awesome-hash on block 42 found in remote attestations store. Continuing...".yellow().to_string());
     }
 
     #[test]
@@ -561,7 +572,7 @@ mod tests {
         );
 
         assert!(res.is_err());
-        assert_eq!(res.unwrap_err().to_string(),"No attestation for subgraph my-awesome-hash on block 42 found in local attestations store. Continuing...".to_string());
+        assert_eq!(res.unwrap_err().to_string(),"No attestation for subgraph my-awesome-hash on block 42 found in local attestations store. Continuing...".yellow().to_string());
     }
 
     #[test]
