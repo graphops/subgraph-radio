@@ -34,7 +34,7 @@ extern crate partial_application;
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    init_tracing();
+    init_tracing().expect("Could not set up global default subscriber");
 
     let graph_node_endpoint =
         env::var("GRAPH_NODE_STATUS_ENDPOINT").expect("No Graph node status endpoint provided.");
@@ -50,6 +50,7 @@ async fn main() {
     // Option for where to host the waku node instance
     let waku_host = env::var("WAKU_HOST").ok();
     let waku_port = env::var("WAKU_PORT").ok();
+    let waku_node_key = env::var("WAKU_NODE_KEY").ok();
 
     // Send message every x blocks for which wait y blocks before attestations
     let examination_frequency = 3;
@@ -78,6 +79,7 @@ async fn main() {
         &network_subgraph,
         read_boot_node_addresses(),
         topics,
+        waku_node_key,
         waku_host,
         waku_port,
         None,
@@ -89,7 +91,11 @@ async fn main() {
     _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
 
     let radio_handler = Arc::new(Mutex::new(attestation_handler()));
-    GOSSIP_AGENT.get().unwrap().register_handler(radio_handler);
+    GOSSIP_AGENT
+        .get()
+        .unwrap()
+        .register_handler(radio_handler)
+        .expect("Could not register handler");
 
     let mut curr_block = 0;
     let mut compare_block: u64 = 0;
@@ -289,6 +295,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -297,7 +304,11 @@ mod tests {
         _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
 
         let radio_handler = Arc::new(Mutex::new(attestation_handler()));
-        GOSSIP_AGENT.get().unwrap().register_handler(radio_handler);
+        GOSSIP_AGENT
+            .get()
+            .unwrap()
+            .register_handler(radio_handler)
+            .expect("Could not register handler (Should not get here)");
         let hash = "some-hash".to_string();
         let content = "poi".to_string();
 
