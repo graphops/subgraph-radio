@@ -6,9 +6,9 @@ use std::{
 use tokio::sync::Mutex as AsyncMutex;
 
 use graphcast_sdk::{
-    gossip_agent::{
+    graphcast_agent::{
         message_typing::{get_indexer_stake, GraphcastMessage},
-        GossipAgent,
+        GraphcastAgent,
     },
     graphql::{client_network::query_network_subgraph, client_registry::query_registry_indexer},
 };
@@ -54,9 +54,9 @@ impl RadioPayloadMessage {
 pub type RemoteAttestationsMap = HashMap<String, HashMap<u64, Vec<Attestation>>>;
 pub type LocalAttestationsMap = HashMap<String, HashMap<u64, Attestation>>;
 
-/// A global static (singleton) instance of GossipAgent. It is useful to ensure that we have only one GossipAgent
+/// A global static (singleton) instance of GraphcastAgent. It is useful to ensure that we have only one GraphcastAgent
 /// per Radio instance, so that we can keep track of state and more easily test our Radio application.
-pub static GOSSIP_AGENT: OnceCell<GossipAgent> = OnceCell::new();
+pub static GRAPHCAST_AGENT: OnceCell<GraphcastAgent> = OnceCell::new();
 
 /// A global static (singleton) instance of A GraphcastMessage vector.
 /// It is used to save incoming messages after they've been validated, in order
@@ -354,7 +354,7 @@ mod tests {
         dotenv().ok();
 
         const REGISTRY_SUBGRAPH: &str =
-            "https://api.thegraph.com/subgraphs/name/hopeyen/gossip-registry-test";
+            "https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-goerli";
         const NETWORK_SUBGRAPH: &str = "https://gateway.testnet.thegraph.com/network";
 
         let hash: String = "QmaCRFCJX3f1LACgqZFecDphpxrqMyJw1r2DCBHXmQRYY8".to_string();

@@ -5,16 +5,17 @@ use ethers::{
     providers::{Http, Middleware, Provider},
     types::U64,
 };
-use graphcast_sdk::gossip_agent::GossipAgent;
+/// Radio specific query function to fetch Proof of Indexing for each allocated subgraph
+use graphcast_sdk::graphcast_agent::GraphcastAgent;
 use graphcast_sdk::graphql::client_network::query_network_subgraph;
 use graphcast_sdk::graphql::client_registry::query_registry_indexer;
-use graphcast_sdk::{init_tracing, operator_address, read_boot_node_addresses};
+use graphcast_sdk::{graphcast_id_address, init_tracing, read_boot_node_addresses};
 use num_bigint::BigUint;
 use num_traits::Zero;
 use poi_radio::{
     active_allocation_hashes, attestation_handler, compare_attestations, process_messages,
-    save_local_attestation, Attestation, LocalAttestationsMap, RadioPayloadMessage, GOSSIP_AGENT,
-    MESSAGES,
+    save_local_attestation, Attestation, LocalAttestationsMap, RadioPayloadMessage,
+    GRAPHCAST_AGENT, MESSAGES,
 };
 use std::collections::HashMap;
 use std::env;
@@ -61,7 +62,7 @@ async fn main() {
     let radio_name: &str = "poi-radio";
 
     let my_address =
-        query_registry_indexer(registry_subgraph.to_string(), operator_address(&wallet))
+        query_registry_indexer(registry_subgraph.to_string(), graphcast_id_address(&wallet))
             .await
             .ok();
 
@@ -71,7 +72,7 @@ async fn main() {
         None
     };
 
-    let gossip_agent = GossipAgent::new(
+    let graphcast_agent = GraphcastAgent::new(
         private_key,
         eth_node,
         radio_name,
@@ -87,11 +88,11 @@ async fn main() {
     .await
     .unwrap();
 
-    _ = GOSSIP_AGENT.set(gossip_agent);
+    _ = GRAPHCAST_AGENT.set(graphcast_agent);
     _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
 
     let radio_handler = Arc::new(Mutex::new(attestation_handler()));
-    GOSSIP_AGENT
+    GRAPHCAST_AGENT
         .get()
         .unwrap()
         .register_handler(radio_handler)
@@ -177,7 +178,7 @@ async fn main() {
             // The example here combines a single function provided query endpoint, current block info
             // Then the function gets sent to agent for making identifier independent queries
             let poi_query = partial!( query_graph_node_poi => graph_node_endpoint.clone(), _, block_hash.to_string(),block_number.try_into().unwrap());
-            let identifiers = GOSSIP_AGENT.get().unwrap().content_identifiers();
+            let identifiers = GRAPHCAST_AGENT.get().unwrap().content_identifiers();
 
             for id in identifiers {
                 match poi_query(id.clone()).await {
@@ -196,7 +197,7 @@ async fn main() {
                         );
 
                         let radio_message = RadioPayloadMessage::new(id.clone(), content.clone());
-                        match GOSSIP_AGENT
+                        match GRAPHCAST_AGENT
                             .get()
                             .unwrap()
                             .send_message(id.clone(), block_number, Some(radio_message))
@@ -239,14 +240,12 @@ mod tests {
         let mock_server = MockServer::start().await;
 
         Mock::given(method("POST"))
-            .and(path("/gossip-registry-test"))
+            .and(path("/graphcast-registry"))
             .respond_with(ResponseTemplate::new(200).set_body_string(
                 r#"{
                     "data": {
-                        "graphAccount": {
-                            "gossipOperatorOf": {
-                                "id": "0x54f4cdc1ac7cd3377f43834fbde09a7ffe6fe337"
-                            }
+                        "indexer": {
+                            "graphcastID": "0x54f4cdc1ac7cd3377f43834fbde09a7ffe6fe337"
                         }
                     },
                     "errors": null
@@ -284,11 +283,11 @@ mod tests {
         // TODO: Add something random and unique here to avoid noise form other operators
         let radio_name: &str = "test-poi-crosschecker-radio";
 
-        let gossip_agent = GossipAgent::new(
+        let graphcast_agent = GraphcastAgent::new(
             private_key,
             eth_node,
             radio_name,
-            &(mock_server.uri() + "/gossip-registry-test"),
+            &(mock_server.uri() + "/graphcast-registry"),
             &(mock_server.uri() + "/network-subgraph"),
             [].to_vec(),
             Some(vec!["some-hash".to_string()]),
@@ -300,11 +299,11 @@ mod tests {
         .await
         .unwrap();
 
-        _ = GOSSIP_AGENT.set(gossip_agent);
+        _ = GRAPHCAST_AGENT.set(graphcast_agent);
         _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
 
         let radio_handler = Arc::new(Mutex::new(attestation_handler()));
-        GOSSIP_AGENT
+        GRAPHCAST_AGENT
             .get()
             .unwrap()
             .register_handler(radio_handler)
@@ -314,7 +313,7 @@ mod tests {
 
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
         // Just to introduce sender and skip first time check
-        GOSSIP_AGENT
+        GRAPHCAST_AGENT
             .get()
             .unwrap()
             .send_message("some-hash".to_string(), 0, Some(radio_msg.clone()))
@@ -326,7 +325,7 @@ mod tests {
         let mut block = 1;
 
         loop {
-            GOSSIP_AGENT
+            GRAPHCAST_AGENT
                 .get()
                 .unwrap()
                 .send_message("some-hash".to_string(), block, Some(radio_msg.clone()))
