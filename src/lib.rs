@@ -1,9 +1,21 @@
+use anyhow::anyhow;
+use colored::*;
+use ethers_contract::EthAbiType;
+use ethers_core::types::transaction::eip712::Eip712;
+use ethers_derive_eip712::*;
+use num_bigint::BigUint;
+use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::{
     collections::HashMap,
     error::Error,
     sync::{Arc, Mutex},
 };
 use tokio::sync::Mutex as AsyncMutex;
+use tracing::error;
 
 use graphcast_sdk::{
     graphcast_agent::{
@@ -12,17 +24,6 @@ use graphcast_sdk::{
     },
     graphql::{client_network::query_network_subgraph, client_registry::query_registry_indexer},
 };
-use num_bigint::BigUint;
-use once_cell::sync::OnceCell;
-
-use anyhow::anyhow;
-use colored::*;
-use ethers_contract::EthAbiType;
-use ethers_core::types::transaction::eip712::Eip712;
-use ethers_derive_eip712::*;
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use tracing::error;
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize)]
 #[eip712(
@@ -50,6 +51,115 @@ impl RadioPayloadMessage {
         self.content.clone()
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct Network {
+    pub name: NetworkName,
+    pub interval: u64,
+}
+
+pub struct BlockClock {
+    pub current_block: u64,
+    pub compare_block: u64,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum NetworkName {
+    Goerli,
+    Mainnet,
+    Gnosis,
+    Hardhat,
+    ArbitrumOne,
+    ArbitrumGoerli,
+    Avalanche,
+    Polygon,
+    Celo,
+    Optimism,
+    Unknown,
+}
+
+impl NetworkName {
+    pub fn from_string(name: &str) -> Self {
+        match name {
+            "goerli" => NetworkName::Goerli,
+            "mainnet" => NetworkName::Mainnet,
+            "gnosis" => NetworkName::Gnosis,
+            "hardhat" => NetworkName::Hardhat,
+            "arbitrum-one" => NetworkName::ArbitrumOne,
+            "arbitrum-goerli" => NetworkName::ArbitrumGoerli,
+            "avalanche" => NetworkName::Avalanche,
+            "polygon" => NetworkName::Polygon,
+            "celo" => NetworkName::Celo,
+            "optimism" => NetworkName::Optimism,
+            _ => NetworkName::Unknown,
+        }
+    }
+}
+
+impl fmt::Display for NetworkName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            NetworkName::Goerli => "goerli",
+            NetworkName::Mainnet => "mainnet",
+            NetworkName::Gnosis => "gnosis",
+            NetworkName::Hardhat => "hardhat",
+            NetworkName::ArbitrumOne => "arbitrum-one",
+            NetworkName::ArbitrumGoerli => "arbitrum-goerli",
+            NetworkName::Avalanche => "avalanche",
+            NetworkName::Polygon => "polygon",
+            NetworkName::Celo => "celo",
+            NetworkName::Optimism => "optimism",
+            NetworkName::Unknown => "unknown",
+        };
+
+        write!(f, "{name}")
+    }
+}
+
+pub static NETWORKS: Lazy<Vec<Network>> = Lazy::new(|| {
+    vec![
+        Network {
+            name: NetworkName::from_string("goerli"),
+            interval: 2,
+        },
+        Network {
+            name: NetworkName::from_string("mainnet"),
+            interval: 10,
+        },
+        Network {
+            name: NetworkName::from_string("gnosis"),
+            interval: 5,
+        },
+        Network {
+            name: NetworkName::from_string("hardhat"),
+            interval: 5,
+        },
+        Network {
+            name: NetworkName::from_string("arbitrum-one"),
+            interval: 5,
+        },
+        Network {
+            name: NetworkName::from_string("arbitrum-goerli"),
+            interval: 5,
+        },
+        Network {
+            name: NetworkName::from_string("avalanche"),
+            interval: 5,
+        },
+        Network {
+            name: NetworkName::from_string("polygon"),
+            interval: 5,
+        },
+        Network {
+            name: NetworkName::from_string("celo"),
+            interval: 5,
+        },
+        Network {
+            name: NetworkName::from_string("optimism"),
+            interval: 5,
+        },
+    ]
+});
 
 pub type RemoteAttestationsMap = HashMap<String, HashMap<u64, Vec<Attestation>>>;
 pub type LocalAttestationsMap = HashMap<String, HashMap<u64, Attestation>>;
