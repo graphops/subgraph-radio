@@ -49,6 +49,7 @@ async fn main() {
         env::var("REGISTRY_SUBGRAPH").expect("No registry subgraph endpoint provided.");
     let network_subgraph =
         env::var("NETWORK_SUBGRAPH").expect("No network subgraph endpoint provided.");
+    let graphcast_network = env::var("GRAPHCAST_NETWORK").ok();
 
     // Option for where to host the waku node instance
     let waku_host = env::var("WAKU_HOST").ok();
@@ -93,6 +94,7 @@ async fn main() {
         &registry_subgraph,
         &network_subgraph,
         read_boot_node_addresses(),
+        graphcast_network.as_deref(),
         topics,
         waku_node_key,
         waku_host,
@@ -380,6 +382,7 @@ mod tests {
             &(mock_server.uri() + "/graphcast-registry"),
             &(mock_server.uri() + "/network-subgraph"),
             [].to_vec(),
+            Some("default"),
             Some(vec!["some-hash".to_string()]),
             None,
             None,
