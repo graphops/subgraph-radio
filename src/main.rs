@@ -5,13 +5,16 @@ use ethers::signers::LocalWallet;
 use graphcast_sdk::graphcast_agent::GraphcastAgent;
 use graphcast_sdk::graphql::client_network::query_network_subgraph;
 use graphcast_sdk::graphql::client_registry::query_registry_indexer;
-use graphcast_sdk::{graphcast_id_address, init_tracing, read_boot_node_addresses};
+use graphcast_sdk::{
+    graphcast_id_address, init_tracing, read_boot_node_addresses, BlockPointer, NetworkName,
+    NETWORKS,
+};
 use num_bigint::BigUint;
 use num_traits::Zero;
 use poi_radio::{
     active_allocation_hashes, attestation_handler, compare_attestations, process_messages,
-    save_local_attestation, Attestation, BlockClock, BlockPointer, LocalAttestationsMap,
-    NetworkName, RadioPayloadMessage, GRAPHCAST_AGENT, MESSAGES, NETWORKS,
+    save_local_attestation, Attestation, BlockClock, LocalAttestationsMap, RadioPayloadMessage,
+    GRAPHCAST_AGENT, MESSAGES,
 };
 use std::collections::HashMap;
 use std::env;
@@ -20,9 +23,7 @@ use std::{thread::sleep, time::Duration};
 use tracing::log::warn;
 use tracing::{debug, error, info};
 
-use crate::graphql::{
-    query_graph_node_network_block_hash, query_graph_node_poi, update_network_chainheads,
-};
+use crate::graphql::{query_graph_node_poi, update_network_chainheads};
 
 mod graphql;
 
@@ -37,7 +38,6 @@ async fn main() {
     let graph_node_endpoint =
         env::var("GRAPH_NODE_STATUS_ENDPOINT").expect("No Graph node status endpoint provided.");
     let private_key = env::var("PRIVATE_KEY").expect("No private key provided.");
-    let eth_node = env::var("ETH_NODE").expect("No ETH URL provided.");
 
     // Subgraph endpoints
     let registry_subgraph =
@@ -70,10 +70,10 @@ async fn main() {
 
     let graphcast_agent = GraphcastAgent::new(
         private_key,
-        eth_node,
         radio_name,
         &registry_subgraph,
         &network_subgraph,
+        &graph_node_endpoint,
         read_boot_node_addresses(),
         graphcast_network.as_deref(),
         topics,
@@ -241,13 +241,11 @@ async fn main() {
             );
             if latest_block.number >= message_block {
                 block_clock.compare_block = message_block + wait_block_duration;
-                // block number and hash can actually be queried from graph node, but need a deterministic consensus on block number
-                let block_hash = match query_graph_node_network_block_hash(
-                    graph_node_endpoint.clone(),
-                    network_name.to_string().to_lowercase(),
-                    message_block.try_into().unwrap(),
-                )
-                .await
+                let block_hash = match GRAPHCAST_AGENT
+                    .get()
+                    .unwrap()
+                    .get_block_hash(network_name.to_string(), message_block)
+                    .await
                 {
                     Ok(hash) => hash,
                     Err(e) => {
@@ -256,7 +254,7 @@ async fn main() {
                     }
                 };
 
-                match poi_query(block_hash, message_block.try_into().unwrap()).await {
+                match poi_query(block_hash.clone(), message_block.try_into().unwrap()).await {
                     Ok(content) => {
                         let attestation = Attestation {
                             npoi: content.clone(),
@@ -275,7 +273,12 @@ async fn main() {
                         match GRAPHCAST_AGENT
                             .get()
                             .unwrap()
-                            .send_message(id.clone(), message_block, Some(radio_message))
+                            .send_message(
+                                id.clone(),
+                                network_name,
+                                message_block,
+                                Some(radio_message),
+                            )
                             .await
                         {
                             Ok(sent) => info!("{}: {}", "Sent message id".green(), sent),
@@ -355,18 +358,30 @@ mod tests {
             .mount(&mock_server)
             .await;
 
+        Mock::given(method("POST"))
+            .and(path("/graph-node-status"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"{
+                    "data": {
+                        "block_hash_from_number" : "193bb3a5e78b8726f6138cfae7dd18c83fe32843032999966fd2ca6973f88f3b"
+                    },
+                    "errors": null
+                }"#,
+            ))
+            .mount(&mock_server)
+            .await;
+
         let private_key = env::var("PRIVATE_KEY").expect("No private key provided.");
-        let eth_node = env::var("ETH_NODE").expect("No ETH URL provided.");
 
         // TODO: Add something random and unique here to avoid noise form other operators
         let radio_name: &str = "test-poi-crosschecker-radio";
 
         let graphcast_agent = GraphcastAgent::new(
             private_key,
-            eth_node,
             radio_name,
             &(mock_server.uri() + "/graphcast-registry"),
             &(mock_server.uri() + "/network-subgraph"),
+            &(mock_server.uri() + "/graph-node-status"),
             [].to_vec(),
             Some("default"),
             Some(vec!["some-hash".to_string()]),
@@ -391,23 +406,33 @@ mod tests {
         let content = "poi".to_string();
 
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
+        let network = NetworkName::from_string("goerli");
+        let mut block = 0;
         // Just to introduce sender and skip first time check
         GRAPHCAST_AGENT
             .get()
             .unwrap()
-            .send_message("some-hash".to_string(), 0, Some(radio_msg.clone()))
+            .send_message(
+                "some-hash".to_string(),
+                network,
+                block,
+                Some(radio_msg.clone()),
+            )
             .await
             .unwrap();
 
         sleep(Duration::from_secs(1));
 
-        let mut block = 1;
-
         loop {
             GRAPHCAST_AGENT
                 .get()
                 .unwrap()
-                .send_message("some-hash".to_string(), block, Some(radio_msg.clone()))
+                .send_message(
+                    "some-hash".to_string(),
+                    network,
+                    block,
+                    Some(radio_msg.clone()),
+                )
                 .await
                 .unwrap();
 

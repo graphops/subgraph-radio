@@ -4,11 +4,9 @@ use ethers_contract::EthAbiType;
 use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
 use num_bigint::BigUint;
-use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use std::{
     collections::HashMap,
     error::Error,
@@ -23,6 +21,7 @@ use graphcast_sdk::{
         GraphcastAgent,
     },
     graphql::{client_network::query_network_subgraph, client_registry::query_registry_indexer},
+    BlockPointer,
 };
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize)]
@@ -52,18 +51,6 @@ impl RadioPayloadMessage {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Network {
-    pub name: NetworkName,
-    pub interval: u64,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct BlockPointer {
-    pub hash: String,
-    pub number: u64,
-}
-
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SubgraphStatus {
     pub network: String,
@@ -74,104 +61,6 @@ pub struct BlockClock {
     pub current_block: u64,
     pub compare_block: u64,
 }
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum NetworkName {
-    Goerli,
-    Mainnet,
-    Gnosis,
-    Hardhat,
-    ArbitrumOne,
-    ArbitrumGoerli,
-    Avalanche,
-    Polygon,
-    Celo,
-    Optimism,
-    Unknown,
-}
-
-impl NetworkName {
-    pub fn from_string(name: &str) -> Self {
-        match name {
-            "goerli" => NetworkName::Goerli,
-            "mainnet" => NetworkName::Mainnet,
-            "gnosis" => NetworkName::Gnosis,
-            "hardhat" => NetworkName::Hardhat,
-            "arbitrum-one" => NetworkName::ArbitrumOne,
-            "arbitrum-goerli" => NetworkName::ArbitrumGoerli,
-            "avalanche" => NetworkName::Avalanche,
-            "polygon" => NetworkName::Polygon,
-            "celo" => NetworkName::Celo,
-            "optimism" => NetworkName::Optimism,
-            _ => NetworkName::Unknown,
-        }
-    }
-}
-
-impl fmt::Display for NetworkName {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
-            NetworkName::Goerli => "goerli",
-            NetworkName::Mainnet => "mainnet",
-            NetworkName::Gnosis => "gnosis",
-            NetworkName::Hardhat => "hardhat",
-            NetworkName::ArbitrumOne => "arbitrum-one",
-            NetworkName::ArbitrumGoerli => "arbitrum-goerli",
-            NetworkName::Avalanche => "avalanche",
-            NetworkName::Polygon => "polygon",
-            NetworkName::Celo => "celo",
-            NetworkName::Optimism => "optimism",
-            NetworkName::Unknown => "unknown",
-        };
-
-        write!(f, "{name}")
-    }
-}
-
-pub static NETWORKS: Lazy<Vec<Network>> = Lazy::new(|| {
-    vec![
-        Network {
-            name: NetworkName::from_string("goerli"),
-            interval: 2,
-        },
-        Network {
-            name: NetworkName::from_string("mainnet"),
-            interval: 10,
-        },
-        Network {
-            name: NetworkName::from_string("gnosis"),
-            interval: 5,
-        },
-        Network {
-            name: NetworkName::from_string("hardhat"),
-            interval: 5,
-        },
-        Network {
-            name: NetworkName::from_string("arbitrum-one"),
-            interval: 5,
-        },
-        Network {
-            name: NetworkName::from_string("arbitrum-goerli"),
-            interval: 5,
-        },
-        Network {
-            name: NetworkName::from_string("avalanche"),
-            interval: 5,
-        },
-        Network {
-            name: NetworkName::from_string("polygon"),
-            interval: 5,
-        },
-        Network {
-            name: NetworkName::from_string("celo"),
-            interval: 5,
-        },
-        Network {
-            name: NetworkName::from_string("optimism"),
-            interval: 5,
-        },
-    ]
-});
 
 pub type RemoteAttestationsMap = HashMap<String, HashMap<u64, Vec<Attestation>>>;
 pub type LocalAttestationsMap = HashMap<String, HashMap<u64, Attestation>>;
@@ -413,9 +302,12 @@ pub fn compare_attestations(
 #[cfg(test)]
 mod tests {
     use dotenv::dotenv;
+    use graphcast_sdk::NetworkName;
     use num_traits::One;
 
     use super::*;
+
+    const NETWORK: NetworkName = NetworkName::Goerli;
 
     #[test]
     fn test_basic_global_map() {
@@ -426,16 +318,21 @@ mod tests {
         let content: String =
             "0xa6008cea5905b8b7811a68132feea7959b623188e2d6ee3c87ead7ae56dd0eae".to_string();
         let nonce: i64 = 123321;
-        let block_number: i64 = 0;
+        let block_number: u64 = 0;
         let block_hash: String = "0xblahh".to_string();
 
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content);
         let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
-        let msg =
-            GraphcastMessage::new(hash, Some(radio_msg), nonce, block_number, block_hash, sig)
-                .expect(
-                    "Shouldn't get here since the message is purposefully constructed for testing",
-                );
+        let msg = GraphcastMessage::new(
+            hash,
+            Some(radio_msg),
+            nonce,
+            NETWORK,
+            block_number,
+            block_hash,
+            sig,
+        )
+        .expect("Shouldn't get here since the message is purposefully constructed for testing");
 
         assert!(messages.is_empty());
 
@@ -483,7 +380,7 @@ mod tests {
         let content: String =
             "0xa6008cea5905b8b7811a68132feea7959b623188e2d6ee3c87ead7ae56dd0eae".to_string();
         let nonce: i64 = 1675908856;
-        let block_number: i64 = 8459496;
+        let block_number: u64 = 8459496;
         let block_hash: String =
             "0x2f3ac7506db33d57a58bf3bcd9b2f6a8b04d8566e50f3a3656eb07e763640882".to_string();
         let sig: String = "907f863a74da1c5e42e2dab66eeb3f617ff3d8ace160ef48b298f28bdc6b7140156be33709c8a5ceec8346e9e02601359ad2d45a6e38bce75a7af8d5f7b170881b".to_string();
@@ -492,6 +389,7 @@ mod tests {
             hash.clone(),
             Some(radio_msg),
             nonce,
+            NETWORK,
             block_number,
             block_hash.clone(),
             sig,
@@ -509,7 +407,7 @@ mod tests {
         let content: String =
             "0xa6008cea5905b8b7811a68132feea7959b623188e2d6ee3c87ead7ae56dd0eae".to_string();
         let nonce: i64 = 1675908903;
-        let block_number: i64 = 8459499;
+        let block_number: u64 = 8459499;
         let block_hash: String =
             "0xf48f240aa359a5750f5b47e748718b70bb010d234e17ee935d65fd3f1503d3ae".to_string();
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
@@ -518,6 +416,7 @@ mod tests {
             hash,
             Some(radio_msg),
             nonce,
+            NETWORK,
             block_number,
             block_hash.clone(),
             sig,
@@ -543,15 +442,20 @@ mod tests {
         let content: String =
             "0xa6008cea5905b8b7811a68132feea7959b623188e2d6ee3c87ead7ae56dd0eae".to_string();
         let nonce: i64 = 123321;
-        let block_number: i64 = 0;
+        let block_number: u64 = 0;
         let block_hash: String = "0xblahh".to_string();
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content);
         let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
-        let msg =
-            GraphcastMessage::new(hash, Some(radio_msg), nonce, block_number, block_hash, sig)
-                .expect(
-                    "Shouldn't get here since the message is purposefully constructed for testing",
-                );
+        let msg = GraphcastMessage::new(
+            hash,
+            Some(radio_msg),
+            nonce,
+            NETWORK,
+            block_number,
+            block_hash,
+            sig,
+        )
+        .expect("Shouldn't get here since the message is purposefully constructed for testing");
 
         messages.push(msg);
         assert!(!messages.is_empty());

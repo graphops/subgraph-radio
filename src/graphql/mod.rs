@@ -3,9 +3,10 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::debug;
 
-use poi_radio::{BlockPointer, NetworkName, SubgraphStatus};
+use poi_radio::SubgraphStatus;
 // Maybe later on move graphql to SDK as the queries are pretty standarded
 use graphcast_sdk::graphql::QueryError;
+use graphcast_sdk::{BlockPointer, NetworkName};
 
 /// Derived GraphQL Query to Proof of Indexing
 #[derive(GraphQLQuery, Serialize, Deserialize, Debug)]
@@ -133,7 +134,7 @@ pub async fn update_network_chainheads(
                                     blk
                                 });
 
-                            let _latest_block = chain
+                            chain
                                 .latest_block
                                 .map(|blk| BlockPointer {
                                     hash: blk.hash,
@@ -157,45 +158,4 @@ pub async fn update_network_chainheads(
         .ok_or(QueryError::IndexingError);
     debug!("Updated networks: {:#?}", updated_networks);
     Ok(subgraph_network_blocks)
-}
-
-/// Query graph node for Block hash
-pub async fn perform_block_hash_from_number(
-    graph_node_endpoint: String,
-    variables: block_hash_from_number::Variables,
-) -> Result<reqwest::Response, reqwest::Error> {
-    let request_body = BlockHashFromNumber::build_query(variables);
-    let client = reqwest::Client::new();
-    client
-        .post(graph_node_endpoint)
-        .json(&request_body)
-        .send()
-        .await?
-        .error_for_status()
-}
-
-/// Construct GraphQL variables and parse result for Proof of Indexing.
-/// For other radio use cases, provide a function that returns a string
-pub async fn query_graph_node_network_block_hash(
-    graph_node_endpoint: String,
-    network: String,
-    block_number: i64,
-) -> Result<String, QueryError> {
-    let variables: block_hash_from_number::Variables = block_hash_from_number::Variables {
-        network,
-        block_number,
-    };
-    let queried_result =
-        perform_block_hash_from_number(graph_node_endpoint.clone(), variables).await?;
-    let response_body: Response<block_hash_from_number::ResponseData> =
-        queried_result.json().await?;
-
-    if let Some(data) = response_body.data {
-        match data.block_hash_from_number {
-            Some(hash) => Ok(hash),
-            _ => Err(QueryError::EmptyResponseError),
-        }
-    } else {
-        Err(QueryError::EmptyResponseError)
-    }
 }
