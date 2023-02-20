@@ -69,10 +69,10 @@ pub async fn query_graph_node_poi(
     if let Some(data) = response_body.data {
         match data.proof_of_indexing {
             Some(poi) => Ok(poi),
-            _ => Err(QueryError::EmptyResponseError),
+            _ => Err(QueryError::EmptyResponseError("Graph node POI".to_string())),
         }
     } else {
-        Err(QueryError::EmptyResponseError)
+        Err(QueryError::EmptyResponseError("Graph node POI".to_string()))
     }
 }
 

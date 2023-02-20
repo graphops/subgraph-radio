@@ -1,3 +1,4 @@
+use chrono::Utc;
 use colored::*;
 use dotenv::dotenv;
 use ethers::signers::LocalWallet;
@@ -62,11 +63,8 @@ async fn main() {
             .await
             .ok();
 
-    let topics = if let Some(addr) = my_address.clone() {
-        active_allocation_hashes(&network_subgraph, addr).await.ok()
-    } else {
-        None
-    };
+    let topics_query = partial!(active_allocation_hashes => &network_subgraph, my_address.clone());
+    let topics = topics_query().await;
 
     let graphcast_agent = GraphcastAgent::new(
         private_key,
@@ -115,6 +113,13 @@ async fn main() {
     // Main loop for sending messages, can factor out
     // and take radio specific query and parsing for radioPayload
     loop {
+        // Update topic subscription
+        if Utc::now().timestamp() % 120 == 0 {
+            GRAPHCAST_AGENT
+                .get()
+                .unwrap()
+                .update_content_topics(topics_query().await);
+        }
         // Update all the chainheads of the network
         // Also get a hash map returned on the subgraph mapped to network name and latest block
         let subgraph_network_latest_blocks = match update_network_chainheads(
@@ -384,7 +389,7 @@ mod tests {
             &(mock_server.uri() + "/graph-node-status"),
             [].to_vec(),
             Some("default"),
-            Some(vec!["some-hash".to_string()]),
+            vec!["some-hash".to_string()],
             None,
             None,
             None,

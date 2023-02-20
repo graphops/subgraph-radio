@@ -6,10 +6,10 @@ use ethers_derive_eip712::*;
 use num_bigint::BigUint;
 use once_cell::sync::OnceCell;
 use prost::Message;
+
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    error::Error,
     sync::{Arc, Mutex},
 };
 use tokio::sync::Mutex as AsyncMutex;
@@ -94,16 +94,25 @@ pub fn update_blocks(
 }
 
 /// Generate default topics that is operator address resolved to indexer address
-/// and then its active on-chain allocations
+/// and then its active on-chain allocations -> function signature should just return
+/// A vec of strings for subtopics
 pub async fn active_allocation_hashes(
     network_subgraph: &str,
-    indexer_address: String,
-) -> Result<Vec<String>, Box<dyn Error>> {
-    Ok(
-        query_network_subgraph(network_subgraph.to_string(), indexer_address.clone())
-            .await?
-            .indexer_allocations(),
-    )
+    indexer_address: Option<String>,
+) -> Vec<String> {
+    if let Some(addr) = indexer_address {
+        let allocs = query_network_subgraph(network_subgraph.to_string(), addr)
+            .await
+            .map_err(|e| -> Vec<String> {
+                error!("Topic generation error: {}", e);
+                [].to_vec()
+            })
+            .unwrap()
+            .indexer_allocations();
+        allocs
+    } else {
+        [].to_vec()
+    }
 }
 
 /// This function processes the global messages map that we populate when
