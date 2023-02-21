@@ -1,22 +1,20 @@
 use colored::*;
 use dotenv::dotenv;
 use ethers::signers::LocalWallet;
-use ethers::types::Block;
-use ethers::{
-    providers::{Http, Middleware, Provider},
-    types::U64,
-};
 /// Radio specific query function to fetch Proof of Indexing for each allocated subgraph
 use graphcast_sdk::graphcast_agent::GraphcastAgent;
 use graphcast_sdk::graphql::client_network::query_network_subgraph;
 use graphcast_sdk::graphql::client_registry::query_registry_indexer;
-use graphcast_sdk::{graphcast_id_address, init_tracing, read_boot_node_addresses};
+use graphcast_sdk::{
+    graphcast_id_address, init_tracing, read_boot_node_addresses, BlockPointer, NetworkName,
+    NETWORKS,
+};
 use num_bigint::BigUint;
 use num_traits::Zero;
 use poi_radio::{
     active_allocation_hashes, attestation_handler, compare_attestations, process_messages,
-    save_local_attestation, Attestation, BlockClock, LocalAttestationsMap, NetworkName,
-    RadioPayloadMessage, GRAPHCAST_AGENT, MESSAGES, NETWORKS,
+    save_local_attestation, Attestation, BlockClock, LocalAttestationsMap, RadioPayloadMessage,
+    GRAPHCAST_AGENT, MESSAGES,
 };
 use std::collections::HashMap;
 use std::env;
@@ -25,9 +23,7 @@ use std::{thread::sleep, time::Duration};
 use tracing::log::warn;
 use tracing::{debug, error, info};
 
-use graphql::query_graph_node_poi;
-
-use crate::graphql::{query_graph_node_deployment_network, query_graph_node_network_block_hash};
+use crate::graphql::{query_graph_node_poi, update_network_chainheads};
 
 mod graphql;
 
@@ -42,7 +38,6 @@ async fn main() {
     let graph_node_endpoint =
         env::var("GRAPH_NODE_STATUS_ENDPOINT").expect("No Graph node status endpoint provided.");
     let private_key = env::var("PRIVATE_KEY").expect("No private key provided.");
-    let eth_node = env::var("ETH_NODE").expect("No ETH URL provided.");
 
     // Subgraph endpoints
     let registry_subgraph =
@@ -58,20 +53,6 @@ async fn main() {
 
     // Send message every x blocks for which wait y blocks before attestations
     let wait_block_duration = 2;
-
-    // Initialize providers for indexing networks in the format of PROVIDER_[NETWORK_NAME]
-    let provider_endpoints: HashMap<NetworkName, Option<Provider<Http>>> = NETWORKS
-        .iter()
-        .map(|n| {
-            let network_name = n.name;
-            (
-                network_name,
-                env::var("PROVIDER_".to_string() + &network_name.to_string().to_uppercase())
-                    .ok()
-                    .and_then(|endpoint| Provider::<Http>::try_from(endpoint).ok()),
-            )
-        })
-        .collect();
 
     let wallet = private_key.parse::<LocalWallet>().unwrap();
     let radio_name: &str = "poi-radio";
@@ -89,10 +70,10 @@ async fn main() {
 
     let graphcast_agent = GraphcastAgent::new(
         private_key,
-        eth_node,
         radio_name,
         &registry_subgraph,
         &network_subgraph,
+        &graph_node_endpoint,
         read_boot_node_addresses(),
         graphcast_network.as_deref(),
         topics,
@@ -115,7 +96,7 @@ async fn main() {
         .expect("Could not register handler");
 
     let mut block_store: HashMap<NetworkName, BlockClock> = HashMap::new();
-
+    let mut network_chainhead_blocks: HashMap<NetworkName, BlockPointer> = HashMap::new();
     let local_attestations: Arc<Mutex<LocalAttestationsMap>> = Arc::new(Mutex::new(HashMap::new()));
 
     let my_stake = if let Some(addr) = my_address.clone() {
@@ -134,6 +115,26 @@ async fn main() {
     // Main loop for sending messages, can factor out
     // and take radio specific query and parsing for radioPayload
     loop {
+        // Update all the chainheads of the network
+        // Also get a hash map returned on the subgraph mapped to network name and latest block
+        let subgraph_network_latest_blocks = match update_network_chainheads(
+            graph_node_endpoint.clone(),
+            &mut network_chainhead_blocks,
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                error!("Could not query indexing statuses, pull again later: {e}");
+                continue;
+            }
+        };
+        debug!(
+            "Subgraph network and latest blocks: {:#?}\nNetwork chainhead: {:#?}",
+            subgraph_network_latest_blocks, network_chainhead_blocks
+        );
+        //TODO: check that if no networks had an new message update blocks, sleep for a few seconds and 'continue'
+
         // Radio specific message content query function
         // Function takes in an identifier string and make specific queries regarding the identifier
         // The example here combines a single function provided query endpoint, current block info based on the subgraph's indexing network
@@ -141,44 +142,39 @@ async fn main() {
         let identifiers = GRAPHCAST_AGENT.get().unwrap().content_identifiers();
         for id in identifiers {
             // Get the indexing network of the deployment
-            let network_name = match query_graph_node_deployment_network(
-                graph_node_endpoint.clone(),
-                id.clone(),
-            )
-            .await
+            // and update the NETWORK message block
+            let (network_name, latest_block) = match subgraph_network_latest_blocks.get(&id.clone())
             {
-                Ok(network) => NetworkName::from_string(&network),
-                Err(e) => {
-                    warn!("Could not query for the subgraph's indexing network, check Graph node's indexing statuses of the deployment {}: {}", id.clone(), e);
-                    sleep(Duration::from_secs(1));
+                Some(network_block) => (
+                    NetworkName::from_string(&network_block.network.clone()),
+                    network_block.block.clone(),
+                ),
+                None => {
+                    error!("Could not query the subgraph's indexing network, check Graph node's indexing statuses of subgraph deployment {}", id.clone());
                     continue;
                 }
             };
 
-            let provider_name = format!("PROVIDER_{}", network_name.to_string().to_uppercase());
-            let indexing_network_provider = if let Some(provider) =
-                provider_endpoints.get(&network_name)
+            // Get the examination frequency of the network
+            let examination_frequency = match NETWORKS
+                .iter()
+                .find(|n| n.name.to_string() == network_name.to_string())
             {
-                provider.as_ref().unwrap()
-            } else {
-                error!(
-                    "Missing a block provider for the indexing network {}, please provide one named `{}`",
-                    network_name,
-                    provider_name
-                );
-                sleep(Duration::from_secs(1));
-                continue;
+                Some(n) => n.interval,
+                None => {
+                    warn!("Subgraph is indexing an unsupported network, please report an issue on https://github.com/graphops/graphcast-rs");
+                    continue;
+                }
             };
 
-            let block_number = match indexing_network_provider.get_block_number().await {
-                Ok(n) => U64::as_u64(&n),
-                Err(err) => {
+            // Calculate the block to send message about
+            let message_block = match network_chainhead_blocks.get(&network_name) {
+                Some(BlockPointer { hash: _, number }) => number - number % examination_frequency,
+                None => {
                     error!(
-                        "Could not get block number on network {}, more info: {}",
+                        "Could not get the chainhead block number on network {} and cannot determine the block to send message about",
                         network_name.to_string(),
-                        err
                     );
-                    sleep(Duration::from_secs(1));
                     continue;
                 }
             };
@@ -190,15 +186,16 @@ async fn main() {
                     compare_block: 0,
                 });
 
-            if block_clock.current_block == block_number {
+            // Wait a bit before querying information on the current block
+            if block_clock.current_block == message_block {
                 sleep(Duration::from_secs(5));
                 continue;
             }
 
-            debug!("{} {}", "🔗 Block number:".cyan(), block_number);
-            block_clock.current_block = block_number;
+            debug!("{} {}", "🔗 Block number:".cyan(), message_block);
+            block_clock.current_block = latest_block.number;
 
-            if block_number == block_clock.compare_block {
+            if latest_block.number == block_clock.compare_block {
                 debug!("{}", "Comparing attestations".magenta());
 
                 let remote_attestations = process_messages(
@@ -238,42 +235,26 @@ async fn main() {
             let poi_query =
                 partial!( query_graph_node_poi => graph_node_endpoint.clone(), id.clone(), _, _);
 
-            // Look for the matching network name and extract the interval
-            let examination_frequency = match NETWORKS
-                .iter()
-                .find(|n| n.name.to_string() == network_name.to_string())
-            {
-                Some(n) => n.interval,
-                None => {
-                    warn!("Subgraph is indexing an unsupported network, please report an issue on https://github.com/graphops/graphcast-rs");
-                    sleep(Duration::from_secs(1));
-                    continue;
-                }
-            };
-
-            if block_number % examination_frequency == 0 {
-                block_clock.compare_block = block_number + wait_block_duration;
-                // block number and hash can actually be queried from graph node, but need a deterministic consensus on block number
-                let block_hash = match query_graph_node_network_block_hash(
-                    graph_node_endpoint.clone(),
-                    network_name.to_string().to_lowercase(),
-                    block_number.try_into().unwrap(),
-                )
-                .await
+            debug!(
+                "Checking latest block number and the message block: {0} >?= {message_block}",
+                latest_block.number
+            );
+            if latest_block.number >= message_block {
+                block_clock.compare_block = message_block + wait_block_duration;
+                let block_hash = match GRAPHCAST_AGENT
+                    .get()
+                    .unwrap()
+                    .get_block_hash(network_name.to_string(), message_block)
+                    .await
                 {
                     Ok(hash) => hash,
                     Err(e) => {
-                        warn!("Failed to query graph node for the block hash: {e}");
-                        let block: Block<_> = indexing_network_provider
-                            .get_block(block_number)
-                            .await
-                            .unwrap()
-                            .unwrap();
-                        format!("{:#x}", block.hash.unwrap())
+                        error!("Failed to query graph node for the block hash: {e}");
+                        continue;
                     }
                 };
 
-                match poi_query(block_hash, block_number.try_into().unwrap()).await {
+                match poi_query(block_hash.clone(), message_block.try_into().unwrap()).await {
                     Ok(content) => {
                         let attestation = Attestation {
                             npoi: content.clone(),
@@ -285,14 +266,19 @@ async fn main() {
                             &mut local_attestations.lock().unwrap(),
                             attestation,
                             id.clone(),
-                            block_number,
+                            message_block,
                         );
 
                         let radio_message = RadioPayloadMessage::new(id.clone(), content.clone());
                         match GRAPHCAST_AGENT
                             .get()
                             .unwrap()
-                            .send_message(id.clone(), block_number, Some(radio_message))
+                            .send_message(
+                                id.clone(),
+                                network_name,
+                                message_block,
+                                Some(radio_message),
+                            )
                             .await
                         {
                             Ok(sent) => info!("{}: {}", "Sent message id".green(), sent),
@@ -303,6 +289,9 @@ async fn main() {
                 }
             }
         }
+
+        sleep(Duration::from_secs(5));
+        continue;
     }
 }
 
@@ -369,18 +358,30 @@ mod tests {
             .mount(&mock_server)
             .await;
 
+        Mock::given(method("POST"))
+            .and(path("/graph-node-status"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"{
+                    "data": {
+                        "block_hash_from_number" : "193bb3a5e78b8726f6138cfae7dd18c83fe32843032999966fd2ca6973f88f3b"
+                    },
+                    "errors": null
+                }"#,
+            ))
+            .mount(&mock_server)
+            .await;
+
         let private_key = env::var("PRIVATE_KEY").expect("No private key provided.");
-        let eth_node = env::var("ETH_NODE").expect("No ETH URL provided.");
 
         // TODO: Add something random and unique here to avoid noise form other operators
         let radio_name: &str = "test-poi-crosschecker-radio";
 
         let graphcast_agent = GraphcastAgent::new(
             private_key,
-            eth_node,
             radio_name,
             &(mock_server.uri() + "/graphcast-registry"),
             &(mock_server.uri() + "/network-subgraph"),
+            &(mock_server.uri() + "/graph-node-status"),
             [].to_vec(),
             Some("default"),
             Some(vec!["some-hash".to_string()]),
@@ -405,23 +406,33 @@ mod tests {
         let content = "poi".to_string();
 
         let radio_msg = RadioPayloadMessage::new(hash.clone(), content.clone());
+        let network = NetworkName::from_string("goerli");
+        let mut block = 0;
         // Just to introduce sender and skip first time check
         GRAPHCAST_AGENT
             .get()
             .unwrap()
-            .send_message("some-hash".to_string(), 0, Some(radio_msg.clone()))
+            .send_message(
+                "some-hash".to_string(),
+                network,
+                block,
+                Some(radio_msg.clone()),
+            )
             .await
             .unwrap();
 
         sleep(Duration::from_secs(1));
 
-        let mut block = 1;
-
         loop {
             GRAPHCAST_AGENT
                 .get()
                 .unwrap()
-                .send_message("some-hash".to_string(), block, Some(radio_msg.clone()))
+                .send_message(
+                    "some-hash".to_string(),
+                    network,
+                    block,
+                    Some(radio_msg.clone()),
+                )
                 .await
                 .unwrap();
 
