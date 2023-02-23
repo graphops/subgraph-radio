@@ -69,10 +69,14 @@ pub async fn query_graph_node_poi(
     if let Some(data) = response_body.data {
         match data.proof_of_indexing {
             Some(poi) => Ok(poi),
-            _ => Err(QueryError::EmptyResponseError),
+            _ => Err(QueryError::EmptyResponseError(
+                "No POI returned".to_string(),
+            )),
         }
     } else {
-        Err(QueryError::EmptyResponseError)
+        Err(QueryError::EmptyResponseError(
+            "No POI response from Graph Node".to_string(),
+        ))
     }
 }
 

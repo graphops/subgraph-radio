@@ -6,14 +6,14 @@ use ethers_derive_eip712::*;
 use num_bigint::BigUint;
 use once_cell::sync::OnceCell;
 use prost::Message;
+
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    error::Error,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex as SyncMutex},
 };
 use tokio::sync::Mutex as AsyncMutex;
-use tracing::error;
+use tracing::{debug, error};
 
 use graphcast_sdk::{
     graphcast_agent::{
@@ -73,7 +73,7 @@ pub static GRAPHCAST_AGENT: OnceCell<GraphcastAgent> = OnceCell::new();
 /// It is used to save incoming messages after they've been validated, in order
 /// defer their processing for later, because async code is required for the processing but
 /// it is not allowed in the handler itself.
-pub static MESSAGES: OnceCell<Arc<Mutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>> =
+pub static MESSAGES: OnceCell<Arc<SyncMutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>> =
     OnceCell::new();
 
 /// Updates the `blocks` HashMap to include the new attestation.
@@ -94,28 +94,37 @@ pub fn update_blocks(
 }
 
 /// Generate default topics that is operator address resolved to indexer address
-/// and then its active on-chain allocations
+/// and then its active on-chain allocations -> function signature should just return
+/// A vec of strings for subtopics
 pub async fn active_allocation_hashes(
     network_subgraph: &str,
-    indexer_address: String,
-) -> Result<Vec<String>, Box<dyn Error>> {
-    Ok(
-        query_network_subgraph(network_subgraph.to_string(), indexer_address.clone())
-            .await?
-            .indexer_allocations(),
-    )
+    indexer_address: Option<String>,
+) -> Vec<String> {
+    if let Some(addr) = indexer_address {
+        let allocs = query_network_subgraph(network_subgraph.to_string(), addr)
+            .await
+            .map_err(|e| -> Vec<String> {
+                error!("Topic generation error: {}", e);
+                [].to_vec()
+            })
+            .unwrap()
+            .indexer_allocations();
+        allocs
+    } else {
+        [].to_vec()
+    }
 }
 
 /// This function processes the global messages map that we populate when
 /// messages are being received. It constructs the remote attestations
 /// map and returns it if the processing succeeds.
 pub async fn process_messages(
-    messages: Arc<Mutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>,
+    messages: Arc<AsyncMutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>,
     registry_subgraph: &str,
     network_subgraph: &str,
 ) -> Result<RemoteAttestationsMap, anyhow::Error> {
     let mut remote_attestations: RemoteAttestationsMap = HashMap::new();
-    let messages = AsyncMutex::new(messages.lock().unwrap());
+    let messages = AsyncMutex::new(messages.lock().await);
 
     for msg in messages.lock().await.iter() {
         let radio_msg = &msg.payload.clone().unwrap();
@@ -223,6 +232,7 @@ pub fn attestation_handler() -> impl Fn(Result<GraphcastMessage<RadioPayloadMess
 {
     |msg: Result<GraphcastMessage<RadioPayloadMessage>, anyhow::Error>| match msg {
         Ok(msg) => {
+            debug!("Received message: {:?}", msg);
             MESSAGES.get().unwrap().lock().unwrap().push(msg);
         }
         Err(err) => {
@@ -236,12 +246,12 @@ pub fn attestation_handler() -> impl Fn(Result<GraphcastMessage<RadioPayloadMess
 /// The top remote attestation is found by grouping attestations together and increasing their total stake-weight every time we see a new message
 /// with the same NPOI from an Indexer (NOTE: one Indexer can only send 1 attestation per subgraph per block). The attestations are then sorted
 /// and we take the one with the highest total stake-weight.
-pub fn compare_attestations(
+pub async fn compare_attestations(
     attestation_block: u64,
     remote: RemoteAttestationsMap,
-    local: Arc<Mutex<LocalAttestationsMap>>,
+    local: Arc<AsyncMutex<LocalAttestationsMap>>,
 ) -> Result<String, anyhow::Error> {
-    let local = local.lock().unwrap();
+    let local = local.lock().await;
 
     // Iterate & compare
     if let Some((ipfs_hash, blocks)) = local.iter().next() {
@@ -311,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_basic_global_map() {
-        _ = MESSAGES.set(Arc::new(Mutex::new(Vec::new())));
+        _ = MESSAGES.set(Arc::new(SyncMutex::new(Vec::new())));
         let mut messages = MESSAGES.get().unwrap().lock().unwrap();
 
         let hash: String = "QmWECgZdP2YMcV9RtKU41GxcdW8EGYqMNoG98ubu5RGN6U".to_string();
@@ -397,7 +407,7 @@ mod tests {
         .expect("Shouldn't get here since the message is purposefully constructed for testing");
 
         let parsed = process_messages(
-            Arc::new(Mutex::new(vec![msg1.clone()])),
+            Arc::new(AsyncMutex::new(vec![msg1.clone()])),
             REGISTRY_SUBGRAPH,
             NETWORK_SUBGRAPH,
         )
@@ -424,7 +434,7 @@ mod tests {
         .expect("Shouldn't get here since the message is purposefully constructed for testing");
 
         let parsed = process_messages(
-            Arc::new(Mutex::new(vec![msg1, msg2])),
+            Arc::new(AsyncMutex::new(vec![msg1, msg2])),
             REGISTRY_SUBGRAPH,
             NETWORK_SUBGRAPH,
         )
@@ -434,7 +444,7 @@ mod tests {
 
     #[test]
     fn test_delete_messages() {
-        _ = MESSAGES.set(Arc::new(Mutex::new(Vec::new())));
+        _ = MESSAGES.set(Arc::new(SyncMutex::new(Vec::new())));
 
         let mut messages = MESSAGES.get().unwrap().lock().unwrap();
 
@@ -530,9 +540,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_compare_attestations_generic_fail() {
-        let res = compare_attestations(42, HashMap::new(), Arc::new(Mutex::new(HashMap::new())));
+    #[tokio::test]
+    async fn test_compare_attestations_generic_fail() {
+        let res = compare_attestations(
+            42,
+            HashMap::new(),
+            Arc::new(AsyncMutex::new(HashMap::new())),
+        )
+        .await;
 
         assert!(res.is_err());
         assert_eq!(
@@ -543,8 +558,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_compare_attestations_remote_not_found_fail() {
+    #[tokio::test]
+    async fn test_compare_attestations_remote_not_found_fail() {
         let mut remote_blocks: HashMap<u64, Vec<Attestation>> = HashMap::new();
         let mut local_blocks: HashMap<u64, Attestation> = HashMap::new();
 
@@ -572,15 +587,16 @@ mod tests {
         let res = compare_attestations(
             42,
             remote_attestations,
-            Arc::new(Mutex::new(local_attestations)),
-        );
+            Arc::new(AsyncMutex::new(local_attestations)),
+        )
+        .await;
 
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(),"No attestations for subgraph different-awesome-hash on block 42 found in remote attestations store. Continuing...".yellow().to_string());
     }
 
-    #[test]
-    fn test_compare_attestations_local_not_found_fail() {
+    #[tokio::test]
+    async fn test_compare_attestations_local_not_found_fail() {
         let remote_blocks: HashMap<u64, Vec<Attestation>> = HashMap::new();
         let local_blocks: HashMap<u64, Attestation> = HashMap::new();
 
@@ -594,15 +610,16 @@ mod tests {
         let res = compare_attestations(
             42,
             remote_attestations,
-            Arc::new(Mutex::new(local_attestations)),
-        );
+            Arc::new(AsyncMutex::new(local_attestations)),
+        )
+        .await;
 
         assert!(res.is_err());
         assert_eq!(res.unwrap_err().to_string(),"No attestation for subgraph my-awesome-hash on block 42 found in local attestations store. Continuing...".yellow().to_string());
     }
 
-    #[test]
-    fn test_compare_attestations_success() {
+    #[tokio::test]
+    async fn test_compare_attestations_success() {
         let mut remote_blocks: HashMap<u64, Vec<Attestation>> = HashMap::new();
         let mut local_blocks: HashMap<u64, Attestation> = HashMap::new();
 
@@ -630,8 +647,9 @@ mod tests {
         let res = compare_attestations(
             42,
             remote_attestations,
-            Arc::new(Mutex::new(local_attestations)),
-        );
+            Arc::new(AsyncMutex::new(local_attestations)),
+        )
+        .await;
 
         assert!(res.is_ok());
         assert_eq!(

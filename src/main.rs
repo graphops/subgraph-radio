@@ -1,3 +1,4 @@
+use chrono::Utc;
 use colored::*;
 use dotenv::dotenv;
 use ethers::signers::LocalWallet;
@@ -18,8 +19,9 @@ use poi_radio::{
 };
 use std::collections::HashMap;
 use std::env;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex as SyncMutex};
 use std::{thread::sleep, time::Duration};
+use tokio::sync::Mutex as AsyncMutex;
 use tracing::log::warn;
 use tracing::{debug, error, info};
 
@@ -62,11 +64,8 @@ async fn main() {
             .await
             .ok();
 
-    let topics = if let Some(addr) = my_address.clone() {
-        active_allocation_hashes(&network_subgraph, addr).await.ok()
-    } else {
-        None
-    };
+    let topics_query = partial!(active_allocation_hashes => &network_subgraph, my_address.clone());
+    let topics = topics_query().await;
 
     let graphcast_agent = GraphcastAgent::new(
         private_key,
@@ -86,18 +85,18 @@ async fn main() {
     .unwrap();
 
     _ = GRAPHCAST_AGENT.set(graphcast_agent);
-    _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
+    _ = MESSAGES.set(Arc::new(SyncMutex::new(vec![])));
 
-    let radio_handler = Arc::new(Mutex::new(attestation_handler()));
     GRAPHCAST_AGENT
         .get()
         .unwrap()
-        .register_handler(radio_handler)
+        .register_handler(Arc::new(AsyncMutex::new(attestation_handler())))
         .expect("Could not register handler");
 
     let mut block_store: HashMap<NetworkName, BlockClock> = HashMap::new();
     let mut network_chainhead_blocks: HashMap<NetworkName, BlockPointer> = HashMap::new();
-    let local_attestations: Arc<Mutex<LocalAttestationsMap>> = Arc::new(Mutex::new(HashMap::new()));
+    let local_attestations: Arc<AsyncMutex<LocalAttestationsMap>> =
+        Arc::new(AsyncMutex::new(HashMap::new()));
 
     let my_stake = if let Some(addr) = my_address.clone() {
         query_network_subgraph(network_subgraph.to_string(), addr)
@@ -115,6 +114,14 @@ async fn main() {
     // Main loop for sending messages, can factor out
     // and take radio specific query and parsing for radioPayload
     loop {
+        // Update topic subscription
+        if Utc::now().timestamp() % 120 == 0 {
+            GRAPHCAST_AGENT
+                .get()
+                .unwrap()
+                .update_content_topics(topics_query().await)
+                .await;
+        }
         // Update all the chainheads of the network
         // Also get a hash map returned on the subgraph mapped to network name and latest block
         let subgraph_network_latest_blocks = match update_network_chainheads(
@@ -139,7 +146,7 @@ async fn main() {
         // Function takes in an identifier string and make specific queries regarding the identifier
         // The example here combines a single function provided query endpoint, current block info based on the subgraph's indexing network
         // Then the function gets sent to agent for making identifier independent queries
-        let identifiers = GRAPHCAST_AGENT.get().unwrap().content_identifiers();
+        let identifiers = GRAPHCAST_AGENT.get().unwrap().content_identifiers().await;
         for id in identifiers {
             // Get the indexing network of the deployment
             // and update the NETWORK message block
@@ -192,33 +199,51 @@ async fn main() {
                 continue;
             }
 
-            debug!("{} {}", "🔗 Block number:".cyan(), message_block);
+            debug!(
+                "{} {} {} {} {} {} {} {}",
+                "🔗 Message block: ".cyan(),
+                message_block,
+                "🔗 Current block from block clock: ".cyan(),
+                block_clock.current_block,
+                "🔗 Latest block: ".cyan(),
+                latest_block.number,
+                "🔗 Compare block: ".cyan(),
+                block_clock.compare_block
+            );
+
             block_clock.current_block = latest_block.number;
 
-            if latest_block.number == block_clock.compare_block {
+            if block_clock.compare_block != 0 && latest_block.number >= block_clock.compare_block {
                 debug!("{}", "Comparing attestations".magenta());
 
+                debug!("{}{:?}", "Messages: ".magenta(), MESSAGES);
+
+                let msgs = MESSAGES.get().unwrap().lock().unwrap().to_vec();
+
                 let remote_attestations = process_messages(
-                    Arc::clone(MESSAGES.get().unwrap()),
+                    //Arc<AsyncMutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>
+                    Arc::new(AsyncMutex::new(msgs)),
                     &registry_subgraph,
                     &network_subgraph,
                 )
                 .await;
                 match remote_attestations {
                     Ok(remote_attestations) => {
-                        let mut messages = MESSAGES.get().unwrap().lock().unwrap();
+                        // let mut messages = ;
                         match compare_attestations(
                             block_clock.compare_block - wait_block_duration,
                             remote_attestations,
                             Arc::clone(&local_attestations),
-                        ) {
+                        )
+                        .await
+                        {
                             Ok(msg) => {
                                 debug!("{}", msg.green().bold());
-                                messages.clear();
+                                MESSAGES.get().unwrap().lock().unwrap().clear();
                             }
                             Err(err) => {
                                 error!("{}", err);
-                                messages.clear();
+                                MESSAGES.get().unwrap().lock().unwrap().clear();
                             }
                         }
                     }
@@ -263,7 +288,7 @@ async fn main() {
                         };
 
                         save_local_attestation(
-                            &mut local_attestations.lock().unwrap(),
+                            &mut *local_attestations.lock().await,
                             attestation,
                             id.clone(),
                             message_block,
@@ -301,6 +326,8 @@ mod tests {
     use hex::encode;
     use rand::{thread_rng, Rng};
     use secp256k1::SecretKey;
+    use std::sync::{Arc, Mutex as SyncMutex};
+    use tokio::sync::Mutex as AsyncMutex;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -384,7 +411,7 @@ mod tests {
             &(mock_server.uri() + "/graph-node-status"),
             [].to_vec(),
             Some("default"),
-            Some(vec!["some-hash".to_string()]),
+            vec!["some-hash".to_string()],
             None,
             None,
             None,
@@ -394,13 +421,12 @@ mod tests {
         .unwrap();
 
         _ = GRAPHCAST_AGENT.set(graphcast_agent);
-        _ = MESSAGES.set(Arc::new(Mutex::new(vec![])));
+        _ = MESSAGES.set(Arc::new(SyncMutex::new(vec![])));
 
-        let radio_handler = Arc::new(Mutex::new(attestation_handler()));
         GRAPHCAST_AGENT
             .get()
             .unwrap()
-            .register_handler(radio_handler)
+            .register_handler(Arc::new(AsyncMutex::new(attestation_handler())))
             .expect("Could not register handler (Should not get here)");
         let hash = "some-hash".to_string();
         let content = "poi".to_string();
