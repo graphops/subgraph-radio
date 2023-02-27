@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex as SyncMutex};
 use std::{thread::sleep, time::Duration};
 use tokio::sync::Mutex as AsyncMutex;
 use tracing::log::warn;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
 use crate::graphql::{query_graph_node_poi, update_network_chainheads};
 
@@ -48,13 +48,17 @@ async fn main() {
         env::var("NETWORK_SUBGRAPH").expect("No network subgraph endpoint provided.");
     let graphcast_network = env::var("GRAPHCAST_NETWORK").ok();
 
+    // Configure the amount of blocks spent collecting messages before attesting
+    //TODO: This should be more customized to network specific durations, or update comparison trigger by time
+    let collect_message_blocks: u64 = env::var("COLLECT_MESSAGE_BLOCKS")
+        .unwrap_or("10".to_string())
+        .parse::<u64>()
+        .unwrap_or(10);
+
     // Option for where to host the waku node instance
     let waku_host = env::var("WAKU_HOST").ok();
     let waku_port = env::var("WAKU_PORT").ok();
     let waku_node_key = env::var("WAKU_NODE_KEY").ok();
-
-    // Send message every x blocks for which wait y blocks before attestations
-    let wait_block_duration = 2;
 
     let wallet = private_key.parse::<LocalWallet>().unwrap();
     let radio_name: &str = "poi-radio";
@@ -136,9 +140,10 @@ async fn main() {
                 continue;
             }
         };
-        debug!(
+        trace!(
             "Subgraph network and latest blocks: {:#?}\nNetwork chainhead: {:#?}",
-            subgraph_network_latest_blocks, network_chainhead_blocks
+            subgraph_network_latest_blocks,
+            network_chainhead_blocks
         );
         //TODO: check that if no networks had an new message update blocks, sleep for a few seconds and 'continue'
 
@@ -190,7 +195,7 @@ async fn main() {
                 .entry(network_name)
                 .or_insert_with(|| BlockClock {
                     current_block: 0,
-                    compare_block: 0,
+                    compare_block: u64::MAX,
                 });
 
             // Wait a bit before querying information on the current block
@@ -213,7 +218,7 @@ async fn main() {
 
             block_clock.current_block = latest_block.number;
 
-            if block_clock.compare_block != 0 && latest_block.number >= block_clock.compare_block {
+            if latest_block.number >= block_clock.compare_block {
                 debug!("{}", "Comparing attestations".magenta());
 
                 debug!("{}{:?}", "Messages: ".magenta(), MESSAGES);
@@ -231,7 +236,7 @@ async fn main() {
                     Ok(remote_attestations) => {
                         // let mut messages = ;
                         match compare_attestations(
-                            block_clock.compare_block - wait_block_duration,
+                            block_clock.compare_block - collect_message_blocks,
                             remote_attestations,
                             Arc::clone(&local_attestations),
                         )
@@ -265,7 +270,7 @@ async fn main() {
                 latest_block.number
             );
             if latest_block.number >= message_block {
-                block_clock.compare_block = message_block + wait_block_duration;
+                block_clock.compare_block = message_block + collect_message_blocks;
                 let block_hash = match GRAPHCAST_AGENT
                     .get()
                     .unwrap()
