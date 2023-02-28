@@ -13,11 +13,12 @@ use std::{
     sync::{Arc, Mutex as SyncMutex},
 };
 use tokio::sync::Mutex as AsyncMutex;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use graphcast_sdk::{
     graphcast_agent::{
         message_typing::{get_indexer_stake, GraphcastMessage},
+        waku_handling::WakuHandlingError,
         GraphcastAgent,
     },
     graphql::{client_network::query_network_subgraph, client_registry::query_registry_indexer},
@@ -113,6 +114,26 @@ pub async fn active_allocation_hashes(
     } else {
         [].to_vec()
     }
+}
+
+/// The function filters for the first message of a particular identifier by block number
+/// get the timestamp it was received from and add the collection duration to
+/// return the time for which message comparisons should be triggered
+pub async fn comparison_trigger(
+    messages: Arc<AsyncMutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>,
+    identifier: String,
+    collect_duration: i64,
+) -> (u64, i64) {
+    let messages = AsyncMutex::new(messages.lock().await);
+    let msgs = messages.lock().await;
+    let matched_msgs = msgs
+        .iter()
+        .filter(|message| message.identifier == identifier);
+    let msg_trigger_time = matched_msgs
+        .min_by_key(|msg| (msg.block_number, msg.nonce))
+        .map(|message| (message.block_number, message.nonce + collect_duration));
+
+    msg_trigger_time.unwrap_or((0, i64::MAX))
 }
 
 /// This function processes the global messages map that we populate when
@@ -228,9 +249,9 @@ pub fn save_local_attestation(
 /// Custom callback for handling the validated GraphcastMessage, in this case we only save the messages to a local store
 /// to process them at a later time. This is required because for the processing we use async operations which are not allowed
 /// in the handler.
-pub fn attestation_handler() -> impl Fn(Result<GraphcastMessage<RadioPayloadMessage>, anyhow::Error>)
-{
-    |msg: Result<GraphcastMessage<RadioPayloadMessage>, anyhow::Error>| match msg {
+pub fn attestation_handler(
+) -> impl Fn(Result<GraphcastMessage<RadioPayloadMessage>, WakuHandlingError>) {
+    |msg: Result<GraphcastMessage<RadioPayloadMessage>, WakuHandlingError>| match msg {
         Ok(msg) => {
             debug!("Received message: {:?}", msg);
             MESSAGES.get().unwrap().lock().unwrap().push(msg);
@@ -267,38 +288,41 @@ pub async fn compare_attestations(
                             Some(remote_attestations) => {
                                 let mut remote_attestations = remote_attestations.clone();
 
-                        remote_attestations
-                        .sort_by(|a, b| a.stake_weight.partial_cmp(&b.stake_weight).unwrap());
+                            remote_attestations
+                                .sort_by(|a, b| a.stake_weight.partial_cmp(&b.stake_weight).unwrap());
 
-                    let most_attested_npoi = &remote_attestations.last().unwrap().npoi;
-                    if most_attested_npoi == &local_attestation.npoi {
-                        return Ok(format!(
-                            "POIs match for subgraph {ipfs_hash} on block {attestation_block}!"
-                        ));
-                    } else {
-                        return Err(anyhow!(format!(
-                            "POIs don't match for subgraph {ipfs_hash} on block {attestation_block}!"
-                        )
-                        .red()
-                        .bold()));
-                    }
+                            info!("Number of nPOI submitted for block {attestation_block}: {:#?}", remote_attestations.len());
+                            if remote_attestations.len() > 1 {
+                                debug!("Sorted attestations: {:#?}", remote_attestations);
+                            }
+
+                            let most_attested_npoi = &remote_attestations.last().unwrap().npoi;
+                            if most_attested_npoi == &local_attestation.npoi {
+                                return Ok(format!(
+                                    "POIs match for subgraph {ipfs_hash} on block {attestation_block}!: {most_attested_npoi}"
+                                ));
+                            } else {
+                                return Err(anyhow!(format!(
+                                    "POIs don't match for subgraph {ipfs_hash} on block {attestation_block}!"
+                                )
+                                ));
+                            }
                             },
                             None => {
                                 return Err(anyhow!(format!(
                                     "No record for subgraph {ipfs_hash} on block {attestation_block} found in remote attestations"
                                 )
-                                .yellow()
                                ));
                             }
                         }
                     }
                     None => {
-                        return Err(anyhow!(format!("No attestations for subgraph {ipfs_hash} on block {attestation_block} found in remote attestations store. Continuing...", ).yellow()))
+                        return Err(anyhow!(format!("No attestations for subgraph {ipfs_hash} on block {attestation_block} found in remote attestations store. Continuing...", )))
                     }
                 }
             }
             None => {
-                return Err(anyhow!(format!("No attestation for subgraph {ipfs_hash} on block {attestation_block} found in local attestations store. Continuing...", ).yellow()))
+                return Err(anyhow!(format!("No attestation for subgraph {ipfs_hash} on block {attestation_block} found in local attestations store. Continuing...", )))
             }
         }
     }
@@ -306,7 +330,7 @@ pub async fn compare_attestations(
     Err(anyhow!(format!(
         "The comparison did not execute successfully for on block {attestation_block}. Continuing...",
     )
-    .yellow()))
+    ))
 }
 
 #[cfg(test)]
@@ -654,7 +678,7 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(
             res.unwrap(),
-            "POIs match for subgraph my-awesome-hash on block 42!".to_string()
+            "POIs match for subgraph my-awesome-hash on block 42!: awesome-npoi".to_string()
         );
     }
 }

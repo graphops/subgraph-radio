@@ -13,9 +13,9 @@ use graphcast_sdk::{
 use num_bigint::BigUint;
 use num_traits::Zero;
 use poi_radio::{
-    active_allocation_hashes, attestation_handler, compare_attestations, process_messages,
-    save_local_attestation, Attestation, BlockClock, LocalAttestationsMap, RadioPayloadMessage,
-    GRAPHCAST_AGENT, MESSAGES,
+    active_allocation_hashes, attestation_handler, compare_attestations, comparison_trigger,
+    process_messages, save_local_attestation, Attestation, BlockClock, LocalAttestationsMap,
+    RadioPayloadMessage, GRAPHCAST_AGENT, MESSAGES,
 };
 use std::collections::HashMap;
 use std::env;
@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex as SyncMutex};
 use std::{thread::sleep, time::Duration};
 use tokio::sync::Mutex as AsyncMutex;
 use tracing::log::warn;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
 use crate::graphql::{query_graph_node_poi, update_network_chainheads};
 
@@ -48,13 +48,16 @@ async fn main() {
         env::var("NETWORK_SUBGRAPH").expect("No network subgraph endpoint provided.");
     let graphcast_network = env::var("GRAPHCAST_NETWORK").ok();
 
+    // Configure the amount of time in seconds spent collecting messages before attesting
+    let collect_message_duration: i64 = env::var("COLLECT_MESSAGE_DURATION")
+        .unwrap_or("30".to_string())
+        .parse::<i64>()
+        .unwrap_or(30);
+
     // Option for where to host the waku node instance
     let waku_host = env::var("WAKU_HOST").ok();
     let waku_port = env::var("WAKU_PORT").ok();
     let waku_node_key = env::var("WAKU_NODE_KEY").ok();
-
-    // Send message every x blocks for which wait y blocks before attestations
-    let wait_block_duration = 2;
 
     let wallet = private_key.parse::<LocalWallet>().unwrap();
     let radio_name: &str = "poi-radio";
@@ -136,9 +139,10 @@ async fn main() {
                 continue;
             }
         };
-        debug!(
+        trace!(
             "Subgraph network and latest blocks: {:#?}\nNetwork chainhead: {:#?}",
-            subgraph_network_latest_blocks, network_chainhead_blocks
+            subgraph_network_latest_blocks,
+            network_chainhead_blocks
         );
         //TODO: check that if no networks had an new message update blocks, sleep for a few seconds and 'continue'
 
@@ -189,8 +193,8 @@ async fn main() {
             let block_clock = block_store
                 .entry(network_name)
                 .or_insert_with(|| BlockClock {
-                    current_block: 0,
-                    compare_block: 0,
+                    current_block: latest_block.number,
+                    compare_block: message_block,
                 });
 
             // Wait a bit before querying information on the current block
@@ -198,6 +202,15 @@ async fn main() {
                 sleep(Duration::from_secs(5));
                 continue;
             }
+
+            let msgs = MESSAGES.get().unwrap().lock().unwrap().to_vec();
+            // first stored message block
+            let (compare_block, comparison_trigger) = comparison_trigger(
+                Arc::new(AsyncMutex::new(msgs)),
+                id.clone(),
+                collect_message_duration,
+            )
+            .await;
 
             debug!(
                 "{} {} {} {} {} {} {} {}",
@@ -208,20 +221,18 @@ async fn main() {
                 "🔗 Latest block: ".cyan(),
                 latest_block.number,
                 "🔗 Compare block: ".cyan(),
-                block_clock.compare_block
+                compare_block
             );
 
+            // Update block clock
             block_clock.current_block = latest_block.number;
 
-            if block_clock.compare_block != 0 && latest_block.number >= block_clock.compare_block {
-                debug!("{}", "Comparing attestations".magenta());
-
-                debug!("{}{:?}", "Messages: ".magenta(), MESSAGES);
+            if Utc::now().timestamp() >= comparison_trigger {
+                debug!("{}", "Comparing attestations");
+                trace!("{}{:?}", "Messages: ", MESSAGES);
 
                 let msgs = MESSAGES.get().unwrap().lock().unwrap().to_vec();
-
                 let remote_attestations = process_messages(
-                    //Arc<AsyncMutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>
                     Arc::new(AsyncMutex::new(msgs)),
                     &registry_subgraph,
                     &network_subgraph,
@@ -229,9 +240,8 @@ async fn main() {
                 .await;
                 match remote_attestations {
                     Ok(remote_attestations) => {
-                        // let mut messages = ;
                         match compare_attestations(
-                            block_clock.compare_block - wait_block_duration,
+                            compare_block,
                             remote_attestations,
                             Arc::clone(&local_attestations),
                         )
@@ -239,11 +249,20 @@ async fn main() {
                         {
                             Ok(msg) => {
                                 debug!("{}", msg.green().bold());
-                                MESSAGES.get().unwrap().lock().unwrap().clear();
+                                // Only clear the ones matching identifier and block number
+                                MESSAGES.get().unwrap().lock().unwrap().retain(|msg| {
+                                    msg.block_number != compare_block
+                                        || msg.identifier != id.clone()
+                                });
+                                debug!("Messages left: {:#?}", MESSAGES);
                             }
                             Err(err) => {
                                 error!("{}", err);
-                                MESSAGES.get().unwrap().lock().unwrap().clear();
+                                MESSAGES.get().unwrap().lock().unwrap().retain(|msg| {
+                                    msg.block_number != compare_block
+                                        || msg.identifier != id.clone()
+                                });
+                                debug!("Messages left: {:#?}", MESSAGES);
                             }
                         }
                     }
@@ -265,7 +284,6 @@ async fn main() {
                 latest_block.number
             );
             if latest_block.number >= message_block {
-                block_clock.compare_block = message_block + wait_block_duration;
                 let block_hash = match GRAPHCAST_AGENT
                     .get()
                     .unwrap()

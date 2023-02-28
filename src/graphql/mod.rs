@@ -1,7 +1,7 @@
 use graphql_client::{GraphQLQuery, Response};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::debug;
+use tracing::trace;
 
 use poi_radio::SubgraphStatus;
 // Maybe later on move graphql to SDK as the queries are pretty standarded
@@ -160,6 +160,6 @@ pub async fn update_network_chainheads(
                 .collect::<Vec<String>>()
         })
         .ok_or(QueryError::IndexingError);
-    debug!("Updated networks: {:#?}", updated_networks);
+    trace!("Updated networks: {:#?}", updated_networks);
     Ok(subgraph_network_blocks)
 }
