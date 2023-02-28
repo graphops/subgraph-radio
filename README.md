@@ -1,4 +1,4 @@
-# POI-Crosschecker Radio
+# POI Radio
 
 [![Docs](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.graphops.xyz/graphcast/radios/poi-radio)
 [![crates.io](https://img.shields.io/crates/v/graphcast-sdk.svg)](https://crates.io/crates/poi-radio)
