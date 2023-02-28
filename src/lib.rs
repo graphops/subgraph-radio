@@ -116,6 +116,26 @@ pub async fn active_allocation_hashes(
     }
 }
 
+/// The function filters for the first message of a particular identifier by block number
+/// get the timestamp it was received from and add the collection duration to
+/// return the time for which message comparisons should be triggered
+pub async fn comparison_trigger(
+    messages: Arc<AsyncMutex<Vec<GraphcastMessage<RadioPayloadMessage>>>>,
+    identifier: String,
+    collect_duration: i64,
+) -> (u64, i64) {
+    let messages = AsyncMutex::new(messages.lock().await);
+    let msgs = messages.lock().await;
+    let matched_msgs = msgs
+        .iter()
+        .filter(|message| message.identifier == identifier);
+    let msg_trigger_time = matched_msgs
+        .min_by_key(|msg| (msg.block_number, msg.nonce))
+        .map(|message| (message.block_number, message.nonce + collect_duration));
+
+    msg_trigger_time.unwrap_or((0, i64::MAX))
+}
+
 /// This function processes the global messages map that we populate when
 /// messages are being received. It constructs the remote attestations
 /// map and returns it if the processing succeeds.
