@@ -1,4 +1,4 @@
-use poi_radio::{operator::attestation::ComparisonResultType, state::PersistedState};
+use subgraph_radio::{operator::attestation::ComparisonResultType, state::PersistedState};
 use test_utils::{
     config::{test_config, TestSenderConfig},
     setup, teardown,

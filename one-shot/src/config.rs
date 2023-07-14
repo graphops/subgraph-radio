@@ -270,7 +270,7 @@ pub struct Config {
         long,
         value_name = "RADIO_NAME",
         env = "RADIO_NAME",
-        default_value = "poi-radio"
+        default_value = "subgraph-radio"
     )]
     pub radio_name: String,
     #[clap(long, value_name = "FILTER_PROTOCOL", env = "ENABLE_FILTER_PROTOCOL")]

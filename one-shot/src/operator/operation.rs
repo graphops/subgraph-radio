@@ -4,7 +4,7 @@ use tracing::{error, info};
 use graphcast_sdk::networks::NetworkName;
 
 use crate::operator::RadioOperator;
-use poi_radio::{messages::upgrade::VersionUpgradeMessage, OperationError};
+use subgraph_radio::{messages::upgrade::VersionUpgradeMessage, OperationError};
 
 impl RadioOperator {
     pub async fn gossip_one_shot(&self) -> Result<String, OperationError> {

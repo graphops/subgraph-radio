@@ -39,7 +39,7 @@ pub async fn main() {
 
     std::env::set_var(
             "RUST_LOG",
-            "off,hyper=off,graphcast_sdk=trace,poi_radio=trace,test_runner=trace,test_sender=trace,test_utils=trace",
+            "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_runner=trace,test_sender=trace,test_utils=trace",
         );
     init_tracing(config.log_format).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level");
 

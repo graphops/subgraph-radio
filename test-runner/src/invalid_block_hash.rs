@@ -1,4 +1,4 @@
-use poi_radio::state::PersistedState;
+use subgraph_radio::state::PersistedState;
 use test_utils::{
     config::{test_config, TestSenderConfig},
     setup, teardown,
@@ -40,9 +40,9 @@ pub async fn invalid_block_hash_test() {
 
     teardown(process_manager, &store_path);
 
-    let remote_messages = persisted_state.remote_messages();
+    let remote_ppoi_messages = persisted_state.remote_ppoi_messages();
     assert!(
-        remote_messages.is_empty(),
+        remote_ppoi_messages.is_empty(),
         "Remote messages should be empty"
     );
 }

@@ -33,8 +33,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./target/release/poi-radio
-          asset_name: poi-radio-${{ github.event.release.tag_name }}-ubuntu
+          asset_path: ./target/release/subgraph-radio
+          asset_name: subgraph-radio-${{ github.event.release.tag_name }}-ubuntu
           asset_content_type: binary/octet-stream
   build-macos:
     runs-on: macos-latest
@@ -56,6 +56,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./target/release/poi-radio
-          asset_name: poi-radio-${{ github.event.release.tag_name }}-macos
+          asset_path: ./target/release/subgraph-radio
+          asset_name: subgraph-radio-${{ github.event.release.tag_name }}-macos
           asset_content_type: binary/octet-stream

@@ -16,7 +16,7 @@ pub static VALIDATED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     let m = IntCounterVec::new(
         Opts::new("validated_messages", "Number of validated messages")
             .namespace("graphcast")
-            .subsystem("poi_radio"),
+            .subsystem("subgraph_radio"),
         &["deployment"],
     )
     .expect("Failed to create validated_messages counters");
@@ -31,7 +31,7 @@ pub static CACHED_MESSAGES: Lazy<IntGaugeVec> = Lazy::new(|| {
     let m = IntGaugeVec::new(
         Opts::new("cached_messages", "Number of messages in cache")
             .namespace("graphcast")
-            .subsystem("poi_radio"),
+            .subsystem("subgraph_radio"),
         &["deployment"],
     )
     .expect("Failed to create cached_messages gauges");
@@ -48,7 +48,7 @@ pub static ACTIVE_INDEXERS: Lazy<IntGaugeVec> = Lazy::new(|| {
             "Number of indexers actively crosschecking on the deployment (self excluded)",
         )
         .namespace("graphcast")
-        .subsystem("poi_radio"),
+        .subsystem("subgraph_radio"),
         &["deployment"],
     )
     .expect("Failed to create ACTIVE_INDEXERS gauges");
@@ -64,7 +64,7 @@ pub static DIVERGING_SUBGRAPHS: Lazy<IntGauge> = Lazy::new(|| {
             "Number of diverging subgraphs with non-consensus POIs from cross-checking",
         )
         .namespace("graphcast")
-        .subsystem("poi_radio"),
+        .subsystem("subgraph_radio"),
     )
     .expect("Failed to create diverging_subgraphs gauge");
     prometheus::register(Box::new(m.clone()))
@@ -73,31 +73,31 @@ pub static DIVERGING_SUBGRAPHS: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 #[allow(dead_code)]
-pub static LOCAL_NPOIS_TO_COMPARE: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static LOCAL_PPOIS_TO_COMPARE: Lazy<IntGaugeVec> = Lazy::new(|| {
     let m = IntGaugeVec::new(
         Opts::new(
-            "local_npois_to_compare",
-            "Number of nPOIs stored locally for each subgraph",
+            "local_ppois_to_compare",
+            "Number of pPOIs stored locally for each subgraph",
         )
         .namespace("graphcast")
-        .subsystem("poi_radio"),
+        .subsystem("subgraph_radio"),
         &["deployment"],
     )
-    .expect("Failed to create LOCAL_NPOIS_TO_COMPARE gauges");
+    .expect("Failed to create LOCAL_PPOIS_TO_COMPARE gauges");
     prometheus::register(Box::new(m.clone()))
-        .expect("Failed to register local_npois_to_compare gauge");
+        .expect("Failed to register local_ppois_to_compare gauge");
     m
 });
 
 #[allow(dead_code)]
-pub static INDEXER_COUNT_BY_NPOI: Lazy<HistogramVec> = Lazy::new(|| {
+pub static INDEXER_COUNT_BY_PPOI: Lazy<HistogramVec> = Lazy::new(|| {
     let m = HistogramVec::new(
         HistogramOpts::new(
-            "indexer_count_by_npoi",
-            "Count of indexers attesting for a nPOI",
+            "indexer_count_by_ppoi",
+            "Count of indexers attesting for a pPOI",
         )
         .namespace("graphcast")
-        .subsystem("poi_radio")
+        .subsystem("subgraph_radio")
         .buckets(linear_buckets(0.0, 1.0, 20).unwrap()),
         // Q: if we add indexer group hash here
         // then new metric is created for changes in indexers. I imagine this not so important
@@ -105,9 +105,9 @@ pub static INDEXER_COUNT_BY_NPOI: Lazy<HistogramVec> = Lazy::new(|| {
         // description of metrics cannot be updated after initialization
         &["deployment"],
     )
-    .expect("Failed to create indexer_count_by_npoi histograms");
+    .expect("Failed to create indexer_count_by_ppoi histograms");
     prometheus::register(Box::new(m.clone()))
-        .expect("Failed to register indexer_count_by_npoi counter");
+        .expect("Failed to register indexer_count_by_ppoi counter");
     m
 });
 
@@ -131,8 +131,8 @@ pub fn start_metrics() {
             Box::new(CACHED_MESSAGES.clone()),
             Box::new(ACTIVE_INDEXERS.clone()),
             Box::new(DIVERGING_SUBGRAPHS.clone()),
-            Box::new(LOCAL_NPOIS_TO_COMPARE.clone()),
-            Box::new(INDEXER_COUNT_BY_NPOI.clone()),
+            Box::new(LOCAL_PPOIS_TO_COMPARE.clone()),
+            Box::new(INDEXER_COUNT_BY_PPOI.clone()),
         ],
     );
 }

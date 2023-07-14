@@ -12,12 +12,12 @@ use config::TestSenderConfig;
 use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
 use graphcast_sdk::graphcast_agent::message_typing::IdentityValidation;
 use mock_server::{start_mock_server, ServerState};
-use poi_radio::{
+use prost::Message;
+use rand::Rng;
+use subgraph_radio::{
     config::{Config, CoverageLevel},
     messages::poi::PublicPoiMessage,
 };
-use prost::Message;
-use rand::Rng;
 use tracing::info;
 
 pub mod config;
@@ -163,7 +163,7 @@ pub fn start_radio(config: &Config) -> Child {
     Command::new("cargo")
         .arg("run")
         .arg("-p")
-        .arg("poi-radio")
+        .arg("subgraph-radio")
         .arg("--")
         .arg("--graph-node-endpoint")
         .arg(&config.graph_node_endpoint)

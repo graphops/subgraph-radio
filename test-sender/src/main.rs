@@ -10,8 +10,8 @@ use graphcast_sdk::{
     networks::NetworkName,
     wallet_address,
 };
-use poi_radio::messages::poi::PublicPoiMessage;
 use std::{net::IpAddr, str::FromStr, thread::sleep, time::Duration};
+use subgraph_radio::messages::poi::PublicPoiMessage;
 use test_utils::{config::TestSenderConfig, dummy_msg::DummyMsg, find_random_udp_port};
 use tracing::{error, info};
 use waku::{
@@ -21,7 +21,7 @@ use waku::{
 async fn start_sender(config: TestSenderConfig) {
     std::env::set_var(
         "RUST_LOG",
-        "off,hyper=off,graphcast_sdk=trace,poi_radio=trace,test_sender=trace",
+        "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_sender=trace",
     );
     init_tracing("pretty".to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level");
 

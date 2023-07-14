@@ -1,6 +1,6 @@
 use dotenv::dotenv;
 
-use poi_radio::{config::Config, operator::RadioOperator, RADIO_OPERATOR};
+use subgraph_radio::{config::Config, operator::RadioOperator, RADIO_OPERATOR};
 
 extern crate partial_application;
 

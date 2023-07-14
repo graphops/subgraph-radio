@@ -31,8 +31,8 @@ pub enum CoverageLevel {
 
 #[derive(Clone, Debug, Parser, Serialize, Deserialize, Getters, Default)]
 #[clap(
-    name = "poi-radio",
-    about = "Cross-check POIs with other Indexer in real time",
+    name = "subgraph-radio",
+    about = "Cross-check POIs with other Indexer and received subgraph owner notifications in real time",
     author = "GraphOps"
 )]
 pub struct Config {
@@ -276,7 +276,7 @@ pub struct Config {
         long,
         value_name = "RADIO_NAME",
         env = "RADIO_NAME",
-        default_value = "poi-radio"
+        default_value = "subgraph-radio"
     )]
     pub radio_name: String,
     #[clap(long, value_name = "FILTER_PROTOCOL", env = "ENABLE_FILTER_PROTOCOL")]
@@ -395,7 +395,7 @@ impl Config {
             let state = PersistedState::load_cache(path);
             trace!(
                 local_attestations = tracing::field::debug(&state.local_attestations()),
-                remote_messages = tracing::field::debug(&state.remote_messages()),
+                remote_ppoi_messages = tracing::field::debug(&state.remote_ppoi_messages()),
                 state = tracing::field::debug(&state),
                 "Loaded Persisted state cache"
             );

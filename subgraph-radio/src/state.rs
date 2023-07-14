@@ -30,7 +30,7 @@ type ComparisonResults = Arc<SyncMutex<HashMap<String, ComparisonResult>>>;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PersistedState {
     pub local_attestations: Local,
-    pub remote_messages: Remote,
+    pub remote_ppoi_messages: Remote,
     pub comparison_results: ComparisonResults,
 }
 
@@ -41,30 +41,30 @@ impl PersistedState {
         comparison_results: Option<ComparisonResults>,
     ) -> PersistedState {
         let local_attestations = local.unwrap_or(Arc::new(SyncMutex::new(HashMap::new())));
-        let remote_messages = remote.unwrap_or(Arc::new(SyncMutex::new(vec![])));
+        let remote_ppoi_messages = remote.unwrap_or(Arc::new(SyncMutex::new(vec![])));
         let comparison_results =
             comparison_results.unwrap_or(Arc::new(SyncMutex::new(HashMap::new())));
 
         PersistedState {
             local_attestations,
-            remote_messages,
+            remote_ppoi_messages,
             comparison_results,
         }
     }
 
-    /// Optional updates for either local_attestations, remote_messages or comparison_results without requiring either to be in-scope
+    /// Optional updates for either local_attestations, remote_ppoi_messages or comparison_results without requiring either to be in-scope
     pub async fn update(
         &mut self,
         local_attestations: Option<Local>,
-        remote_messages: Option<Remote>,
+        remote_ppoi_messages: Option<Remote>,
         comparison_results: Option<ComparisonResults>,
     ) -> PersistedState {
         let local_attestations = match local_attestations {
             None => self.local_attestations.clone(),
             Some(l) => l,
         };
-        let remote_messages = match remote_messages {
-            None => self.remote_messages.clone(),
+        let remote_ppoi_messages = match remote_ppoi_messages {
+            None => self.remote_ppoi_messages.clone(),
             Some(r) => r,
         };
         let comparison_results = match comparison_results {
@@ -73,7 +73,7 @@ impl PersistedState {
         };
         PersistedState {
             local_attestations,
-            remote_messages,
+            remote_ppoi_messages,
             comparison_results,
         }
     }
@@ -92,8 +92,8 @@ impl PersistedState {
     }
 
     /// Getter for remote_messages
-    pub fn remote_messages(&self) -> Vec<GraphcastMessage<PublicPoiMessage>> {
-        self.remote_messages.lock().unwrap().clone()
+    pub fn remote_ppoi_messages(&self) -> Vec<GraphcastMessage<PublicPoiMessage>> {
+        self.remote_ppoi_messages.lock().unwrap().clone()
     }
 
     /// Getter for comparison_results
@@ -115,20 +115,20 @@ impl PersistedState {
         self.local_attestations = local_attestations;
     }
 
-    /// Update remote_messages
+    /// Update remote_ppoi_messages
     pub async fn update_remote(
         &mut self,
-        remote_messages: Vec<GraphcastMessage<PublicPoiMessage>>,
+        remote_ppoi_messages: Vec<GraphcastMessage<PublicPoiMessage>>,
     ) -> Vec<GraphcastMessage<PublicPoiMessage>> {
-        self.remote_messages = Arc::new(SyncMutex::new(remote_messages));
-        self.remote_messages()
+        self.remote_ppoi_messages = Arc::new(SyncMutex::new(remote_ppoi_messages));
+        self.remote_ppoi_messages()
     }
 
-    /// Add message to remote_messages
+    /// Add message to remote_ppoi_messages
     /// Generalize PublicPoiMessage
-    pub fn add_remote_message(&self, msg: GraphcastMessage<PublicPoiMessage>) {
+    pub fn add_remote_ppoi_message(&self, msg: GraphcastMessage<PublicPoiMessage>) {
         trace!(msg = tracing::field::debug(&msg), "adding remote message");
-        self.remote_messages.lock().unwrap().push(msg)
+        self.remote_ppoi_messages.lock().unwrap().push(msg)
     }
 
     /// Add entry to comparison_results
@@ -145,10 +145,10 @@ impl PersistedState {
         &mut self,
         graph_node_endpoint: &str,
     ) -> Vec<GraphcastMessage<PublicPoiMessage>> {
-        let remote_messages = self.remote_messages();
+        let remote_ppoi_messages = self.remote_ppoi_messages();
         let mut valid_messages = vec![];
 
-        for message in remote_messages {
+        for message in remote_ppoi_messages {
             let is_valid = message
                 .payload
                 .validity_check(&message, graph_node_endpoint)
@@ -213,13 +213,13 @@ impl PersistedState {
         result_type
     }
 
-    /// Clean remote_messages
-    pub fn clean_remote_messages(&self, block_number: u64, deployment: String) {
+    /// Clean remote_ppoi_messages
+    pub fn clean_remote_ppoi_messages(&self, block_number: u64, deployment: String) {
         trace!(
-            msgs = tracing::field::debug(&self.remote_messages.lock().unwrap()),
+            msgs = tracing::field::debug(&self.remote_ppoi_messages.lock().unwrap()),
             "cleaning these messages"
         );
-        self.remote_messages
+        self.remote_ppoi_messages
             .lock()
             .unwrap()
             .retain(|msg| msg.payload.block_number >= block_number || msg.identifier != deployment)
@@ -317,7 +317,7 @@ mod tests {
 
         let mut state = PersistedState::load_cache(path);
         assert!(state.local_attestations().is_empty());
-        assert!(state.remote_messages().is_empty());
+        assert!(state.remote_ppoi_messages().is_empty());
         assert!(state.comparison_results().is_empty());
 
         let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
@@ -326,21 +326,21 @@ mod tests {
 
         save_local_attestation(
             local_attestations.clone(),
-            "npoi-x".to_string(),
+            "ppoi-x".to_string(),
             "0xa1".to_string(),
             0,
         );
 
         save_local_attestation(
             local_attestations.clone(),
-            "npoi-y".to_string(),
+            "ppoi-y".to_string(),
             "0xa1".to_string(),
             1,
         );
 
         save_local_attestation(
             local_attestations.clone(),
-            "npoi-z".to_string(),
+            "ppoi-z".to_string(),
             "0xa2".to_string(),
             2,
         );
@@ -393,7 +393,7 @@ mod tests {
         state.update_cache(path);
 
         let state = PersistedState::load_cache(path);
-        assert_eq!(state.remote_messages.lock().unwrap().len(), 1);
+        assert_eq!(state.remote_ppoi_messages.lock().unwrap().len(), 1);
         assert!(!state.local_attestations.lock().unwrap().is_empty());
         assert!(state.local_attestations.lock().unwrap().len() == 2);
         assert!(
@@ -425,8 +425,8 @@ mod tests {
                 .unwrap()
                 .get(&0)
                 .unwrap()
-                .npoi
-                == *"npoi-x"
+                .ppoi
+                == *"ppoi-x"
         );
 
         assert_eq!(state.comparison_results.lock().unwrap().len(), 1);
@@ -458,11 +458,11 @@ mod tests {
     async fn handle_comparison_result_new_deployment() {
         let notifier = Notifier::new("not-a-real-radio".to_string(), None, None, None, None, None);
         let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
-        let remote_messages = Arc::new(SyncMutex::new(Vec::new()));
+        let remote_ppoi_messages = Arc::new(SyncMutex::new(Vec::new()));
         let comparison_results = Arc::new(SyncMutex::new(HashMap::new()));
         let state = PersistedState {
             local_attestations,
-            remote_messages,
+            remote_ppoi_messages,
             comparison_results,
         };
 
@@ -484,11 +484,11 @@ mod tests {
     async fn handle_comparison_result_change_result_type() {
         let notifier = Notifier::new("not-a-real-radio".to_string(), None, None, None, None, None);
         let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
-        let remote_messages = Arc::new(SyncMutex::new(Vec::new()));
+        let remote_ppoi_messages = Arc::new(SyncMutex::new(Vec::new()));
         let comparison_results = Arc::new(SyncMutex::new(HashMap::new()));
         let state = PersistedState {
             local_attestations,
-            remote_messages,
+            remote_ppoi_messages,
             comparison_results,
         };
 

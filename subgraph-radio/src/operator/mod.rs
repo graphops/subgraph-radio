@@ -10,16 +10,15 @@ use tracing::{debug, error, info, trace, warn};
 use graphcast_sdk::{
     build_wallet,
     graphcast_agent::{
-        message_typing::{check_message_validity, GraphcastMessage},
-        waku_handling::WakuHandlingError,
-        GraphcastAgent,
+        message_typing::check_message_validity, waku_handling::WakuHandlingError, GraphcastAgent,
     },
     graphql::client_graph_node::{subgraph_network_blocks, update_network_chainheads},
 };
 
-use crate::chainhead_block_str;
 use crate::messages::poi::PublicPoiMessage;
+use crate::{chainhead_block_str, messages::poi::process_valid_message};
 
+use crate::config::Config;
 use crate::messages::upgrade::VersionUpgradeMessage;
 use crate::metrics::handle_serve_metrics;
 use crate::operator::attestation::log_gossip_summary;
@@ -27,7 +26,6 @@ use crate::operator::attestation::process_comparison_results;
 use crate::server::run_server;
 use crate::state::PersistedState;
 use crate::GRAPHCAST_AGENT;
-use crate::{config::Config, metrics::CACHED_MESSAGES};
 
 use self::notifier::Notifier;
 
@@ -158,22 +156,10 @@ impl RadioOperator {
                         }
                     };
 
-                    let identifier = msg.identifier.clone();
-
                     let is_valid = msg.payload.validity_check(&msg, &graph_node).await;
 
                     if is_valid.is_ok() {
-                        state_ref.add_remote_message(msg.clone());
-                        CACHED_MESSAGES.with_label_values(&[&identifier]).set(
-                            state_ref
-                                .remote_messages()
-                                .iter()
-                                .filter(|m| m.identifier == identifier)
-                                .collect::<Vec<&GraphcastMessage<PublicPoiMessage>>>()
-                                .len()
-                                .try_into()
-                                .unwrap(),
-                        );
+                        process_valid_message(msg, &state_ref).await;
                     };
                 } else if let Ok(msg) = agent.decode::<VersionUpgradeMessage>(msg.payload()).await {
                     trace!(
@@ -199,17 +185,11 @@ impl RadioOperator {
                             continue;
                         }
                     };
+
                     let is_valid = msg.payload.validity_check(&msg, &graph_node).await;
 
-                    if let Ok(payload) = is_valid {
-                        // send notifications to the indexer?
-                        upgrade_notifier.notify(format!(
-                                "Subgraph owner for a deployment has shared version upgrade info:\nold deployment: {}\nnew deployment: {}\nplanned migrate time: {}\nnetwork: {}",
-                                payload.identifier,
-                                payload.new_hash,
-                                payload.migrate_time,
-                                payload.network
-                            )).await;
+                    if let Ok(radio_msg) = is_valid {
+                        radio_msg.process_valid_message(&upgrade_notifier).await;
                     };
                 } else {
                     trace!("Waku message not decoded or validated, skipped message",);

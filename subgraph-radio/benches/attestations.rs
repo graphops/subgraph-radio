@@ -5,13 +5,13 @@ extern crate criterion;
 mod attestation {
     use criterion::{black_box, criterion_group, Criterion};
     use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
-    use poi_radio::{
+    use std::collections::HashMap;
+    use subgraph_radio::{
         messages::poi::PublicPoiMessage,
         operator::attestation::{
             compare_attestations, local_comparison_point, update_blocks, Attestation,
         },
     };
-    use std::collections::HashMap;
 
     criterion_group!(
         benches,
@@ -38,7 +38,7 @@ mod attestation {
                 update_blocks(
                     42,
                     &blocks,
-                    "awesome-npoi".to_string(),
+                    "awesome-ppoi".to_string(),
                     0.0,
                     "0xadd3".to_string(),
                     1,
@@ -49,7 +49,7 @@ mod attestation {
 
     fn update_attestations_bench(c: &mut Criterion) {
         let attestation = black_box(Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa1".to_string()],
             vec![2],
@@ -65,7 +65,7 @@ mod attestation {
         let mut local_blocks: HashMap<u64, Attestation> = black_box(HashMap::new());
 
         let remote = black_box(Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa1".to_string()],
             vec![0],
@@ -73,7 +73,7 @@ mod attestation {
         black_box(remote_blocks.insert(42, vec![remote]));
 
         let local = black_box(Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             Vec::new(),
             vec![0],
@@ -103,21 +103,21 @@ mod attestation {
     fn comparison_point_bench(c: &mut Criterion) {
         let mut local_blocks: HashMap<u64, Attestation> = black_box(HashMap::new());
         let attestation1 = black_box(Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa1".to_string()],
             vec![2],
         ));
 
         let attestation2 = black_box(Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa2".to_string()],
             vec![4],
         ));
 
         let attestation3 = black_box(Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             1.0,
             vec!["0xa3".to_string()],
             vec![6],
@@ -147,7 +147,7 @@ mod attestation {
             graph_account: String::from("0x7e6528e4ce3055e829a32b5dc4450072bac28bc6"),
             payload: PublicPoiMessage {
                 identifier: String::from("hash"),
-                content: String::from("awesome-npoi"),
+                content: String::from("awesome-ppoi"),
                 nonce: 2,
                 network: String::from("goerli"),
                 block_number: 42,

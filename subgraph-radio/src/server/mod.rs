@@ -8,7 +8,7 @@ use tracing::{debug, info};
 use crate::{
     config::Config,
     server::{
-        model::{build_schema, POIRadioContext},
+        model::{build_schema, SubgraphRadioContext},
         routes::{graphql_handler, graphql_playground, health},
     },
     shutdown_signal,
@@ -31,7 +31,7 @@ pub async fn run_server(
         return;
     }
     let port = config.server_port().unwrap();
-    let context = Arc::new(POIRadioContext::init(config.clone(), persisted_state));
+    let context = Arc::new(SubgraphRadioContext::init(config.clone(), persisted_state));
 
     let schema = build_schema(Arc::clone(&context)).await;
 

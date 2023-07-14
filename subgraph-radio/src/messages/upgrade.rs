@@ -11,6 +11,8 @@ use graphcast_sdk::{
 use prost::Message;
 use serde::{Deserialize, Serialize};
 
+use crate::operator::notifier::Notifier;
+
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize, PartialEq, SimpleObject)]
 #[eip712(
     name = "VersionUpgradeMessage",
@@ -124,5 +126,17 @@ impl VersionUpgradeMessage {
             .await
             .map(|radio_msg| radio_msg.valid_outer(gc_msg))??;
         Ok(self)
+    }
+
+    /// process the validated version upgrade messages, currently just notify
+    pub async fn process_valid_message(&self, notifier: &Notifier) {
+        // send notifications, later can optionally automate deployment
+        notifier.notify(format!(
+                "Subgraph owner for a deployment has shared version upgrade info:\nold deployment: {}\nnew deployment: {}\nplanned migrate time: {}\nnetwork: {}",
+                self.identifier,
+                self.new_hash,
+                self.migrate_time,
+                self.network
+            )).await;
     }
 }

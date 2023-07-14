@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize, SimpleObject)]
 #[eip712(
-    name = "Graphcast POI Radio Dummy Msg",
+    name = "Graphcast Subgraph Radio Dummy Msg",
     version = "0",
     chain_id = 1,
     verifying_contract = "0xc944e90c64b2c07662a292be6244bdf05cda44a7"

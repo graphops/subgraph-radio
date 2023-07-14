@@ -2,7 +2,7 @@
 set -e
 set -x
 
-VERSION="$(cargo metadata --quiet --format-version 1 | jq -r '.packages[] | select(.name == "poi-radio") | .version')"
+VERSION="$(cargo metadata --quiet --format-version 1 | jq -r '.packages[] | select(.name == "subgraph-radio") | .version')"
 
 if [[ -z "$VERSION" ]]; then
   echo "Usage: $0 <version>"
@@ -17,4 +17,4 @@ git-cliff -o CHANGELOG.md
 ) || true
 
 # Publish to crates.io
-cargo publish -p poi-radio
+cargo publish -p subgraph-radio

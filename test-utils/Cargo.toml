@@ -3,9 +3,9 @@ name = "test-utils"
 version = "0.0.1"
 edition = "2021"
 authors = ["GraphOps (axiomatic-aardvark, hopeyen)"]
-description = "POI Radio e2e tests"
+description = "Subgraph Radio e2e tests"
 license = "Apache-2.0"
-repository = "https://github.com/graphops/poi-radio"
+repository = "https://github.com/graphops/subgraph-radio"
 keywords = [
     "graphprotocol",
     "data-integrity",
@@ -23,7 +23,7 @@ categories = [
 [dependencies]
 waku = { version = "0.1.1", package = "waku-bindings" }
 graphcast-sdk = "0.4.0"
-poi-radio = { path = "../poi-radio" }
+subgraph-radio = { path = "../subgraph-radio" }
 tokio = { version = "1.1.1", features = ["full", "rt"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"

@@ -1,4 +1,4 @@
-use poi_radio::state::PersistedState;
+use subgraph_radio::state::PersistedState;
 use test_utils::{
     config::{test_config, TestSenderConfig},
     setup, teardown,
@@ -45,17 +45,17 @@ pub async fn topics_test() {
     let persisted_state = PersistedState::load_cache(&config.persistence_file_path.unwrap());
     debug!(
         local_attestations = tracing::field::debug(&persisted_state.local_attestations()),
-        remote_messages = tracing::field::debug(&persisted_state.remote_messages()),
+        remote_ppoi_messages = tracing::field::debug(&persisted_state.remote_ppoi_messages()),
         persisted_state = tracing::field::debug(&persisted_state),
         "loaded persisted state"
     );
 
     let local_attestations = persisted_state.local_attestations();
-    let remote_messages = persisted_state.remote_messages();
+    let remote_ppoi_messages = persisted_state.remote_ppoi_messages();
 
     debug!(
         local_attestations = tracing::field::debug(&local_attestations),
-        remote_messages = tracing::field::debug(&remote_messages),
+        remote_ppoi_messages = tracing::field::debug(&remote_ppoi_messages),
         "Starting topics_test"
     );
 
@@ -78,7 +78,7 @@ pub async fn topics_test() {
     ];
 
     for target_id in test_hashes_remote {
-        let has_target_id = remote_messages
+        let has_target_id = remote_ppoi_messages
             .iter()
             .any(|msg| msg.identifier == *target_id);
         assert!(
@@ -90,7 +90,7 @@ pub async fn topics_test() {
 
     let non_existent_test_hash = "QmonlyintestsenderXyZABCdeFgHIjklMNOpqrstuvWXYZabcdEFG";
 
-    let has_non_existent_test_hash = remote_messages
+    let has_non_existent_test_hash = remote_ppoi_messages
         .iter()
         .any(|msg| msg.identifier == non_existent_test_hash);
 
@@ -111,10 +111,10 @@ pub async fn topics_test() {
     let persisted_state = PersistedState::load_cache(&store_path);
     debug!("persisted state {:?}", persisted_state);
 
-    let remote_messages = persisted_state.remote_messages();
+    let remote_ppoi_messages = persisted_state.remote_ppoi_messages();
 
     let test_hash = "QmonlyintestsenderXyZABCdeFgHIjklMNOpqrstuvWXYZabcdEFG";
-    let has_test_hash = remote_messages
+    let has_test_hash = remote_ppoi_messages
         .iter()
         .any(|msg| msg.identifier == test_hash);
 

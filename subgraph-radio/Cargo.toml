@@ -1,11 +1,11 @@
 [package]
-name = "poi-radio"
-version = "0.3.6"
+name = "subgraph-radio"
+version = "0.1.0"
 edition = "2021"
 authors = ["GraphOps (axiomatic-aardvark, hopeyen)"]
-description = "POI Radio monitors subgraph data integrity in real time using Graphcast SDK"
+description = "Subgraph Radio monitors subgraph Public PoI and version upgrades messages in real time using Graphcast SDK"
 license = "Apache-2.0"
-repository = "https://github.com/graphops/poi-radio"
+repository = "https://github.com/graphops/subgraph-radio"
 keywords = ["graphprotocol", "data-integrity", "Indexer", "waku", "p2p"]
 categories = ["network-programming", "web-programming::http-client"]
 

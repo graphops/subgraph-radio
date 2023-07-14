@@ -40,7 +40,7 @@ pub static RADIO_OPERATOR: OnceCell<RadioOperator> = OnceCell::new();
 pub static GRAPHCAST_AGENT: OnceCell<Arc<GraphcastAgent>> = OnceCell::new();
 
 pub fn radio_name() -> &'static str {
-    "poi-radio"
+    "subgraph-radio"
 }
 
 /// Generate default topics that is operator address resolved to indexer address

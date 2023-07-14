@@ -12,8 +12,8 @@ use std::sync::Arc;
 use tracing::{span, trace, Instrument, Level};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use super::model::POIRadioContext;
-use crate::server::model::POIRadioSchema;
+use super::model::SubgraphRadioContext;
+use crate::server::model::SubgraphRadioSchema;
 
 #[derive(Serialize)]
 struct Health {
@@ -34,8 +34,8 @@ pub(crate) async fn graphql_playground() -> impl IntoResponse {
 
 pub(crate) async fn graphql_handler(
     req: GraphQLRequest,
-    Extension(schema): Extension<POIRadioSchema>,
-    Extension(context): Extension<Arc<POIRadioContext>>,
+    Extension(schema): Extension<SubgraphRadioSchema>,
+    Extension(context): Extension<Arc<SubgraphRadioContext>>,
 ) -> GraphQLResponse {
     let span = span!(Level::TRACE, "graphql_execution");
 

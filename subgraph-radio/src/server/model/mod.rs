@@ -15,7 +15,7 @@ use crate::{
 };
 use graphcast_sdk::{graphcast_agent::message_typing::GraphcastMessage, graphql::QueryError};
 
-pub(crate) type POIRadioSchema = Schema<QueryRoot, EmptyMutation, EmptySubscription>;
+pub(crate) type SubgraphRadioSchema = Schema<QueryRoot, EmptyMutation, EmptySubscription>;
 
 // Unified query object for resolvers
 #[derive(Default)]
@@ -30,8 +30,8 @@ impl QueryRoot {
         block: Option<u64>,
     ) -> Result<Vec<GraphcastMessage<PublicPoiMessage>>, HttpServiceError> {
         let msgs = ctx
-            .data_unchecked::<Arc<POIRadioContext>>()
-            .remote_messages_filtered(&identifier, &block);
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
+            .remote_ppoi_messages_filtered(&identifier, &block);
         Ok(msgs)
     }
 
@@ -42,7 +42,7 @@ impl QueryRoot {
         block: Option<u64>,
     ) -> Result<Vec<AttestationEntry>, HttpServiceError> {
         let attestations = ctx
-            .data_unchecked::<Arc<POIRadioContext>>()
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
             .local_attestations(identifier, block);
         let filtered = attestations_to_vec(&attestations);
 
@@ -58,7 +58,7 @@ impl QueryRoot {
         result_type: Option<ComparisonResultType>,
     ) -> Result<Vec<ComparisonResult>, HttpServiceError> {
         let res = &ctx
-            .data_unchecked::<Arc<POIRadioContext>>()
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
             .comparison_results(identifier, block, result_type)
             .await;
 
@@ -72,7 +72,7 @@ impl QueryRoot {
         identifier: String,
     ) -> Result<Option<ComparisonResult>, HttpServiceError> {
         let res = &ctx
-            .data_unchecked::<Arc<POIRadioContext>>()
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
             .comparison_result(identifier);
         Ok(res.clone())
     }
@@ -98,12 +98,12 @@ impl QueryRoot {
             } else {
                 continue;
             };
-            let local_npoi = local_attestation.npoi.clone();
+            let local_ppoi = local_attestation.ppoi.clone();
 
             // Aggregate remote attestations with the local attestations
             let mut aggregated_attestations: Vec<Attestation> = vec![];
             for a in r.attestations {
-                if a.npoi == local_attestation.npoi {
+                if a.ppoi == local_attestation.ppoi {
                     let updateed_attestation = attestation::Attestation::update(
                         &a,
                         local_info.address.clone(),
@@ -119,8 +119,8 @@ impl QueryRoot {
                     aggregated_attestations.push(a)
                 }
             }
-            let sender_ratio = sender_count_str(&aggregated_attestations, local_npoi.clone());
-            let stake_ratio = stake_weight_str(&aggregated_attestations, local_npoi);
+            let sender_ratio = sender_count_str(&aggregated_attestations, local_ppoi.clone());
+            let stake_ratio = stake_weight_str(&aggregated_attestations, local_ppoi);
             ratios.push(CompareRatio::new(
                 r.deployment,
                 r.block_number,
@@ -133,7 +133,9 @@ impl QueryRoot {
 
     /// Return indexer info
     async fn indexer_info(&self, ctx: &Context<'_>) -> Result<IndexerInfo, HttpServiceError> {
-        let config = ctx.data_unchecked::<Arc<POIRadioContext>>().radio_config();
+        let config = ctx
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
+            .radio_config();
         let basic_info = config
             .basic_info()
             .await
@@ -146,7 +148,7 @@ impl QueryRoot {
 }
 
 /// Helper function to order attestations by stake weight and then find the number of unique senders
-pub fn sender_count_str(attestations: &[Attestation], local_npoi: String) -> String {
+pub fn sender_count_str(attestations: &[Attestation], local_ppoi: String) -> String {
     // Create a HashMap to store the attestation and senders
     let mut temp_attestations = attestations.to_owned();
     let mut output = String::new();
@@ -156,7 +158,7 @@ pub fn sender_count_str(attestations: &[Attestation], local_npoi: String) -> Str
     // Iterate through the attestations and populate the maps
     // No set is needed since uniqueness is garuanteeded by validation
     for att in attestations.iter() {
-        let separator = if att.npoi == local_npoi { "*:" } else { ":" };
+        let separator = if att.ppoi == local_ppoi { "*:" } else { ":" };
 
         output.push_str(&format!("{}{}", att.senders.len(), separator));
     }
@@ -167,7 +169,7 @@ pub fn sender_count_str(attestations: &[Attestation], local_npoi: String) -> Str
 }
 
 /// Helper function to order attestations by stake weight and then find the number of unique senders
-pub fn stake_weight_str(attestations: &[Attestation], local_npoi: String) -> String {
+pub fn stake_weight_str(attestations: &[Attestation], local_ppoi: String) -> String {
     // Create a HashMap to store the attestation and senders
     let mut temp_attestations = attestations.to_owned();
     let mut output = String::new();
@@ -177,7 +179,7 @@ pub fn stake_weight_str(attestations: &[Attestation], local_npoi: String) -> Str
     // Iterate through the attestations and populate the maps
     // No set is needed since uniqueness is garuanteeded by validation
     for att in attestations.iter() {
-        let separator = if att.npoi == local_npoi { "*:" } else { ":" };
+        let separator = if att.ppoi == local_ppoi { "*:" } else { ":" };
         output.push_str(&format!("{}{}", att.stake_weight, separator));
     }
 
@@ -185,18 +187,18 @@ pub fn stake_weight_str(attestations: &[Attestation], local_npoi: String) -> Str
     output
 }
 
-pub async fn build_schema(ctx: Arc<POIRadioContext>) -> POIRadioSchema {
+pub async fn build_schema(ctx: Arc<SubgraphRadioContext>) -> SubgraphRadioSchema {
     Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
         .data(ctx.persisted_state)
         .finish()
 }
 
-pub struct POIRadioContext {
+pub struct SubgraphRadioContext {
     pub radio_config: Config,
     pub persisted_state: &'static PersistedState,
 }
 
-impl POIRadioContext {
+impl SubgraphRadioContext {
     pub fn init(radio_config: Config, persisted_state: &'static PersistedState) -> Self {
         Self {
             radio_config,
@@ -237,20 +239,20 @@ impl POIRadioContext {
         }
     }
 
-    pub fn remote_messages(&self) -> Vec<GraphcastMessage<PublicPoiMessage>> {
-        self.persisted_state.remote_messages()
+    pub fn remote_ppoi_messages(&self) -> Vec<GraphcastMessage<PublicPoiMessage>> {
+        self.persisted_state.remote_ppoi_messages()
     }
 
-    pub fn remote_messages_filtered(
+    pub fn remote_ppoi_messages_filtered(
         &self,
         identifier: &Option<String>,
         block: &Option<u64>,
     ) -> Vec<GraphcastMessage<PublicPoiMessage>> {
-        let msgs = self.remote_messages();
+        let msgs = self.remote_ppoi_messages();
         let filtered = msgs
             .iter()
             .cloned()
-            .filter(|message| filter_remote_messages(message, identifier, block))
+            .filter(|message| filter_remote_ppoi_messages(message, identifier, block))
             .collect::<Vec<_>>();
         filtered
     }
@@ -287,7 +289,7 @@ impl POIRadioContext {
             let mut res = vec![];
             for entry in locals {
                 let deployment_identifier = entry.deployment.clone();
-                let msgs = self.remote_messages_filtered(&identifier, &block);
+                let msgs = self.remote_ppoi_messages_filtered(&identifier, &block);
                 let remote_attestations = process_ppoi_message(msgs, &config.callbook())
                     .await
                     .ok()
@@ -315,7 +317,7 @@ impl POIRadioContext {
 }
 
 /// Filter funciton for Attestations on deployment and block
-fn filter_remote_messages(
+fn filter_remote_ppoi_messages(
     entry: &GraphcastMessage<PublicPoiMessage>,
     identifier: &Option<String>,
     block: &Option<u64>,

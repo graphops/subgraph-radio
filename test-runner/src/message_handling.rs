@@ -1,4 +1,4 @@
-use poi_radio::state::PersistedState;
+use subgraph_radio::state::PersistedState;
 use test_utils::{
     config::{test_config, TestSenderConfig},
     messages_are_equal, payloads_are_equal, setup, teardown,
@@ -48,7 +48,7 @@ pub async fn send_and_receive_test() {
         local_attestations,
         !local_attestations.is_empty()
     );
-    let remote_messages = persisted_state.remote_messages();
+    let remote_ppoi_messages = persisted_state.remote_ppoi_messages();
 
     assert!(
         !local_attestations.is_empty(),
@@ -66,7 +66,7 @@ pub async fn send_and_receive_test() {
     let test_hashes_remote = vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq"];
 
     for target_id in test_hashes_remote {
-        let has_target_id = remote_messages
+        let has_target_id = remote_ppoi_messages
             .iter()
             .any(|msg| msg.identifier == *target_id);
         assert!(
@@ -76,16 +76,16 @@ pub async fn send_and_receive_test() {
         );
     }
 
-    trace!("Num of remote messages {}", remote_messages.len());
+    trace!("Num of remote messages {}", remote_ppoi_messages.len());
 
     assert!(
-        remote_messages.len() >= 5,
+        remote_ppoi_messages.len() >= 5,
         "The number of remote messages should at least 5. Actual: {}",
-        remote_messages.len()
+        remote_ppoi_messages.len()
     );
 
-    for (index, message1) in remote_messages.iter().enumerate() {
-        for message2 in remote_messages.iter().skip(index + 1) {
+    for (index, message1) in remote_ppoi_messages.iter().enumerate() {
+        for message2 in remote_ppoi_messages.iter().skip(index + 1) {
             if messages_are_equal(message1, message2)
                 && payloads_are_equal(&message1.payload, &message2.payload)
             {

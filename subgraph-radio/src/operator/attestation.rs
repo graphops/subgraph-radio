@@ -20,7 +20,7 @@ use graphcast_sdk::{
 use crate::{
     messages::poi::PublicPoiMessage,
     metrics::{
-        ACTIVE_INDEXERS, DIVERGING_SUBGRAPHS, INDEXER_COUNT_BY_NPOI, LOCAL_NPOIS_TO_COMPARE,
+        ACTIVE_INDEXERS, DIVERGING_SUBGRAPHS, INDEXER_COUNT_BY_PPOI, LOCAL_PPOIS_TO_COMPARE,
     },
     state::PersistedState,
     OperationError,
@@ -28,10 +28,10 @@ use crate::{
 
 use super::Notifier;
 
-/// A wrapper around an attested NPOI, tracks Indexers that have sent it plus their accumulated stake
+/// A wrapper around an attested public POI, tracks Indexers that have sent it plus their accumulated stake
 #[derive(Clone, Debug, PartialEq, Eq, Hash, SimpleObject, Serialize, Deserialize)]
 pub struct Attestation {
-    pub npoi: String,
+    pub ppoi: String,
     pub stake_weight: i64,
     pub senders: Vec<String>,
     pub sender_group_hash: String,
@@ -40,12 +40,12 @@ pub struct Attestation {
 
 #[autometrics]
 impl Attestation {
-    pub fn new(npoi: String, stake_weight: f32, senders: Vec<String>, timestamp: Vec<i64>) -> Self {
+    pub fn new(ppoi: String, stake_weight: f32, senders: Vec<String>, timestamp: Vec<i64>) -> Self {
         let addresses = &mut senders.clone();
         sort_addresses(addresses);
         let sender_group_hash = hash_addresses(addresses);
         Attestation {
-            npoi,
+            ppoi,
             stake_weight: stake_weight as i64,
             senders,
             sender_group_hash,
@@ -53,7 +53,7 @@ impl Attestation {
         }
     }
 
-    /// Used whenever we receive a new attestation for an NPOI that already exists in the store
+    /// Used whenever we receive a new attestation for an PPOI that already exists in the store
     pub fn update(
         base: &Self,
         address: String,
@@ -66,7 +66,7 @@ impl Attestation {
             ))
         } else {
             Ok(Self::new(
-                base.npoi.clone(),
+                base.ppoi.clone(),
                 (base.stake_weight as f32) + stake,
                 [base.senders.clone(), vec![address]].concat(),
                 [base.timestamp.clone(), vec![timestamp]].concat(),
@@ -79,8 +79,8 @@ impl fmt::Display for Attestation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "NPOI: {}\nsender addresses: {:#?}\nstake weight: {}",
-            self.npoi, self.senders, self.stake_weight
+            "PPOI: {}\nsender addresses: {:#?}\nstake weight: {}",
+            self.ppoi, self.senders, self.stake_weight
         )
     }
 }
@@ -98,9 +98,9 @@ pub struct AttestationEntry {
 pub fn attestations_to_vec(attestations: &LocalAttestationsMap) -> Vec<AttestationEntry> {
     attestations
         .iter()
-        .flat_map(|(npoi, inner_map)| {
+        .flat_map(|(ppoi, inner_map)| {
             inner_map.iter().map(move |(blk, att)| AttestationEntry {
-                deployment: npoi.clone(),
+                deployment: ppoi.clone(),
                 block_number: *blk,
                 attestation: att.clone(),
             })
@@ -125,7 +125,7 @@ pub async fn process_ppoi_message(
     for msg in messages.iter() {
         let radio_msg = &msg.payload.clone();
         // Message has passed GraphcastMessage validation, now check for radio validation
-        let npoi = radio_msg.payload_content().to_string();
+        let ppoi = radio_msg.payload_content().to_string();
         let sender_stake =
             get_indexer_stake(&radio_msg.graph_account.clone(), callbook.graph_network())
                 .await
@@ -139,7 +139,7 @@ pub async fn process_ppoi_message(
             .or_default();
         let attestations = blocks.entry(radio_msg.block_number).or_default();
 
-        let existing_attestation = attestations.iter_mut().find(|a| a.npoi == npoi);
+        let existing_attestation = attestations.iter_mut().find(|a| a.ppoi == ppoi);
 
         if let Some(existing_attestation) = existing_attestation {
             if let Ok(updated_attestation) = Attestation::update(
@@ -169,16 +169,16 @@ pub async fn process_ppoi_message(
         num_attestation = remote_attestations.len(),
         "Process message into attestations",
     );
-    // npoi_hist by attestation - don't care for attestation but should be grouped together
+    // ppoi_hist by attestation - don't care for attestation but should be grouped together
     // so the summed up metrics should be ACTIVE_INDEXERS
-    let npoi_hist = INDEXER_COUNT_BY_NPOI.with_label_values(&[&first_msg.identifier.to_string()]);
+    let ppoi_hist = INDEXER_COUNT_BY_PPOI.with_label_values(&[&first_msg.identifier.to_string()]);
     let blocks = remote_attestations
         .entry(first_msg.identifier.to_string())
         .or_default();
     for a in blocks.entry(first_msg.payload.block_number).or_default() {
         // this can probably sum up to active peers)
-        // Update INDEXER_COUNT_BY_NPOI metric
-        npoi_hist.observe(a.senders.len() as f64);
+        // Update INDEXER_COUNT_BY_PPOI metric
+        ppoi_hist.observe(a.senders.len() as f64);
     }
 
     let active_indexers = ACTIVE_INDEXERS.with_label_values(&[&first_msg.identifier.to_string()]);
@@ -199,13 +199,13 @@ pub fn combine_senders(attestations: &[Attestation]) -> Vec<String> {
 /// If they don't exist, then return default value that shall never be validated to trigger
 pub fn local_comparison_point(
     local_attestations: &LocalAttestationsMap,
-    remote_messages: &[GraphcastMessage<PublicPoiMessage>],
+    remote_ppoi_messages: &[GraphcastMessage<PublicPoiMessage>],
     id: String,
     collect_window_duration: i64,
 ) -> Option<(u64, i64)> {
     if let Some(blocks_map) = local_attestations.get(&id) {
         // Find the attestaion by the smallest block
-        let remote_blocks = remote_messages
+        let remote_blocks = remote_ppoi_messages
             .iter()
             .filter(|m| m.identifier == id.clone())
             .map(|m| m.payload.block_number)
@@ -232,7 +232,7 @@ pub fn local_comparison_point(
 pub fn update_blocks(
     block_number: u64,
     blocks: &HashMap<u64, Vec<Attestation>>,
-    npoi: String,
+    ppoi: String,
     stake: f32,
     address: String,
     timestamp: i64,
@@ -242,7 +242,7 @@ pub fn update_blocks(
     blocks_clone.insert(
         block_number,
         vec![Attestation::new(
-            npoi,
+            ppoi,
             stake,
             vec![address],
             vec![timestamp],
@@ -251,7 +251,7 @@ pub fn update_blocks(
     blocks_clone
 }
 
-/// Saves NPOIs that we've generated locally, in order to compare them with remote ones later
+/// Saves PPOIs that we've generated locally, in order to compare them with remote ones later
 pub fn save_local_attestation(
     local_attestations: Arc<SyncMutex<LocalAttestationsMap>>,
     content: String,
@@ -269,10 +269,10 @@ pub fn save_local_attestation(
         .and_modify(|existing_attestation| *existing_attestation = attestation.clone())
         .or_insert(attestation);
 
-    let npoi_gauge = LOCAL_NPOIS_TO_COMPARE.with_label_values(&[&ipfs_hash]);
+    let ppoi_gauge = LOCAL_PPOIS_TO_COMPARE.with_label_values(&[&ipfs_hash]);
 
     // The value is the total number of senders that are attesting for that subgraph
-    npoi_gauge.set(local_attestations.len().try_into().unwrap());
+    ppoi_gauge.set(local_attestations.len().try_into().unwrap());
 }
 
 /// Clear the expired local attestations after comparing with remote results
@@ -288,9 +288,9 @@ pub fn clear_local_attestation(
         let mut blocks_clone: HashMap<u64, Attestation> = HashMap::new();
         blocks_clone.extend(blocks.clone());
         blocks_clone.remove(&block_number);
-        let npoi_gauge = LOCAL_NPOIS_TO_COMPARE.with_label_values(&[&ipfs_hash]);
+        let ppoi_gauge = LOCAL_PPOIS_TO_COMPARE.with_label_values(&[&ipfs_hash]);
         // The value is the total number of senders that are attesting for that subgraph
-        npoi_gauge.set(blocks_clone.len().try_into().unwrap());
+        ppoi_gauge.set(blocks_clone.len().try_into().unwrap());
         local_attestations.insert(ipfs_hash, blocks_clone);
     };
 }
@@ -406,9 +406,9 @@ impl Clone for ComparisonResult {
 }
 
 /// Compares local attestations against remote ones using the attestation stores we populated while processing saved GraphcastMessage messages.
-/// It takes our attestation (NPOI) for a given subgraph on a given block and compares it to the top-attested one from the remote attestations.
+/// It takes our attestation (PPOI) for a given subgraph on a given block and compares it to the top-attested one from the remote attestations.
 /// The top remote attestation is found by grouping attestations together and increasing their total stake-weight every time we see a new message
-/// with the same NPOI from an Indexer (NOTE: one Indexer can only send 1 attestation per subgraph per block). The attestations are then sorted
+/// with the same PPOI from an Indexer (NOTE: one Indexer can only send 1 attestation per subgraph per block). The attestations are then sorted
 /// and we take the one with the highest total stake-weight.
 pub fn compare_attestations(
     attestation_block: u64,
@@ -490,17 +490,17 @@ pub fn compare_attestations(
             ipfs_hash,
             attestation_block,
             sorted_attestations = tracing::field::debug(&remote_attestations),
-            "More than 1 nPOI found",
+            "More than 1 pPOI found",
         );
     }
 
-    let most_attested_npoi = &remote_attestations.last().unwrap().npoi;
-    if most_attested_npoi == &local_attestation.npoi {
+    let most_attested_ppoi = &remote_attestations.last().unwrap().ppoi;
+    if most_attested_ppoi == &local_attestation.ppoi {
         trace!(
             ipfs_hash,
             attestation_block,
-            num_unique_npois = remote_attestations.len(),
-            "nPOI matched",
+            num_unique_ppois = remote_attestations.len(),
+            "pPOI matched",
         );
         ComparisonResult {
             deployment: ipfs_hash.to_string(),
@@ -514,7 +514,7 @@ pub fn compare_attestations(
             attestation_block,
             remote_attestations = tracing::field::debug(&remote_attestations),
             local_attestation = tracing::field::debug(&local_attestation),
-            "Number of nPOI submitted",
+            "Number of pPOI submitted",
         );
         ComparisonResult {
             deployment: ipfs_hash.to_string(),
@@ -535,13 +535,13 @@ pub fn compare_attestation(
     let mut remote_attestations = remote_attestations;
     remote_attestations.sort_by(|a, b| a.stake_weight.partial_cmp(&b.stake_weight).unwrap());
 
-    let most_attested_npoi = &remote_attestations.last().unwrap().npoi;
-    if most_attested_npoi == &local_attestation.npoi {
+    let most_attested_ppoi = &remote_attestations.last().unwrap().ppoi;
+    if most_attested_ppoi == &local_attestation.ppoi {
         trace!(
             local.block_number,
             remote_attestations = tracing::field::debug(&remote_attestations),
             local_attestation = tracing::field::debug(&local_attestation),
-            "nPOI matched",
+            "pPOI matched",
         );
         ComparisonResult {
             deployment: local.deployment.to_string(),
@@ -576,7 +576,7 @@ fn sort_addresses(addresses: &mut [String]) {
     });
 }
 
-/// Deterministically ordering the indexer addresses attesting to a nPOI, and then hashing that list
+/// Deterministically ordering the indexer addresses attesting to a pPOI, and then hashing that list
 fn hash_addresses(addresses: &[String]) -> String {
     // create a SHA3-256 object
     let mut hasher = Sha3_256::new();
@@ -718,28 +718,28 @@ mod tests {
         let block_clone = update_blocks(
             42,
             &blocks,
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             "0xadd3".to_string(),
             1,
         );
 
         assert_eq!(
-            block_clone.get(&42).unwrap().first().unwrap().npoi,
-            "awesome-npoi".to_string()
+            block_clone.get(&42).unwrap().first().unwrap().ppoi,
+            "awesome-ppoi".to_string()
         );
     }
 
     #[test]
     fn test_sort_sender_addresses_unique() {
         let attestation = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             1.0,
             vec!["0xaac5349585cbbf924026d25a520ffa9e8b51a39b".to_string()],
             vec![1],
         );
         let attestation2 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             1.0,
             vec!["0xbbc5349585cbbf924026d25a520ffa9e8b51a39b".to_string()],
             vec![1],
@@ -753,7 +753,7 @@ mod tests {
     #[test]
     fn test_sort_sender_addresses() {
         let attestation = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             1.0,
             vec![
                 "0xaac5349585cbbf924026d25a520ffa9e8b51a39b".to_string(),
@@ -762,7 +762,7 @@ mod tests {
             vec![1, 2],
         );
         let attestation2 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             1.0,
             vec![
                 "0xbbc5349585cbbf924026d25a520ffa9e8b51a39b".to_string(),
@@ -779,21 +779,21 @@ mod tests {
     #[test]
     fn test_attestation_sorting() {
         let attestation1 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa1".to_string()],
             vec![0],
         );
 
         let attestation2 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa2".to_string()],
             vec![1],
         );
 
         let attestation3 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             1.0,
             vec!["0xa3".to_string()],
             vec![2],
@@ -814,7 +814,7 @@ mod tests {
     #[test]
     fn test_attestation_update_success() {
         let attestation = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa1".to_string()],
             vec![2],
@@ -830,7 +830,7 @@ mod tests {
     #[test]
     fn test_attestation_update_fail() {
         let attestation = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa1".to_string()],
             vec![0],
@@ -869,7 +869,7 @@ mod tests {
         remote_blocks.insert(
             42,
             vec![Attestation::new(
-                "awesome-npoi".to_string(),
+                "awesome-ppoi".to_string(),
                 0.0,
                 vec!["0xa1".to_string()],
                 vec![1],
@@ -878,7 +878,7 @@ mod tests {
 
         local_blocks.insert(
             42,
-            Attestation::new("awesome-npoi".to_string(), 0.0, Vec::new(), vec![0]),
+            Attestation::new("awesome-ppoi".to_string(), 0.0, Vec::new(), vec![0]),
         );
 
         let mut remote_attestations: HashMap<String, HashMap<u64, Vec<Attestation>>> =
@@ -933,14 +933,14 @@ mod tests {
         let mut local_blocks: HashMap<u64, Attestation> = HashMap::new();
 
         let remote = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa1".to_string()],
             vec![0],
         );
         remote_blocks.insert(42, vec![remote.clone()]);
 
-        let local = Attestation::new("awesome-npoi".to_string(), 0.0, Vec::new(), vec![0]);
+        let local = Attestation::new("awesome-ppoi".to_string(), 0.0, Vec::new(), vec![0]);
         local_blocks.insert(42, local.clone());
 
         let mut remote_attestations: HashMap<String, HashMap<u64, Vec<Attestation>>> =
@@ -973,21 +973,21 @@ mod tests {
     async fn clear_local_attestation_success() {
         let mut local_blocks: HashMap<u64, Attestation> = HashMap::new();
         let attestation1 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa1".to_string()],
             vec![0],
         );
 
         let attestation2 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa2".to_string()],
             vec![1],
         );
 
         let attestation3 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             1.0,
             vec!["0xa3".to_string()],
             vec![2],
@@ -1022,7 +1022,7 @@ mod tests {
             graph_account: String::from("0x7e6528e4ce3055e829a32b5dc4450072bac28bc6"),
             payload: PublicPoiMessage {
                 identifier: String::from("hash"),
-                content: String::from("awesome-npoi"),
+                content: String::from("awesome-ppoi"),
                 nonce: 2,
                 network: String::from("goerli"),
                 block_number: 42,
@@ -1037,21 +1037,21 @@ mod tests {
     async fn local_attestation_pointer_success() {
         let mut local_blocks: HashMap<u64, Attestation> = HashMap::new();
         let attestation1 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa1".to_string()],
             vec![2],
         );
 
         let attestation2 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             0.0,
             vec!["0xa2".to_string()],
             vec![4],
         );
 
         let attestation3 = Attestation::new(
-            "awesome-npoi".to_string(),
+            "awesome-ppoi".to_string(),
             1.0,
             vec!["0xa3".to_string()],
             vec![6],
@@ -1086,21 +1086,21 @@ mod tests {
         let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
         save_local_attestation(
             local_attestations.clone(),
-            "npoi-x".to_string(),
+            "ppoi-x".to_string(),
             "0xa1".to_string(),
             0,
         );
 
         save_local_attestation(
             local_attestations.clone(),
-            "npoi-y".to_string(),
+            "ppoi-y".to_string(),
             "0xa1".to_string(),
             1,
         );
 
         save_local_attestation(
             local_attestations.clone(),
-            "npoi-z".to_string(),
+            "ppoi-z".to_string(),
             "0xa2".to_string(),
             2,
         );
@@ -1133,8 +1133,8 @@ mod tests {
                 .unwrap()
                 .get(&0)
                 .unwrap()
-                .npoi
-                == *"npoi-x"
+                .ppoi
+                == *"ppoi-x"
         );
     }
 }

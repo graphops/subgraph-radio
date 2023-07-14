@@ -1,7 +1,7 @@
 use clap::{ArgSettings, Parser};
 use graphcast_sdk::graphcast_agent::message_typing::IdentityValidation;
-use poi_radio::config::{Config, CoverageLevel};
 use serde::{Deserialize, Serialize};
+use subgraph_radio::config::{Config, CoverageLevel};
 
 #[derive(Clone, Debug, Parser, Serialize, Deserialize)]
 #[clap(name = "test-sender", about = "Mock message sender")]
@@ -42,7 +42,7 @@ pub fn test_config() -> Config {
         waku_addr: None,
         boot_node_addresses: vec![],
         waku_log_level: None,
-        log_level: "off,hyper=off,graphcast_sdk=trace,poi_radio=trace,test_runner=trace"
+        log_level: "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_runner=trace"
             .to_string(),
         slack_token: None,
         slack_channel: None,

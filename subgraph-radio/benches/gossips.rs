@@ -1,7 +1,7 @@
 use criterion::async_executor::FuturesExecutor;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use graphcast_sdk::graphcast_agent::message_typing::IdentityValidation;
-use poi_radio::operator::RadioOperator;
+use subgraph_radio::operator::RadioOperator;
 
 use rand::{thread_rng, Rng};
 use secp256k1::SecretKey;
@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use graphcast_sdk::networks::NetworkName;
 use graphcast_sdk::{BlockPointer, NetworkPointer};
-use poi_radio::config::Config;
+use subgraph_radio::config::Config;
 
 fn gossip_poi_bench(c: &mut Criterion) {
     let identifiers = black_box(vec!["identifier1".to_string(), "identifier2".to_string()]);
@@ -35,7 +35,7 @@ fn gossip_poi_bench(c: &mut Criterion) {
         topics: vec![String::from(
             "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",
         )],
-        coverage: poi_radio::config::CoverageLevel::Comprehensive,
+        coverage: subgraph_radio::config::CoverageLevel::Comprehensive,
         collect_message_duration: 10,
         waku_host: None,
         waku_port: None,
