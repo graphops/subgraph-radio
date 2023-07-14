@@ -6,11 +6,9 @@ use axum::{
     response::{Html, IntoResponse},
     Json,
 };
-use opentelemetry::trace::TraceContextExt;
 use serde::Serialize;
 use std::sync::Arc;
 use tracing::{span, trace, Instrument, Level};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::model::SubgraphRadioContext;
 use crate::server::model::SubgraphRadioSchema;
@@ -47,13 +45,5 @@ pub(crate) async fn graphql_handler(
 
     trace!("Processing GraphQL request finished");
 
-    response
-        .extension(
-            "traceId",
-            async_graphql::Value::String(format!(
-                "{}",
-                span.context().span().span_context().trace_id()
-            )),
-        )
-        .into()
+    response.into()
 }

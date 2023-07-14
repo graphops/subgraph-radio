@@ -1,6 +1,6 @@
 [package]
 name = "subgraph-radio"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["GraphOps (axiomatic-aardvark, hopeyen)"]
 description = "Subgraph Radio monitors subgraph Public PoI and version upgrades messages in real time using Graphcast SDK"
@@ -20,22 +20,19 @@ sha3 = "0.10.8"
 derive-getters = "0.2.1"
 tokio = { version = "1.28.1", features = ["full", "rt"] }
 anyhow = "1.0"
-graphql_client = "0.9.0"
+graphql_client = "0.12.0"
 serde_derive = "1.0"
 reqwest = { version = "0.11.17", features = ["json"] }
 thiserror = "1.0.40"
-regex = "1.8.1"
 ethers = "2.0.4"
 ethers-contract = "2.0.4"
 ethers-core = "2.0.4"
 ethers-derive-eip712 = "1.0.2"
 partial_application = "0.2.1"
-num-bigint = "0.4.3"
 num-traits = "0.2.15"
-wiremock = "0.5.18"
 dotenv = "0.15"
 rand = "0.8.5"
-secp256k1 = "0.25.0"
+secp256k1 = "0.27.0"
 hex = "0.4.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [
@@ -48,13 +45,11 @@ tracing-subscriber = { version = "0.3", features = [
 autometrics = { version = "0.3.3", features = ["prometheus-exporter"] }
 axum = "0.5"
 prometheus = "0.13.3"
-tower-http = { version = "0.4.0", features = ["trace", "cors"] }
 async-graphql = "4.0.16"
 async-graphql-axum = "4.0.16"
 async-trait = "0.1.71"
-metrics = "0.20.1"
-metrics-exporter-prometheus = "0.11.0"
-opentelemetry = { version = "0.18.0", features = ["rt-tokio"] }
+metrics = "0.21.0"
+opentelemetry = { version = "0.19.0", features = ["rt-tokio", "trace"] }
 tracing-opentelemetry = "0.18.0"
 clap = { version = "3.2.25", features = ["derive", "env"] }
 
