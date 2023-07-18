@@ -8,9 +8,7 @@ use graphcast_sdk::{
     graphcast_agent::{
         message_typing::IdentityValidation, GraphcastAgentConfig, GraphcastAgentError,
     },
-    graphql::{
-        client_network::query_network_subgraph, client_registry::query_registry, QueryError,
-    },
+    graphql::{client_network::query_network_subgraph, QueryError},
     init_tracing, wallet_address,
 };
 
@@ -365,17 +363,9 @@ impl Config {
         .await
     }
 
-    pub async fn basic_info(&self) -> Result<(String, f32), QueryError> {
-        // Using unwrap directly as the query has been ran in the set-up validation
-        let wallet = build_wallet(
-            self.wallet_input()
-                .map_err(|e| QueryError::Other(e.into()))?,
-        )
-        .map_err(|e| QueryError::Other(e.into()))?;
-        // The query here must be Ok but so it is okay to panic here
-        // Alternatively, make validate_set_up return wallet, address, and stake
-        let my_address = query_registry(self.registry_subgraph(), &wallet_address(&wallet)).await?;
-        let my_stake = query_network_subgraph(self.network_subgraph(), &my_address)
+    pub async fn basic_info(&self) -> Result<(&str, f32), QueryError> {
+        let my_address = self.indexer_address();
+        let my_stake = query_network_subgraph(self.network_subgraph(), my_address)
             .await
             .unwrap()
             .indexer_stake();
