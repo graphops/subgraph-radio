@@ -26,10 +26,8 @@
   "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "fifemon-graphql-datasource",
-        "uid": "oQVPXg84z"
-      },
+      "datasource": "FifemonGraphql",
+
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -84,9 +82,7 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -102,10 +98,7 @@
           "annotationTitle": "",
           "constant": 6.5,
           "dataPath": "data",
-          "datasource": {
-            "type": "fifemon-graphql-datasource",
-            "uid": "oQVPXg84z"
-          },
+          "datasource": "FifemonGraphql",
           "endTimePath": "endTime",
           "groupBy": "resultType",
           "hide": false,
@@ -121,15 +114,11 @@
           "options": {
             "fields": {
               "Count": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "aggregate"
               },
               "DIVERGENT_deployment": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "aggregate"
               },
               "DIVERGENT_resultType": {
@@ -141,15 +130,11 @@
                 "operation": "groupby"
               },
               "MATCH_deployment": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "aggregate"
               },
               "MATCH_resultType": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "groupby"
               },
               "deployment": {
@@ -163,10 +148,7 @@
       "type": "gauge"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "description": "Average metrics based on each scrape\n- counter for received valid messages\n- gauge of cached messages\n\n- cached messages \n",
       "fieldConfig": {
         "defaults": {
@@ -197,9 +179,7 @@
         "displayMode": "basic",
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -214,10 +194,7 @@
           "annotationTitle": "",
           "constant": 6.5,
           "dataPath": "data",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "endTimePath": "endTime",
           "exemplar": true,
           "expr": "avg(graphcast_poi_radio_validated_messages{})",
@@ -233,10 +210,7 @@
           "timePath": "Time"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": false,
           "expr": "avg(graphcast_poi_radio_cached_messages{})",
           "hide": false,
@@ -246,10 +220,7 @@
           "refId": "Cached Messages"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "avg(graphcast_poi_radio_local_npois_to_compare{})",
           "hide": false,
@@ -263,10 +234,8 @@
       "type": "bargauge"
     },
     {
-      "datasource": {
-        "type": "fifemon-graphql-datasource",
-        "uid": "oQVPXg84z"
-      },
+      "datasource": "FifemonGraphql",
+
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -303,9 +272,7 @@
       "options": {
         "footer": {
           "fields": "",
-          "reducer": [
-            "sum"
-          ],
+          "reducer": ["sum"],
           "show": false
         },
         "showHeader": true,
@@ -325,10 +292,7 @@
           "annotationTitle": "",
           "constant": 6.5,
           "dataPath": "data",
-          "datasource": {
-            "type": "fifemon-graphql-datasource",
-            "uid": "oQVPXg84z"
-          },
+          "datasource": "FifemonGraphql",
           "endTimePath": "endTime",
           "groupBy": "null",
           "queryText": "query {\n  data:comparisonRatio{\n    deployment\n    blockNumber\n    senderRatio\n    stakeRatio\n  }\n}",
@@ -341,10 +305,7 @@
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -414,10 +375,7 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "histogram_quantile(0.95, sum(rate(graphcast_poi_radio_indexer_count_by_npoi_bucket[5m])) by (le))",
           "interval": "",
@@ -425,10 +383,7 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "rate(graphcast_poi_radio_indexer_count_by_npoi_count[1m])",
           "hide": false,
@@ -437,10 +392,7 @@
           "refId": "B"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "graphcast_poi_radio_indexer_count_by_npoi",
           "format": "time_series",
@@ -454,10 +406,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -552,10 +501,7 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "graphcast_poi_radio_local_npois_to_compare",
           "interval": "",
@@ -567,10 +513,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -665,10 +608,7 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": false,
           "expr": "graphcast_poi_radio_ACTIVE_INDEXERS",
           "interval": "",
@@ -680,10 +620,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -778,10 +715,7 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "rate(graphcast_poi_radio_validated_messages[5m])",
           "interval": "",
@@ -789,10 +723,7 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "rate(graphcast_poi_radio_cached_messages[5m])",
           "hide": false,
@@ -805,10 +736,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -878,10 +806,7 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "graphcast_poi_radio_diverging_subgraphs",
           "interval": "",
@@ -893,10 +818,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -991,10 +913,7 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "function_calls_concurrent",
           "interval": "",
@@ -1002,10 +921,7 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "histogram_quantile(0.95, sum(rate(function_calls_duration_bucket[5m])) by (le))",
           "hide": false,
@@ -1014,10 +930,7 @@
           "refId": "B"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "rate(function_calls_count[5m])",
           "hide": false,
@@ -1115,17 +1028,7 @@
       "2h",
       "1d"
     ],
-    "time_options": [
-      "5m",
-      "15m",
-      "1h",
-      "6h",
-      "12h",
-      "24h",
-      "2d",
-      "7d",
-      "30d"
-    ],
+    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"],
     "type": "timepicker"
   },
   "timezone": "browser",

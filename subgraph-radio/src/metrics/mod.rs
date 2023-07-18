@@ -149,6 +149,8 @@ pub async fn get_metrics() -> (StatusCode, String) {
 /// Run the API server as well as Prometheus and a traffic generator
 #[allow(dead_code)]
 pub async fn handle_serve_metrics(host: String, port: u16) {
+    println!("HELLO88");
+
     // Set up the exporter to collect metrics
     let _exporter = global_metrics_exporter();
 

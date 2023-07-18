@@ -217,6 +217,7 @@ impl RadioOperator {
     pub async fn prepare(&self) {
         // Set up Prometheus metrics url if configured
         if let Some(port) = self.config.metrics_port {
+            println!("HELLO44");
             debug!("Initializing metrics port");
             tokio::spawn(handle_serve_metrics(self.config.metrics_host.clone(), port));
         }
