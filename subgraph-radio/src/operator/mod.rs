@@ -7,6 +7,8 @@ use std::time::Duration;
 use tokio::time::{interval, sleep, timeout};
 use tracing::{debug, error, info, trace, warn};
 
+use crate::{chainhead_block_str, messages::poi::process_valid_message};
+use crate::{messages::poi::PublicPoiMessage, metrics::VALIDATED_MESSAGES};
 use graphcast_sdk::{
     build_wallet,
     graphcast_agent::{
@@ -14,9 +16,6 @@ use graphcast_sdk::{
     },
     graphql::client_graph_node::{subgraph_network_blocks, update_network_chainheads},
 };
-
-use crate::messages::poi::PublicPoiMessage;
-use crate::{chainhead_block_str, messages::poi::process_valid_message};
 
 use crate::config::Config;
 use crate::messages::upgrade::VersionUpgradeMessage;
@@ -159,6 +158,9 @@ impl RadioOperator {
                     let is_valid = msg.payload.validity_check(&msg, &graph_node).await;
 
                     if is_valid.is_ok() {
+                        VALIDATED_MESSAGES
+                            .with_label_values(&[&msg.identifier, "public_poi_message"])
+                            .inc();
                         process_valid_message(msg, &state_ref).await;
                     };
                 } else if let Ok(msg) = agent.decode::<VersionUpgradeMessage>(msg.payload()).await {
@@ -189,6 +191,9 @@ impl RadioOperator {
                     let is_valid = msg.payload.validity_check(&msg, &graph_node).await;
 
                     if let Ok(radio_msg) = is_valid {
+                        VALIDATED_MESSAGES
+                            .with_label_values(&[&msg.identifier, "version_upgrade_message"])
+                            .inc();
                         radio_msg.process_valid_message(&upgrade_notifier).await;
                     };
                 } else {

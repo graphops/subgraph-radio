@@ -24,7 +24,7 @@ use graphcast_sdk::{
 };
 
 use crate::{
-    metrics::CACHED_MESSAGES,
+    metrics::CACHED_PPOI_MESSAGES,
     operator::{
         attestation::{
             compare_attestations, local_comparison_point, save_local_attestation, Attestation,
@@ -297,7 +297,7 @@ pub async fn process_valid_message(
     let identifier = msg.identifier.clone();
 
     state.add_remote_ppoi_message(msg.clone());
-    CACHED_MESSAGES.with_label_values(&[&identifier]).set(
+    CACHED_PPOI_MESSAGES.with_label_values(&[&identifier]).set(
         state
             .remote_ppoi_messages()
             .iter()

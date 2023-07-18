@@ -141,7 +141,7 @@ impl QueryRoot {
             .await
             .map_err(HttpServiceError::QueryError)?;
         Ok(IndexerInfo {
-            address: basic_info.0,
+            address: basic_info.0.to_string(),
             stake: basic_info.1,
         })
     }

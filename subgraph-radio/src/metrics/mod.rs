@@ -17,7 +17,7 @@ pub static VALIDATED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new("validated_messages", "Number of validated messages")
             .namespace("graphcast")
             .subsystem("subgraph_radio"),
-        &["deployment"],
+        &["deployment", "message_type"],
     )
     .expect("Failed to create validated_messages counters");
     prometheus::register(Box::new(m.clone()))
@@ -27,15 +27,16 @@ pub static VALIDATED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
 
 // Received (and validated) messages counter
 #[allow(dead_code)]
-pub static CACHED_MESSAGES: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static CACHED_PPOI_MESSAGES: Lazy<IntGaugeVec> = Lazy::new(|| {
     let m = IntGaugeVec::new(
-        Opts::new("cached_messages", "Number of messages in cache")
+        Opts::new("cached_ppoi_messages", "Number of messages in cache")
             .namespace("graphcast")
             .subsystem("subgraph_radio"),
         &["deployment"],
     )
-    .expect("Failed to create cached_messages gauges");
-    prometheus::register(Box::new(m.clone())).expect("Failed to register cached_messages guage");
+    .expect("Failed to create cached_ppoi_messages gauges");
+    prometheus::register(Box::new(m.clone()))
+        .expect("Failed to register cached_ppoi_messages guage");
     m
 });
 
@@ -128,7 +129,7 @@ pub fn start_metrics() {
         &REGISTRY,
         vec![
             Box::new(VALIDATED_MESSAGES.clone()),
-            Box::new(CACHED_MESSAGES.clone()),
+            Box::new(CACHED_PPOI_MESSAGES.clone()),
             Box::new(ACTIVE_INDEXERS.clone()),
             Box::new(DIVERGING_SUBGRAPHS.clone()),
             Box::new(LOCAL_PPOIS_TO_COMPARE.clone()),
