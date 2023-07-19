@@ -13,7 +13,7 @@ use graphcast_sdk::{
 use crate::messages::poi::{poi_message_comparison, send_poi_message};
 
 use crate::{
-    metrics::CACHED_MESSAGES,
+    metrics::CACHED_PPOI_MESSAGES,
     operator::{attestation::ComparisonResult, RadioOperator},
     OperationError, GRAPHCAST_AGENT,
 };
@@ -169,7 +169,7 @@ impl RadioOperator {
                             .clean_local_attestations(r.block(), r.deployment_hash());
                         self.persisted_state
                             .clean_remote_ppoi_messages(r.block(), r.deployment_hash());
-                        CACHED_MESSAGES
+                        CACHED_PPOI_MESSAGES
                             .with_label_values(&[&r.deployment_hash()])
                             .set(
                                 self.state()
