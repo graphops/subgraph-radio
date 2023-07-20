@@ -19,9 +19,7 @@ use graphcast_sdk::{
 
 use crate::{
     messages::poi::PublicPoiMessage,
-    metrics::{
-        ACTIVE_INDEXERS, DIVERGING_SUBGRAPHS, INDEXER_COUNT_BY_PPOI, LOCAL_PPOIS_TO_COMPARE,
-    },
+    metrics::{ACTIVE_INDEXERS, DIVERGING_SUBGRAPHS, LOCAL_PPOIS_TO_COMPARE},
     state::PersistedState,
     OperationError,
 };
@@ -171,15 +169,9 @@ pub async fn process_ppoi_message(
     );
     // ppoi_hist by attestation - don't care for attestation but should be grouped together
     // so the summed up metrics should be ACTIVE_INDEXERS
-    let ppoi_hist = INDEXER_COUNT_BY_PPOI.with_label_values(&[&first_msg.identifier.to_string()]);
     let blocks = remote_attestations
         .entry(first_msg.identifier.to_string())
         .or_default();
-    for a in blocks.entry(first_msg.payload.block_number).or_default() {
-        // this can probably sum up to active peers)
-        // Update INDEXER_COUNT_BY_PPOI metric
-        ppoi_hist.observe(a.senders.len() as f64);
-    }
 
     let active_indexers = ACTIVE_INDEXERS.with_label_values(&[&first_msg.identifier.to_string()]);
     let senders = combine_senders(blocks.entry(first_msg.payload.block_number).or_default());

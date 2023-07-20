@@ -4,9 +4,7 @@ use axum::routing::get;
 use axum::Router;
 use once_cell::sync::Lazy;
 use prometheus::{core::Collector, Registry};
-use prometheus::{
-    linear_buckets, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts,
-};
+use prometheus::{IntCounterVec, IntGauge, IntGaugeVec, Opts};
 use std::{net::SocketAddr, str::FromStr};
 use tracing::{debug, info};
 
@@ -91,28 +89,6 @@ pub static LOCAL_PPOIS_TO_COMPARE: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 #[allow(dead_code)]
-pub static INDEXER_COUNT_BY_PPOI: Lazy<HistogramVec> = Lazy::new(|| {
-    let m = HistogramVec::new(
-        HistogramOpts::new(
-            "indexer_count_by_ppoi",
-            "Count of indexers attesting for a pPOI",
-        )
-        .namespace("graphcast")
-        .subsystem("subgraph_radio")
-        .buckets(linear_buckets(0.0, 1.0, 20).unwrap()),
-        // Q: if we add indexer group hash here
-        // then new metric is created for changes in indexers. I imagine this not so important
-        // when it is the same group, but it is a chance to record indexer info.
-        // description of metrics cannot be updated after initialization
-        &["deployment"],
-    )
-    .expect("Failed to create indexer_count_by_ppoi histograms");
-    prometheus::register(Box::new(m.clone()))
-        .expect("Failed to register indexer_count_by_ppoi counter");
-    m
-});
-
-#[allow(dead_code)]
 pub static REGISTRY: Lazy<prometheus::Registry> = Lazy::new(prometheus::Registry::new);
 
 #[allow(dead_code)]
@@ -133,7 +109,6 @@ pub fn start_metrics() {
             Box::new(ACTIVE_INDEXERS.clone()),
             Box::new(DIVERGING_SUBGRAPHS.clone()),
             Box::new(LOCAL_PPOIS_TO_COMPARE.clone()),
-            Box::new(INDEXER_COUNT_BY_PPOI.clone()),
         ],
     );
 }

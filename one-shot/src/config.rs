@@ -221,43 +221,6 @@ pub struct Config {
     pub telegram_chat_id: Option<i64>,
     #[clap(
         long,
-        value_name = "METRICS_HOST",
-        default_value = "0.0.0.0",
-        help = "If port is set, the Radio will expose Prometheus metrics on the given host. This requires having a local Prometheus server running and scraping metrics on the given port.",
-        env = "METRICS_HOST"
-    )]
-    pub metrics_host: String,
-    #[clap(
-        long,
-        value_name = "METRICS_PORT",
-        help = "If set, the Radio will expose Prometheus metrics on the given port (off by default). This requires having a local Prometheus server running and scraping metrics on the given port.",
-        env = "METRICS_PORT"
-    )]
-    pub metrics_port: Option<u16>,
-    #[clap(
-        long,
-        value_name = "SERVER_HOST",
-        default_value = "0.0.0.0",
-        help = "If port is set, the Radio will expose API service on the given host.",
-        env = "SERVER_HOST"
-    )]
-    pub server_host: String,
-    #[clap(
-        long,
-        value_name = "SERVER_PORT",
-        help = "If set, the Radio will expose API service on the given port (off by default).",
-        env = "SERVER_PORT"
-    )]
-    pub server_port: Option<u16>,
-    #[clap(
-        long,
-        value_name = "PERSISTENCE_FILE_PATH",
-        help = "If set, the Radio will periodically store states of the program to the file in json format",
-        env = "PERSISTENCE_FILE_PATH"
-    )]
-    pub persistence_file_path: Option<String>,
-    #[clap(
-        long,
         value_name = "LOG_FORMAT",
         env = "LOG_FORMAT",
         help = "Support logging formats: pretty, json, full, compact",
@@ -273,12 +236,11 @@ pub struct Config {
         default_value = "subgraph-radio"
     )]
     pub radio_name: String,
-    #[clap(long, value_name = "FILTER_PROTOCOL", env = "ENABLE_FILTER_PROTOCOL")]
-    pub filter_protocol: Option<bool>,
     #[clap(
         long,
         value_name = "ID_VALIDATION",
         value_enum,
+        default_value = "subgraph-staker",
         env = "ID_VALIDATION",
         help = "Identity validaiton mechanism for message signers",
         long_help = "Identity validaiton mechanism for message signers\n
@@ -290,13 +252,6 @@ pub struct Config {
         indexer: must be registered at Graphcast Registry or is a Graph Account, correspond to and Indexer statisfying indexer minimum stake requirement"
     )]
     pub id_validation: IdentityValidation,
-    #[clap(
-        long,
-        value_name = "TOPIC_UPDATE_INTERVAL",
-        env = "TOPIC_UPDATE_INTERVAL",
-        default_value = "600"
-    )]
-    pub topic_update_interval: u64,
 }
 
 impl Config {
@@ -336,26 +291,6 @@ impl Config {
         let wallet_key = self.wallet_input().unwrap().to_string();
         let topics = self.topics.clone();
 
-        info!(
-            wallet_key = tracing::field::debug(&wallet_key),
-            graph_account = tracing::field::debug(&self.graph_account.clone()),
-            radio_name = tracing::field::debug(&self.radio_name.clone()),
-            registry_subgraph = tracing::field::debug(&self.registry_subgraph.clone()),
-            network_subgraph = tracing::field::debug(&self.network_subgraph.clone()),
-            id_validation = tracing::field::debug(&self.id_validation.clone()),
-            boot_node_addresses = tracing::field::debug(&Some(self.boot_node_addresses.clone())),
-            graphcast_network = tracing::field::debug(&Some(self.graphcast_network.to_owned())),
-            topics = tracing::field::debug(&Some(topics.clone())),
-            waku_node_key = tracing::field::debug(&self.waku_node_key.clone()),
-            waku_host = tracing::field::debug(&self.waku_host.clone()),
-            waku_port = tracing::field::debug(&self.waku_port.clone()),
-            waku_addr = tracing::field::debug(&self.waku_addr.clone()),
-            filter_protocol = tracing::field::debug(&self.filter_protocol),
-            discv5_enrs = tracing::field::debug(&self.discv5_enrs.clone()),
-            discv5_port = tracing::field::debug(&self.discv5_port),
-            "Config stuff",
-        );
-
         GraphcastAgentConfig::new(
             wallet_key,
             self.graph_account.clone(),
@@ -371,7 +306,7 @@ impl Config {
             self.waku_host.clone(),
             self.waku_port.clone(),
             self.waku_addr.clone(),
-            self.filter_protocol,
+            Some(true),
             self.discv5_enrs.clone(),
             self.discv5_port,
         )

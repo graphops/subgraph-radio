@@ -105,12 +105,12 @@ pub struct Config {
         long,
         value_name = "COVERAGE",
         value_enum,
-        default_value = "on-chain",
+        default_value = "comprehensive",
         env = "COVERAGE",
         help = "Toggle for topic coverage level",
         long_help = "Topic coverage level\ncomprehensive: Subscribe to on-chain topics, user defined static topics, and additional topics\n
             on-chain: Subscribe to on-chain topics and user defined static topics\nminimal: Only subscribe to user defined static topics.\n
-            Default is set to on-chain coverage"
+            Default: comprehensive"
     )]
     pub coverage: CoverageLevel,
     #[clap(
@@ -283,10 +283,10 @@ pub struct Config {
         long,
         value_name = "ID_VALIDATION",
         value_enum,
-        default_value = "registered-indexer",
+        default_value = "indexer",
         env = "ID_VALIDATION",
         help = "Identity validaiton mechanism for message signers",
-        long_help = "Identity validaiton mechanism for message signers\n
+        long_help = "Identity validaiton mechanism for message signers. Default: indexer\n
         no-check: all messages signer is valid, \n
         valid-address: signer needs to be an valid Eth address, \n
         graphcast-registered: must be registered at Graphcast Registry, \n
