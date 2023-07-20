@@ -10,7 +10,6 @@ use tracing::{debug, error, info, trace, warn};
 use crate::{chainhead_block_str, messages::poi::process_valid_message};
 use crate::{messages::poi::PublicPoiMessage, metrics::VALIDATED_MESSAGES};
 use graphcast_sdk::{
-    build_wallet,
     graphcast_agent::{
         message_typing::check_message_validity, waku_handling::WakuHandlingError, GraphcastAgent,
     },
@@ -91,14 +90,6 @@ impl RadioOperator {
     /// Create a radio operator with radio configurations, persisted data,
     /// graphcast agent, and control flow
     pub async fn new(config: &Config) -> RadioOperator {
-        debug!("Initializing Radio operator");
-        let _wallet = build_wallet(
-            config
-                .wallet_input()
-                .expect("Operator wallet input invalid"),
-        )
-        .expect("Radio operator cannot build wallet");
-
         debug!("Initializing program state");
         // Initialize program state
         let persisted_state: PersistedState = config.init_radio_state().await;
