@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -26,10 +29,7 @@
   "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "fifemon-graphql-datasource",
-        "uid": "oQVPXg84z"
-      },
+      "datasource": "SubgraphRadioGraphQL",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -84,16 +84,14 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "8.3.1",
+      "pluginVersion": "9.4.1",
       "targets": [
         {
           "aliasBy": "",
@@ -102,10 +100,7 @@
           "annotationTitle": "",
           "constant": 6.5,
           "dataPath": "data",
-          "datasource": {
-            "type": "fifemon-graphql-datasource",
-            "uid": "oQVPXg84z"
-          },
+          "datasource": "SubgraphRadioGraphQL",
           "endTimePath": "endTime",
           "groupBy": "resultType",
           "hide": false,
@@ -121,15 +116,11 @@
           "options": {
             "fields": {
               "Count": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "aggregate"
               },
               "DIVERGENT_deployment": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "aggregate"
               },
               "DIVERGENT_resultType": {
@@ -141,15 +132,11 @@
                 "operation": "groupby"
               },
               "MATCH_deployment": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "aggregate"
               },
               "MATCH_resultType": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "groupby"
               },
               "deployment": {
@@ -163,10 +150,7 @@
       "type": "gauge"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "description": "Average metrics based on each scrape\n- counter for received valid messages\n- gauge of cached messages\n\n- cached messages \n",
       "fieldConfig": {
         "defaults": {
@@ -195,50 +179,32 @@
       "id": 123139,
       "options": {
         "displayMode": "basic",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
         "showUnfilled": true
       },
-      "pluginVersion": "8.3.1",
+      "pluginVersion": "9.4.1",
       "targets": [
         {
-          "aliasBy": "",
-          "annotationTags": "",
-          "annotationText": "",
-          "annotationTitle": "",
-          "constant": 6.5,
-          "dataPath": "data",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
-          "endTimePath": "endTime",
-          "exemplar": true,
-          "expr": "avg(graphcast_poi_radio_validated_messages{})",
-          "format": "time_series",
-          "groupBy": "",
+          "datasource": "Prometheus",
+          "editorMode": "builder",
+          "expr": "avg(graphcast_subgraph_radio_validated_messages{})",
           "hide": false,
-          "instant": false,
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "",
-          "queryText": "query {\n      data:submissions(user:\"$user\"){\n          Time:submitTime\n          idle running completed\n      }\n}",
-          "refId": "Received Messages",
-          "timePath": "Time"
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "Received Messages"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(graphcast_poi_radio_cached_messages{})",
+          "expr": "avg(graphcast_subgraph_radio_cached_ppoi_messages{})",
           "hide": false,
           "instant": true,
           "interval": "",
@@ -246,16 +212,13 @@
           "refId": "Cached Messages"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
-          "expr": "avg(graphcast_poi_radio_local_npois_to_compare{})",
+          "expr": "avg(graphcast_subgraph_radio_local_ppois_to_compare{})",
           "hide": false,
           "interval": "",
           "legendFormat": "",
-          "refId": "Local POIs"
+          "refId": "Local Public POIs"
         }
       ],
       "title": "Message averages",
@@ -263,10 +226,7 @@
       "type": "bargauge"
     },
     {
-      "datasource": {
-        "type": "fifemon-graphql-datasource",
-        "uid": "oQVPXg84z"
-      },
+      "datasource": "SubgraphRadioGraphQL",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -274,7 +234,10 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto"
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -302,10 +265,9 @@
       "id": 123137,
       "options": {
         "footer": {
+          "countRows": false,
           "fields": "",
-          "reducer": [
-            "sum"
-          ],
+          "reducer": ["sum"],
           "show": false
         },
         "showHeader": true,
@@ -316,7 +278,7 @@
           }
         ]
       },
-      "pluginVersion": "8.3.1",
+      "pluginVersion": "9.4.1",
       "targets": [
         {
           "aliasBy": "",
@@ -325,10 +287,7 @@
           "annotationTitle": "",
           "constant": 6.5,
           "dataPath": "data",
-          "datasource": {
-            "type": "fifemon-graphql-datasource",
-            "uid": "oQVPXg84z"
-          },
+          "datasource": "SubgraphRadioGraphQL",
           "endTimePath": "endTime",
           "groupBy": "null",
           "queryText": "query {\n  data:comparisonRatio{\n    deployment\n    blockNumber\n    senderRatio\n    stakeRatio\n  }\n}",
@@ -341,16 +300,15 @@
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -401,7 +359,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "graphcast_poi_radio_local_npois_to_compare{deployment=\"QmbwR7LNo7ZFJWvqqNhsL9gRUUotV7R9osA6dZSZxhEjtg\", instance=\"poi-radio:2384\", job=\"poi-radio\"}"
+                  "graphcast_subgraph_radio_local_ppois_to_compare{deployment=\"QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB\", instance=\"localhost:3010\", job=\"example-api-metrics\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -431,39 +389,39 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "graphcast_poi_radio_local_npois_to_compare",
+          "expr": "graphcast_subgraph_radio_local_ppois_to_compare",
           "interval": "",
           "legendFormat": "",
+          "range": true,
           "refId": "A"
         }
       ],
-      "title": "Locally tracked NPOIs",
+      "title": "Locally tracked Public POIs",
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -496,8 +454,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -514,7 +471,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "graphcast_poi_radio_ACTIVE_INDEXERS{deployment=\"QmZXmDNqvDWTdcyCTwV5HevwLix1tY2MA97B5hkvdHUQFi\", instance=\"poi-radio:2384\", job=\"poi-radio\"}"
+                  "graphcast_subgraph_radio_ACTIVE_INDEXERS{deployment=\"QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB\", instance=\"localhost:3010\", job=\"example-api-metrics\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -544,22 +501,23 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "graphcast_poi_radio_ACTIVE_INDEXERS",
+          "expr": "graphcast_subgraph_radio_ACTIVE_INDEXERS",
           "interval": "",
           "legendFormat": "",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -567,16 +525,15 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -609,8 +566,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -627,7 +583,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "{deployment=\"QmUVskWrz1ZiQZ76AtyhcfFDEH1ELnRpoyEhVL8p6NFTbR\", instance=\"poi-radio:2384\", job=\"poi-radio\"}"
+                  "{deployment=\"QmeVudaULhhuriTEreJWXrTPBmnGHXTQ8DgUukmhSR7Naa\", instance=\"localhost:3010\", job=\"example-api-metrics\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -657,34 +613,24 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "rate(graphcast_poi_radio_validated_messages[5m])",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
-          "exemplar": true,
-          "expr": "rate(graphcast_poi_radio_cached_messages[5m])",
+          "expr": "rate(graphcast_subgraph_radio_cached_ppoi_messages[5m])",
           "hide": false,
           "interval": "",
           "legendFormat": "",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -692,16 +638,15 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -734,8 +679,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -757,22 +701,23 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "graphcast_poi_radio_diverging_subgraphs",
+          "expr": "graphcast_subgraph_radio_diverging_subgraphs",
           "interval": "",
           "legendFormat": "",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -780,16 +725,15 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "P1809F7CD0C75ACF3"
-      },
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -822,8 +766,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -840,7 +783,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "function_calls_concurrent{function=\"message_comparison\", instance=\"poi-radio:2384\", job=\"poi-radio\", module=\"poi_radio::operation\"}"
+                  "function_calls_concurrent{function=\"gossip_set_up\", instance=\"localhost:3010\", job=\"example-api-metrics\", module=\"subgraph_radio::operator::operation\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -870,18 +813,17 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "function_calls_concurrent",
           "interval": "",
@@ -889,10 +831,7 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "histogram_quantile(0.95, sum(rate(function_calls_duration_bucket[5m])) by (le))",
           "hide": false,
@@ -901,10 +840,7 @@
           "refId": "B"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "P1809F7CD0C75ACF3"
-          },
+          "datasource": "Prometheus",
           "exemplar": true,
           "expr": "rate(function_calls_count[5m])",
           "hide": false,
@@ -915,77 +851,18 @@
       ],
       "title": "Function Stats",
       "type": "timeseries"
-    },
-    {
-      "gridPos": {
-        "h": 3,
-        "w": 24,
-        "x": 0,
-        "y": 40
-      },
-      "id": 1,
-      "type": "welcome"
-    },
-    {
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 43
-      },
-      "id": 123123,
-      "type": "gettingstarted"
-    },
-    {
-      "gridPos": {
-        "h": 15,
-        "w": 12,
-        "x": 0,
-        "y": 52
-      },
-      "id": 3,
-      "links": [],
-      "options": {
-        "folderId": 0,
-        "maxItems": 30,
-        "query": "",
-        "showHeadings": true,
-        "showRecentlyViewed": true,
-        "showSearch": false,
-        "showStarred": true,
-        "tags": []
-      },
-      "pluginVersion": "8.3.1",
-      "tags": [],
-      "title": "Dashboards",
-      "type": "dashlist"
-    },
-    {
-      "gridPos": {
-        "h": 15,
-        "w": 12,
-        "x": 12,
-        "y": 52
-      },
-      "id": 4,
-      "links": [],
-      "options": {
-        "feedUrl": "https://grafana.com/blog/news.xml",
-        "showImage": true
-      },
-      "title": "Latest from the blog",
-      "type": "news"
     }
   ],
   "refresh": "",
-  "schemaVersion": 33,
+  "revision": 1,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {
@@ -1002,22 +879,11 @@
       "2h",
       "1d"
     ],
-    "time_options": [
-      "5m",
-      "15m",
-      "1h",
-      "6h",
-      "12h",
-      "24h",
-      "2d",
-      "7d",
-      "30d"
-    ],
+    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"],
     "type": "timepicker"
   },
   "timezone": "browser",
-  "title": "Graphcast POI Radio",
-  "uid": "WzeduAYVz",
-  "version": 61,
+  "title": "Graphcast Subgraph Radio",
+  "version": 9,
   "weekStart": ""
 }
