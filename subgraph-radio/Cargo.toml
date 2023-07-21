@@ -1,6 +1,6 @@
 [package]
 name = "subgraph-radio"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["GraphOps (axiomatic-aardvark, hopeyen)"]
 description = "Subgraph Radio monitors subgraph Public PoI and version upgrades messages in real time using Graphcast SDK"

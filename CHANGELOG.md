@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Add metrics label for msg types
+- Remove id verification for self in api service
+
+### Miscellaneous Tasks
+
+- Update grafana dashboard json
+- Release 0.1.2
+
+### Refactor
+
+- Id_validation and coverage defaults, remove indexer_count_by_ppoi
+
+## [0.4.0] - 2023-07-14
+
+### Bug Fixes
+
 - Server context types
 - Remove double Arc Mutex from state types
 - Consistent nonce during build
