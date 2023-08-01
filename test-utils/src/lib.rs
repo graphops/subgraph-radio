@@ -69,7 +69,7 @@ pub async fn setup(
     test_file_name: &str,
     test_sender_config: &mut TestSenderConfig,
 ) -> ProcessManager {
-    if let Some(file_path) = &config.persistence_file_path {
+    if let Some(file_path) = &config.radio_infrastructure().persistence_file_path {
         let path = Path::new(file_path);
         if path.exists() {
             fs::remove_file(path).expect("Failed to remove file");
@@ -121,20 +121,20 @@ pub async fn setup(
     let host = format!("127.0.0.1:{}", port);
     let server_state = start_mock_server(
         host.clone(),
-        config.topics.clone(),
+        config.radio_infrastructure().topics.clone(),
         test_sender_config.staked_tokens.clone(),
     )
     .await;
 
-    config.graph_node_endpoint = format!("http://{}/graphql", host);
-    config.registry_subgraph = format!("http://{}/registry-subgraph", host);
-    config.network_subgraph = format!("http://{}/network-subgraph", host);
-    config.radio_name = radio_name;
-    config.waku_port = Some(waku_port.to_string());
-    config.discv5_port = Some(discv5_port);
+    config.graph_stack.graph_node_status_endpoint = format!("http://{}/graphql", host);
+    config.graph_stack.registry_subgraph = format!("http://{}/registry-subgraph", host);
+    config.graph_stack.network_subgraph = format!("http://{}/network-subgraph", host);
+    config.radio_infrastructure.radio_name = radio_name;
+    config.waku.waku_port = Some(waku_port.to_string());
+    config.waku.discv5_port = Some(discv5_port);
 
     info!(
-        "Starting POI Radio instance on port {}",
+        "Starting Subgraph Radio instance on port {}",
         waku_port.to_string()
     );
 
@@ -166,56 +166,97 @@ pub fn start_radio(config: &Config) -> Child {
         .arg("subgraph-radio")
         .arg("--")
         .arg("--graph-node-endpoint")
-        .arg(&config.graph_node_endpoint)
+        .arg(&config.graph_stack().graph_node_status_endpoint)
         .arg("--private-key")
-        .arg(config.private_key.as_deref().unwrap_or("None"))
+        .arg(
+            config
+                .graph_stack()
+                .private_key
+                .as_deref()
+                .unwrap_or("None"),
+        )
         .arg("--registry-subgraph")
-        .arg(&config.registry_subgraph)
+        .arg(&config.graph_stack().registry_subgraph)
         .arg("--network-subgraph")
-        .arg(&config.network_subgraph)
+        .arg(&config.graph_stack().network_subgraph)
         .arg("--graphcast-network")
-        .arg(&config.graphcast_network)
+        .arg(config.radio_infrastructure().graphcast_network.to_string())
         .arg("--topics")
-        .arg(config.topics.join(","))
+        .arg(config.radio_infrastructure().topics.join(","))
         .arg("--coverage")
-        .arg(match config.coverage {
+        .arg(match config.radio_infrastructure().coverage {
             CoverageLevel::Minimal => "minimal",
             CoverageLevel::OnChain => "on-chain",
             CoverageLevel::Comprehensive => "comprehensive",
         })
         .arg("--collect-message-duration")
-        .arg(config.collect_message_duration.to_string())
+        .arg(
+            config
+                .radio_infrastructure()
+                .collect_message_duration
+                .to_string(),
+        )
         .arg("--waku-log-level")
-        .arg(config.waku_log_level.as_deref().unwrap_or("None"))
+        .arg(config.waku().waku_log_level.as_deref().unwrap_or("None"))
         .arg("--waku-port")
-        .arg(config.waku_port.as_deref().unwrap_or("None"))
+        .arg(config.waku().waku_port.as_deref().unwrap_or("None"))
         .arg("--log-level")
-        .arg(&config.log_level)
+        .arg(&config.radio_infrastructure().log_level)
         .arg("--slack-token")
-        .arg(config.slack_token.as_deref().unwrap_or("None"))
+        .arg(
+            config
+                .radio_infrastructure()
+                .slack_token
+                .as_deref()
+                .unwrap_or("None"),
+        )
         .arg("--slack-channel")
-        .arg(config.slack_channel.as_deref().unwrap_or("None"))
+        .arg(
+            config
+                .radio_infrastructure()
+                .slack_channel
+                .as_deref()
+                .unwrap_or("None"),
+        )
         .arg("--discord-webhook")
-        .arg(config.discord_webhook.as_deref().unwrap_or("None"))
+        .arg(
+            config
+                .radio_infrastructure()
+                .discord_webhook
+                .as_deref()
+                .unwrap_or("None"),
+        )
         .arg("--persistence-file-path")
-        .arg(config.persistence_file_path.as_deref().unwrap_or("None"))
+        .arg(
+            config
+                .radio_infrastructure()
+                .persistence_file_path
+                .as_deref()
+                .unwrap_or("None"),
+        )
         .arg("--log-format")
-        .arg(&config.log_format)
+        .arg(&config.radio_infrastructure().log_format.to_string())
         .arg("--radio-name")
-        .arg(&config.radio_name)
+        .arg(&config.radio_infrastructure().radio_name)
         .arg("--topic-update-interval")
-        .arg(&config.topic_update_interval.to_string())
+        .arg(
+            config
+                .radio_infrastructure()
+                .topic_update_interval
+                .to_string(),
+        )
         .arg("--discv5-port")
         .arg(
             config
+                .waku()
                 .discv5_port
                 .map(|p| p.to_string())
                 .unwrap_or_else(|| "None".to_string()),
         )
         .arg("--indexer-address")
-        .arg(&config.indexer_address)
+        .arg(&config.graph_stack().indexer_address)
         .arg("--id-validation")
-        .arg(match config.id_validation {
+        .arg(match config.radio_infrastructure().id_validation {
             IdentityValidation::NoCheck => "no-check",
             IdentityValidation::ValidAddress => "valid-address",
             IdentityValidation::GraphcastRegistered => "graphcast-registered",

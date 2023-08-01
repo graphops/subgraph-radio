@@ -8,8 +8,8 @@ use secp256k1::SecretKey;
 use std::collections::HashMap;
 
 use graphcast_sdk::networks::NetworkName;
-use graphcast_sdk::{BlockPointer, NetworkPointer};
-use subgraph_radio::config::Config;
+use graphcast_sdk::{BlockPointer, GraphcastNetworkName, LogFormat, NetworkPointer};
+use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioInfrastructure, Waku};
 
 fn gossip_poi_bench(c: &mut Criterion) {
     let identifiers = black_box(vec!["identifier1".to_string(), "identifier2".to_string()]);
@@ -20,46 +20,53 @@ fn gossip_poi_bench(c: &mut Criterion) {
     let pk = black_box(generate_random_private_key());
 
     let config = black_box(Config {
-        radio_name: String::from("test"),
-        indexer_address: String::from("indexer_address"),
-        graph_node_endpoint: String::from("http://localhost:8030/graphql"),
-        private_key: Some(pk.display_secret().to_string()),
-        mnemonic: None,
-        registry_subgraph: String::from(
-            "https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-goerli",
-        ),
-        network_subgraph: String::from(
-            "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli",
-        ),
-        graphcast_network: String::from("testnet"),
-        topics: vec![String::from(
-            "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",
-        )],
-        coverage: subgraph_radio::config::CoverageLevel::Comprehensive,
-        collect_message_duration: 10,
-        waku_host: None,
-        waku_port: None,
-        waku_node_key: None,
-        boot_node_addresses: vec![],
-        waku_log_level: None,
-        waku_addr: None,
-        log_level: String::from("info"),
-        slack_token: None,
-        slack_channel: None,
-        discord_webhook: None,
-        telegram_token: None,
-        telegram_chat_id: None,
-        metrics_host: String::from("0.0.0.0"),
-        metrics_port: None,
-        server_host: String::from("0.0.0.0"),
-        server_port: None,
-        log_format: String::from("pretty"),
-        persistence_file_path: None,
-        discv5_enrs: None,
-        discv5_port: None,
-        filter_protocol: None,
-        id_validation: IdentityValidation::NoCheck,
-        topic_update_interval: 600,
+        graph_stack: GraphStack {
+            indexer_address: String::from("indexer_address"),
+            graph_node_status_endpoint: String::from("http://localhost:8030/graphql"),
+            private_key: Some(pk.display_secret().to_string()),
+            mnemonic: None,
+            registry_subgraph: String::from(
+                "https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-goerli",
+            ),
+            network_subgraph: String::from(
+                "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli",
+            ),
+        },
+        waku: Waku {
+            waku_host: None,
+            waku_port: None,
+            waku_node_key: None,
+            boot_node_addresses: vec![],
+            waku_log_level: None,
+            waku_addr: None,
+            discv5_enrs: None,
+            discv5_port: None,
+            filter_protocol: None,
+        },
+        radio_infrastructure: RadioInfrastructure {
+            radio_name: String::from("test"),
+            topics: vec![String::from(
+                "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",
+            )],
+            coverage: CoverageLevel::Comprehensive,
+            collect_message_duration: 10,
+            log_level: String::from("info"),
+            slack_token: None,
+            slack_channel: None,
+            discord_webhook: None,
+            telegram_token: None,
+            telegram_chat_id: None,
+            metrics_host: String::from("0.0.0.0"),
+            metrics_port: None,
+            server_host: String::from("0.0.0.0"),
+            server_port: None,
+            persistence_file_path: None,
+            id_validation: IdentityValidation::NoCheck,
+            topic_update_interval: 600,
+            log_format: LogFormat::Pretty,
+            graphcast_network: GraphcastNetworkName::Testnet,
+        },
+        config_file: None,
     });
 
     c.bench_function("gossip_poi", move |b| {
