@@ -17,8 +17,8 @@ pub async fn invalid_payload_test() {
         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
 
     let mut config = test_config();
-    config.persistence_file_path = Some(store_path.clone());
-    config.topics = radio_topics.clone();
+    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+    config.radio_infrastructure.topics = radio_topics.clone();
 
     let dummy_radio_payload = DummyMsg::new("hello".to_string(), 42);
 

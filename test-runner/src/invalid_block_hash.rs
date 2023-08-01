@@ -16,8 +16,8 @@ pub async fn invalid_block_hash_test() {
         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
 
     let mut config = test_config();
-    config.persistence_file_path = Some(store_path.clone());
-    config.topics = radio_topics.clone();
+    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+    config.radio_infrastructure.topics = radio_topics.clone();
 
     let mut test_sender_config = TestSenderConfig {
         topics: test_sender_topics,

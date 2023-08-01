@@ -108,7 +108,7 @@ impl RadioOperator {
 
         let state_ref = persisted_state.clone();
         let upgrade_notifier = notifier.clone();
-        let graph_node = config.graph_node_endpoint().clone();
+        let graph_node = config.graph_stack.graph_node_status_endpoint.clone();
 
         // try message format in order of PublicPOIMessage, VersionUpgradeMessage
         tokio::spawn(async move {
@@ -212,10 +212,10 @@ impl RadioOperator {
     /// Expose metrics and subscribe to graphcast topics
     pub async fn prepare(&self) {
         // Set up Prometheus metrics url if configured
-        if let Some(port) = self.config.metrics_port {
+        if let Some(port) = self.config.radio_infrastructure().metrics_port {
             debug!("Initializing metrics port");
             tokio::spawn(handle_serve_metrics(
-                self.config.metrics_host.clone(),
+                self.config.radio_infrastructure().metrics_host.clone(),
                 port,
                 self.control_flow.running.clone(),
             ));
@@ -224,7 +224,7 @@ impl RadioOperator {
         // Provide generated topics to Graphcast agent
         let topics = self
             .config
-            .generate_topics(self.config.indexer_address.clone())
+            .generate_topics(self.config.graph_stack.indexer_address.clone())
             .await;
         debug!(
             topics = tracing::field::debug(&topics),
@@ -252,8 +252,9 @@ impl RadioOperator {
         let skip_iteration = Arc::new(AtomicBool::new(false));
         let skip_iteration_clone = skip_iteration.clone();
 
-        let mut topic_update_interval =
-            interval(Duration::from_secs(self.config.topic_update_interval));
+        let mut topic_update_interval = interval(Duration::from_secs(
+            self.config.radio_infrastructure.topic_update_interval,
+        ));
 
         let mut state_update_interval = interval(Duration::from_secs(60));
         let mut gossip_poi_interval = interval(Duration::from_secs(30));
@@ -270,7 +271,7 @@ impl RadioOperator {
         });
 
         // Initialize Http server with graceful shutdown if configured
-        if self.config.server_port().is_some() {
+        if self.config.radio_infrastructure().server_port.is_some() {
             let state_ref = &self.persisted_state;
             let config_cloned = self.config.clone();
             tokio::spawn(run_server(config_cloned, state_ref, running.clone()));
@@ -289,7 +290,7 @@ impl RadioOperator {
                     // Update topic subscription
                     let result = timeout(update_timeout,
                         self.graphcast_agent()
-                        .update_content_topics(self.config.generate_topics(self.config.indexer_address.clone()).await)
+                        .update_content_topics(self.config.generate_topics(self.config.graph_stack().indexer_address.clone()).await)
                     ).await;
 
                     if result.is_err() {
@@ -305,7 +306,7 @@ impl RadioOperator {
                     }
 
                     // Save cache if path provided
-                    let _ = &self.config.persistence_file_path.as_ref().map(|path| {
+                    let _ = &self.config.radio_infrastructure().persistence_file_path.as_ref().map(|path| {
                         self.persisted_state.update_cache(path);
                     });
                 },

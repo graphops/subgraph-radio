@@ -124,12 +124,16 @@ impl RadioOperator {
         // Additional radio message check happens here since messages are synchronously stored to state cache in msg handler
         let remote_ppoi_messages = self
             .state()
-            .valid_ppoi_messages(&self.config.graph_node_endpoint)
+            .valid_ppoi_messages(&self.config.graph_stack().graph_node_status_endpoint)
             .await;
 
         for id in identifiers.clone() {
             /* Set up */
-            let collect_duration: i64 = self.config.collect_message_duration().to_owned();
+            let collect_duration: i64 = self
+                .config
+                .radio_infrastructure
+                .collect_message_duration
+                .to_owned();
             let id_cloned = id.clone();
             let callbook = self.config.callbook();
             let local_attestations = self.state().local_attestations();

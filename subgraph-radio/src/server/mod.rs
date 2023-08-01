@@ -26,10 +26,10 @@ pub async fn run_server(
     persisted_state: &'static PersistedState,
     _running_program: Arc<AtomicBool>,
 ) {
-    if config.server_port().is_none() {
+    if config.radio_infrastructure().server_port.is_none() {
         return;
     }
-    let port = config.server_port().unwrap();
+    let port = config.radio_infrastructure().server_port.unwrap();
     let context = Arc::new(SubgraphRadioContext::init(config.clone(), persisted_state));
 
     let schema = build_schema(Arc::clone(&context)).await;
@@ -44,11 +44,15 @@ pub async fn run_server(
         )
         .layer(Extension(schema))
         .layer(Extension(context));
-    let addr = SocketAddr::from_str(&format!("{}:{}", config.server_host(), port))
-        .expect("Create address");
+    let addr = SocketAddr::from_str(&format!(
+        "{}:{}",
+        config.radio_infrastructure().server_host,
+        port
+    ))
+    .expect("Create address");
 
     info!(
-        host = tracing::field::debug(config.server_host()),
+        host = tracing::field::debug(&config.radio_infrastructure().server_host),
         port, "Bind port to service"
     );
     Server::bind(&addr)

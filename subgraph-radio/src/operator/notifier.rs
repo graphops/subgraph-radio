@@ -36,12 +36,12 @@ impl Notifier {
     }
 
     pub fn from_config(config: &Config) -> Self {
-        let radio_name = config.radio_name.clone();
-        let slack_token = config.slack_token.clone();
-        let slack_channel = config.slack_channel.clone();
-        let discord_webhook = config.discord_webhook.clone();
-        let telegram_token = config.telegram_token.clone();
-        let telegram_chat_id = config.telegram_chat_id;
+        let radio_name = config.radio_infrastructure().radio_name.clone();
+        let slack_token = config.radio_infrastructure().slack_token.clone();
+        let slack_channel = config.radio_infrastructure().slack_channel.clone();
+        let discord_webhook = config.radio_infrastructure().discord_webhook.clone();
+        let telegram_token = config.radio_infrastructure().telegram_token.clone();
+        let telegram_chat_id = config.radio_infrastructure().telegram_chat_id;
 
         Notifier::new(
             radio_name,
