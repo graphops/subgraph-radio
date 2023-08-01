@@ -5,6 +5,8 @@ use axum::Router;
 use once_cell::sync::Lazy;
 use prometheus::{core::Collector, Registry};
 use prometheus::{IntCounterVec, IntGauge, IntGaugeVec, Opts};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::{net::SocketAddr, str::FromStr};
 use tracing::{debug, info};
 
@@ -124,7 +126,7 @@ pub async fn get_metrics() -> (StatusCode, String) {
 
 /// Run the API server as well as Prometheus and a traffic generator
 #[allow(dead_code)]
-pub async fn handle_serve_metrics(host: String, port: u16) {
+pub async fn handle_serve_metrics(host: String, port: u16, _running_program: Arc<AtomicBool>) {
     // Set up the exporter to collect metrics
     let _exporter = global_metrics_exporter();
 
@@ -139,6 +141,7 @@ pub async fn handle_serve_metrics(host: String, port: u16) {
 
     server
         .serve(app.into_make_service())
+        // .with_graceful_shutdown(shutdown_signal(running_program))
         .await
-        .expect("Error starting example API server");
+        .expect("Error starting Prometheus metrics service");
 }

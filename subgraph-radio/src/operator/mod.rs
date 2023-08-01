@@ -214,7 +214,11 @@ impl RadioOperator {
         // Set up Prometheus metrics url if configured
         if let Some(port) = self.config.metrics_port {
             debug!("Initializing metrics port");
-            tokio::spawn(handle_serve_metrics(self.config.metrics_host.clone(), port));
+            tokio::spawn(handle_serve_metrics(
+                self.config.metrics_host.clone(),
+                port,
+                self.control_flow.running.clone(),
+            ));
         }
 
         // Provide generated topics to Graphcast agent

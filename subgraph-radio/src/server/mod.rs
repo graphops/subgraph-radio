@@ -11,7 +11,6 @@ use crate::{
         model::{build_schema, SubgraphRadioContext},
         routes::{graphql_handler, graphql_playground, health},
     },
-    shutdown_signal,
     state::PersistedState,
 };
 
@@ -25,7 +24,7 @@ pub mod routes;
 pub async fn run_server(
     config: Config,
     persisted_state: &'static PersistedState,
-    running_program: Arc<AtomicBool>,
+    _running_program: Arc<AtomicBool>,
 ) {
     if config.server_port().is_none() {
         return;
@@ -50,11 +49,11 @@ pub async fn run_server(
 
     info!(
         host = tracing::field::debug(config.server_host()),
-        port, "Bind and serve"
+        port, "Bind port to service"
     );
     Server::bind(&addr)
         .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal(running_program))
+        // .with_graceful_shutdown(shutdown_signal(running_program))
         .await
-        .unwrap();
+        .expect("Error starting API service");
 }
