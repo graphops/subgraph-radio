@@ -185,6 +185,7 @@ pub fn start_radio(config: &Config) -> Child {
         .arg(config.radio_infrastructure().topics.join(","))
         .arg("--coverage")
         .arg(match config.radio_infrastructure().coverage {
+            CoverageLevel::None => "none",
             CoverageLevel::Minimal => "minimal",
             CoverageLevel::OnChain => "on-chain",
             CoverageLevel::Comprehensive => "comprehensive",

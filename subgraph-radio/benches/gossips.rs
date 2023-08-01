@@ -31,6 +31,7 @@ fn gossip_poi_bench(c: &mut Criterion) {
             network_subgraph: String::from(
                 "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli",
             ),
+            indexer_management_server_endpoint: None,
         },
         waku: Waku {
             waku_host: None,
@@ -65,6 +66,7 @@ fn gossip_poi_bench(c: &mut Criterion) {
             topic_update_interval: 600,
             log_format: LogFormat::Pretty,
             graphcast_network: GraphcastNetworkName::Testnet,
+            auto_upgrade: CoverageLevel::Comprehensive,
         },
         config_file: None,
     });
