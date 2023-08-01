@@ -36,6 +36,7 @@ pub fn test_config() -> Config {
                 mnemonic: None,
                 registry_subgraph: String::new(),
                 network_subgraph: String::new(),
+                indexer_management_server_endpoint: None,
             }
         },
         waku: {
@@ -74,6 +75,7 @@ pub fn test_config() -> Config {
                 telegram_token: None,
                 id_validation: IdentityValidation::ValidAddress,
                 topic_update_interval: 600,
+                auto_upgrade: CoverageLevel::OnChain,
             }
         },
         config_file: None,

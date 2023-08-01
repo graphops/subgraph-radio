@@ -10,9 +10,8 @@ use graphcast_sdk::{
         message_typing::IdentityValidation, GraphcastAgentConfig, GraphcastAgentError,
     },
     graphql::{client_network::query_network_subgraph, QueryError},
-    init_tracing, wallet_address,
+    init_tracing, wallet_address, GraphcastNetworkName, LogFormat,
 };
-use graphcast_sdk::{GraphcastNetworkName, LogFormat};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tracing::{debug, info, trace};
@@ -22,6 +21,7 @@ use crate::{active_allocation_hashes, syncing_deployment_hashes};
 
 #[derive(clap::ValueEnum, Clone, Debug, Serialize, Deserialize, Default)]
 pub enum CoverageLevel {
+    None,
     Minimal,
     #[default]
     OnChain,
@@ -160,6 +160,7 @@ impl Config {
     pub async fn generate_topics(&self, indexer_address: String) -> Vec<String> {
         let static_topics = HashSet::from_iter(self.radio_infrastructure().topics.to_vec());
         let topics = match self.radio_infrastructure().coverage {
+            CoverageLevel::None => HashSet::new(),
             CoverageLevel::Minimal => static_topics,
             CoverageLevel::OnChain => {
                 let mut topics: HashSet<String> =
@@ -244,6 +245,13 @@ pub struct GraphStack {
         help = "Mnemonic to the Graphcast ID wallet (first address of the wallet is used; Only one of private key or mnemonic is needed)",
     )]
     pub mnemonic: Option<String>,
+    #[clap(
+        long,
+        value_name = "ENDPOINT",
+        env = "INDEXER_MANAGEMENT_SERVER_ENDPOINT",
+        help = "API endpoint to the Indexer management server endpoint"
+    )]
+    pub indexer_management_server_endpoint: Option<String>,
 }
 
 #[derive(Clone, Debug, Args, Serialize, Deserialize, Default)]
@@ -277,6 +285,18 @@ pub struct RadioInfrastructure {
             Default: comprehensive"
     )]
     pub coverage: CoverageLevel,
+    #[clap(
+        long,
+        value_name = "COVERAGE",
+        value_enum,
+        default_value = "comprehensive",
+        env = "AUTO_UPGRADE",
+        help = "Toggle for the types of subgraph the radio send offchain syncing commands to indexer management server. Default to upgrade all syncing deployments",
+        long_help = "Topic upgrade  coverage level\ncomprehensive: on-chain allocations, user defined static topics, and additional topics\n
+            on-chain: Subscribe to on-chain topics and user defined static topics\nminimal: Only subscribe to user defined static topics.\n
+            none: no automatic upgrade, only notifications.\nDefault: comprehensive"
+    )]
+    pub auto_upgrade: CoverageLevel,
     #[clap(
         long,
         value_parser = value_parser!(i64).range(1..),

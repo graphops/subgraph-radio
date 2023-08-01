@@ -7,7 +7,10 @@ use std::time::Duration;
 use tokio::time::{interval, sleep, timeout};
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{chainhead_block_str, messages::poi::process_valid_message};
+use crate::{
+    chainhead_block_str, messages::poi::process_valid_message,
+    operator::indexer_management::health_query,
+};
 use crate::{messages::poi::PublicPoiMessage, metrics::VALIDATED_MESSAGES};
 use graphcast_sdk::{
     graphcast_agent::{
@@ -29,6 +32,7 @@ use self::notifier::Notifier;
 
 pub mod attestation;
 pub mod callbook;
+pub mod indexer_management;
 pub mod notifier;
 pub mod operation;
 
@@ -104,6 +108,12 @@ impl RadioOperator {
         debug!("Set global static instance of graphcast_agent");
         _ = GRAPHCAST_AGENT.set(graphcast_agent.clone());
 
+        //TODO: Refactor indexer management server validation to SDK, similar to graph node status endpoint
+        if let Some(url) = &config.graph_stack.indexer_management_server_endpoint {
+            _ = health_query(url)
+                .await
+                .expect("Failed to validate the provided indexer management server endpoint");
+        };
         let notifier = Notifier::from_config(config);
 
         let state_ref = persisted_state.clone();

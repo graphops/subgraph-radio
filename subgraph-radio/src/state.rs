@@ -15,13 +15,14 @@ use tracing::{info, trace, warn};
 
 use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
 
-use crate::operator::attestation::{
-    clear_local_attestation, ComparisonResult, ComparisonResultType,
+use crate::{
+    messages::poi::PublicPoiMessage,
+    operator::attestation::{
+        clear_local_attestation, Attestation, ComparisonResult, ComparisonResultType,
+    },
+    operator::notifier::Notifier,
+    RADIO_OPERATOR,
 };
-use crate::operator::notifier::Notifier;
-use crate::RADIO_OPERATOR;
-
-use crate::{messages::poi::PublicPoiMessage, operator::attestation::Attestation};
 
 type Local = Arc<SyncMutex<HashMap<String, HashMap<u64, Attestation>>>>;
 type Remote = Arc<SyncMutex<Vec<GraphcastMessage<PublicPoiMessage>>>>;
