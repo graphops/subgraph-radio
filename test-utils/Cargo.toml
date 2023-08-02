@@ -40,6 +40,6 @@ clap = { version = "3.2.25", features = ["derive"] }
 prost = "0.11"
 ethers = "2.0.4"
 ethers-contract = "2.0.4"
-ethers-core = "2.0.4"
+ethers-core = "2.0.8"
 ethers-derive-eip712 = "1.0.2"
 async-graphql = "4.0.16"

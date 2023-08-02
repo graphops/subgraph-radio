@@ -1613,7 +1613,7 @@ checksum = "2a58ce802c65cf3d0756dee5a61094a92cde53c1583b246e9ee5b37226c7fc15"
 dependencies = [
  "ethers-addressbook",
  "ethers-contract",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "ethers-etherscan",
  "ethers-middleware",
  "ethers-providers",
@@ -1627,7 +1627,7 @@ version = "2.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b856b7b8ff5c961093cb8efe151fbcce724b451941ce20781de11a531ccd578"
 dependencies = [
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "once_cell",
  "serde",
  "serde_json",
@@ -1641,7 +1641,7 @@ checksum = "e066a0d9cfc70c454672bf16bb433b0243427420076dc5b2f49c448fb5a10628"
 dependencies = [
  "ethers-contract-abigen",
  "ethers-contract-derive",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "ethers-providers",
  "futures-util",
  "hex",
@@ -1660,7 +1660,7 @@ checksum = "c113e3e86b6bc16d98484b2c3bb2d01d6fed9f489fe2e592e5cc87c3024d616b"
 dependencies = [
  "Inflector",
  "dunce",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "ethers-etherscan",
  "eyre",
  "hex",
@@ -1684,7 +1684,7 @@ checksum = "8c3fb5adee25701c79ec58fcf2c63594cd8829bc9ad6037ff862d5a111101ed2"
 dependencies = [
  "Inflector",
  "ethers-contract-abigen",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "hex",
  "proc-macro2",
  "quote",
@@ -1716,7 +1716,7 @@ dependencies = [
  "rlp-derive",
  "serde",
  "serde_json",
- "strum",
+ "strum 0.24.1",
  "syn 1.0.109",
  "thiserror",
  "tiny-keccak",
@@ -1725,9 +1725,9 @@ dependencies = [
 
 [[package]]
 name = "ethers-core"
-version = "2.0.7"
+version = "2.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6da5fa198af0d3be20c19192df2bd9590b92ce09a8421e793bec8851270f1b05"
+checksum = "60ca2514feb98918a0a31de7e1983c29f2267ebf61b2dc5d4294f91e5b866623"
 dependencies = [
  "arrayvec",
  "bytes",
@@ -1745,7 +1745,7 @@ dependencies = [
  "rlp",
  "serde",
  "serde_json",
- "strum",
+ "strum 0.25.0",
  "syn 2.0.25",
  "tempfile",
  "thiserror",
@@ -1772,7 +1772,7 @@ version = "2.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84ebb401ba97c6f5af278c2c9936c4546cad75dec464b439ae6df249906f4caa"
 dependencies = [
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "reqwest",
  "semver",
  "serde",
@@ -1790,7 +1790,7 @@ dependencies = [
  "async-trait",
  "auto_impl",
  "ethers-contract",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "ethers-etherscan",
  "ethers-providers",
  "ethers-signers",
@@ -1819,7 +1819,7 @@ dependencies = [
  "base64 0.21.2",
  "bytes",
  "enr 0.8.1",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "futures-core",
  "futures-timer",
  "futures-util",
@@ -1855,7 +1855,7 @@ dependencies = [
  "coins-bip39",
  "elliptic-curve 0.13.5",
  "eth-keystore",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "hex",
  "rand",
  "sha2 0.10.7",
@@ -1871,7 +1871,7 @@ checksum = "a81c89f121595cf8959e746045bb8b25a6a38d72588561e1a3b7992fc213f674"
 dependencies = [
  "cfg-if",
  "dunce",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "glob",
  "hex",
  "home",
@@ -2209,7 +2209,7 @@ dependencies = [
  "dotenv",
  "ethers",
  "ethers-contract",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "ethers-derive-eip712",
  "graphql_client",
  "lazy_static",
@@ -4926,7 +4926,16 @@ version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
 dependencies = [
- "strum_macros",
+ "strum_macros 0.24.3",
+]
+
+[[package]]
+name = "strum"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
+dependencies = [
+ "strum_macros 0.25.1",
 ]
 
 [[package]]
@@ -4940,6 +4949,19 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6069ca09d878a33f883cc06aaa9718ede171841d3832450354410b718b097232"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 2.0.25",
 ]
 
 [[package]]
@@ -4960,7 +4982,7 @@ dependencies = [
  "dotenv",
  "ethers",
  "ethers-contract",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "ethers-derive-eip712",
  "graphcast-sdk",
  "graphql_client",
@@ -5214,7 +5236,7 @@ dependencies = [
  "clap",
  "ethers",
  "ethers-contract",
- "ethers-core 2.0.7",
+ "ethers-core 2.0.8",
  "ethers-derive-eip712",
  "graphcast-sdk",
  "prost",
