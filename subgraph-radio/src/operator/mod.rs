@@ -118,7 +118,7 @@ impl RadioOperator {
 
         let state_ref = persisted_state.clone();
         let upgrade_notifier = notifier.clone();
-        let graph_node = config.graph_stack.graph_node_status_endpoint.clone();
+        let upgrade_config = config.clone();
 
         // try message format in order of PublicPOIMessage, VersionUpgradeMessage
         tokio::spawn(async move {
@@ -131,12 +131,13 @@ impl RadioOperator {
                 let callbook = agent.callbook.clone();
                 let nonces = agent.nonces.clone();
                 let local_sender = agent.graphcast_identity.graphcast_id.clone();
-                if let Ok(msg) = agent.decode::<PublicPoiMessage>(msg.payload()).await {
+                let parsed = if let Ok(msg) = agent.decode::<PublicPoiMessage>(msg.payload()).await
+                {
                     trace!(
                         message = tracing::field::debug(&msg),
                         "Parseable as Public PoI message, now validate",
                     );
-                    let msg = match check_message_validity(
+                    match check_message_validity(
                         msg,
                         &nonces,
                         callbook.clone(),
@@ -146,60 +147,82 @@ impl RadioOperator {
                     .await
                     .map_err(|e| WakuHandlingError::InvalidMessage(e.to_string()))
                     {
-                        Ok(msg) => msg,
+                        Ok(msg) => {
+                            let is_valid = msg
+                                .payload
+                                .validity_check(
+                                    &msg,
+                                    &upgrade_config.graph_stack.graph_node_status_endpoint,
+                                )
+                                .await
+                                .is_ok();
+
+                            if is_valid {
+                                VALIDATED_MESSAGES
+                                    .with_label_values(&[&msg.identifier, "public_poi_message"])
+                                    .inc();
+                                process_valid_message(msg.clone(), &state_ref).await;
+                            };
+                            is_valid
+                        }
                         Err(e) => {
                             debug!(
                                 err = tracing::field::debug(e),
                                 "Failed to validate by Graphcast"
                             );
-                            continue;
+                            false
                         }
-                    };
-
-                    let is_valid = msg.payload.validity_check(&msg, &graph_node).await;
-
-                    if is_valid.is_ok() {
-                        VALIDATED_MESSAGES
-                            .with_label_values(&[&msg.identifier, "public_poi_message"])
-                            .inc();
-                        process_valid_message(msg, &state_ref).await;
-                    };
-                } else if let Ok(msg) = agent.decode::<VersionUpgradeMessage>(msg.payload()).await {
-                    trace!(
-                        message = tracing::field::debug(&msg),
-                        "Parseable as Version Upgrade message, now validate",
-                    );
-                    let msg = match check_message_validity(
-                        msg,
-                        &nonces,
-                        callbook.clone(),
-                        local_sender.clone(),
-                        &id_validation,
-                    )
-                    .await
-                    .map_err(|e| WakuHandlingError::InvalidMessage(e.to_string()))
-                    {
-                        Ok(msg) => msg,
-                        Err(e) => {
-                            debug!(
-                                err = tracing::field::debug(e),
-                                "Failed to validate by Graphcast"
-                            );
-                            continue;
-                        }
-                    };
-
-                    let is_valid = msg.payload.validity_check(&msg, &graph_node).await;
-
-                    if let Ok(radio_msg) = is_valid {
-                        VALIDATED_MESSAGES
-                            .with_label_values(&[&msg.identifier, "version_upgrade_message"])
-                            .inc();
-                        radio_msg.process_valid_message(&upgrade_notifier).await;
-                    };
+                    }
                 } else {
-                    trace!("Waku message not decoded or validated, skipped message",);
+                    false
                 };
+
+                if !parsed {
+                    if let Ok(msg) = agent.decode::<VersionUpgradeMessage>(msg.payload()).await {
+                        trace!(
+                            message = tracing::field::debug(&msg),
+                            "Parseable as Version Upgrade message, now validate",
+                        );
+                        // Skip general first time sender nonce check and timestamp check
+                        let msg = match msg
+                            .valid_sender(
+                                callbook.graphcast_registry(),
+                                callbook.graph_network(),
+                                local_sender.clone(),
+                                &id_validation,
+                            )
+                            .await
+                            .map_err(|e| WakuHandlingError::InvalidMessage(e.to_string()))
+                        {
+                            Ok(msg) => msg,
+                            Err(e) => {
+                                debug!(
+                                    err = tracing::field::debug(e),
+                                    "Failed to validate Graphcast sender"
+                                );
+                                continue;
+                            }
+                        };
+                        let is_valid = msg
+                            .payload
+                            .validity_check(
+                                msg,
+                                &upgrade_config.graph_stack.network_subgraph.clone(),
+                            )
+                            .await;
+
+                        if let Ok(radio_msg) = is_valid {
+                            VALIDATED_MESSAGES
+                                .with_label_values(&[&msg.identifier, "version_upgrade_message"])
+                                .inc();
+                            radio_msg
+                                .process_valid_message(&upgrade_config, &upgrade_notifier)
+                                .await;
+                        };
+                    } else {
+                        trace!("Waku message not decoded or validated, skipped message",);
+                    };
+                }
             }
         });
 

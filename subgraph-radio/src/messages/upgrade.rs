@@ -10,7 +10,10 @@ use graphcast_sdk::{
 };
 use prost::Message;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
+use crate::config::Config;
+use crate::operator::indexer_management::{check_decision_basis, offchain_sync_indexing_rules};
 use crate::operator::notifier::Notifier;
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize, PartialEq, SimpleObject)]
@@ -106,7 +109,7 @@ impl VersionUpgradeMessage {
         let subgraphs = owned_subgraphs(network_subgraph, &self.graph_account)
             .await
             .map_err(BuildMessageError::FieldDerivations)?;
-        if !subgraphs.contains(&self.identifier) {
+        if !subgraphs.contains(&self.subgraph_id) {
             return Err(BuildMessageError::InvalidFields(anyhow::anyhow!(format!(
                 "Verified account failed to be subgraph owner. Verified account: {:#?}",
                 self.graph_account
@@ -129,14 +132,35 @@ impl VersionUpgradeMessage {
     }
 
     /// process the validated version upgrade messages, currently just notify
-    pub async fn process_valid_message(&self, notifier: &Notifier) {
-        // send notifications, later can optionally automate deployment
+    pub async fn process_valid_message(&self, config: &Config, notifier: &Notifier) {
+        // send notifications
         notifier.notify(format!(
-                "Subgraph owner for a deployment has shared version upgrade info:\nold deployment: {}\nnew deployment: {}\nplanned migrate time: {}\nnetwork: {}",
-                self.identifier,
-                self.new_hash,
-                self.migrate_time,
-                self.network
-            )).await;
+            "Subgraph owner for a deployment has shared version upgrade info:\nold deployment: {}\nnew deployment: {}\nplanned migrate time: {}\nnetwork: {}",
+            self.identifier,
+            self.new_hash,
+            self.migrate_time,
+            self.network
+        )).await;
+        // auto deployment
+        // If the identifier satisfy the config coverage level
+        // and if indexer management server endpoint is provided
+        if let Some(url) = &config.graph_stack().indexer_management_server_endpoint {
+            let covered_topics = config
+                .generate_topics(config.graph_stack().indexer_address.clone())
+                .await;
+
+            if covered_topics
+                .clone()
+                .into_iter()
+                .any(|x| x == self.identifier.clone())
+            {
+                let res = offchain_sync_indexing_rules(url, &self.new_hash).await;
+                let decision_basis = check_decision_basis(url, &self.new_hash).await;
+                debug!(
+                    res = tracing::field::debug(&res),
+                    decision_basis, "New deployment setting"
+                );
+            }
+        }
     }
 }

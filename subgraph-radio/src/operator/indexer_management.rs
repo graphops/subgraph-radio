@@ -112,6 +112,28 @@ pub async fn offchain_sync_indexing_rules(
         .map_err(|e| OperationError::Query(graphcast_sdk::graphql::QueryError::Transport(e)))
 }
 
+pub async fn check_decision_basis(url: &str, deployment: &str) -> Option<String> {
+    indexing_rules(url)
+        .await
+        .ok()?
+        .as_object()?
+        .get("data")?
+        .as_object()?
+        .get("indexingRules")?
+        .as_array()?
+        .iter()
+        .find(|o| {
+            o.as_object()
+                .and_then(|rule| rule.get("identifier"))
+                .and_then(|identifier| identifier.as_str())
+                .map_or(false, |i| i == deployment)
+        })?
+        .as_object()?
+        .get("decisionBasis")?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
 // // NOTE: this set of tests can only run in context of running indexer_management server
 // #[cfg(test)]
 // mod tests {
@@ -138,33 +160,14 @@ pub async fn offchain_sync_indexing_rules(
 //     async fn test_set_offchain_sync() {
 //         let res_json = offchain_sync_indexing_rules(
 //             "http://127.0.0.1:18000",
-//             "Qmb5Ysp5oCUXhLA8NmxmYKDAX2nCMnh7Vvb5uffb9n5vss",
+//             "QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB",
 //         )
 //         .await;
 //         assert!(res_json.is_ok());
 
-//         let check_setting = indexing_rules("http://127.0.0.1:18000").await.unwrap();
+//         let rule_decision = check_decision_basis("http://127.0.0.1:18000",
+//             "QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB",).await.unwrap();
 
-//         assert!(check_setting
-//             .as_object()
-//             .unwrap()
-//             .get("data")
-//             .unwrap()
-//             .as_object()
-//             .unwrap()
-//             .get("iiterles")
-//             .unwrap()
-//             .as_array()
-//             .unwrap()
-//             .into_iter()
-//             .any(|o| o
-//                 .as_object()
-//                 .unwrap()
-//                 .get("identifier")
-//                 .unwrap()
-//                 .as_str()
-//                 .unwrap()
-//                 == "Qmb5Ysp5oCUXhLA8NmxmYKDAX2nCMnh7Vvb5uffb9n5vss")
-//             );
+//         assert!(rule_decision == "offchain".to_string());
 //     }
 // }
