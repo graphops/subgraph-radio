@@ -3233,6 +3233,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
+name = "one-shot"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cargo-husky",
+ "chrono",
+ "clap",
+ "derive-getters",
+ "dotenv",
+ "ethers",
+ "graphcast-sdk",
+ "once_cell",
+ "partial_application",
+ "serde",
+ "serde_json",
+ "subgraph-radio",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "oorandom"
 version = "11.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
