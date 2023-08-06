@@ -239,7 +239,7 @@ pub async fn send_poi_message(
         )
         .await
     {
-        Ok(content) => {
+        Ok(_content) => {
             let nonce = Utc::now().timestamp();
             let block_hash = callbook
                 .block_hash(&network_name.to_string(), message_block)
@@ -247,7 +247,7 @@ pub async fn send_poi_message(
                 .map_err(OperationError::Query)?;
             let radio_message = PublicPoiMessage::build(
                 id.clone(),
-                content.clone(),
+                "0xBadPOI".to_string(),
                 nonce,
                 network_name,
                 message_block,
@@ -261,7 +261,7 @@ pub async fn send_poi_message(
                 Ok(msg_id) => {
                     save_local_attestation(
                         local_attestations.clone(),
-                        content.clone(),
+                        "0xBadPOI".to_string(),
                         id.clone(),
                         message_block,
                     );

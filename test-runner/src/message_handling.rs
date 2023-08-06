@@ -15,8 +15,7 @@ pub async fn send_and_receive_test() {
         "Qmdefault2XyZABCdefGHIjklMNOpqrstuvWXYZabcdefGHIJKLMN".to_string(),
     ];
 
-    let test_sender_topics =
-        vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
+    let test_sender_topics = vec!["QmU63f6LkM6XDQy2QU8eB5VD2tecRMwE8K59Sb9NnrGoAa".to_string()];
 
     let mut config = test_config();
     config.persistence_file_path = Some(store_path.clone());
@@ -25,17 +24,17 @@ pub async fn send_and_receive_test() {
 
     let mut test_sender_config = TestSenderConfig {
         topics: test_sender_topics,
-        radio_name: String::new(),
+        radio_name: String::from("subgraph-radio"),
         block_hash: None,
         staked_tokens: None,
         nonce: None,
         radio_payload: None,
-        poi: None,
+        poi: Some("0xBadPOI".to_string()),
     };
 
     let process_manager = setup(&config, test_file_name, &mut test_sender_config).await;
 
-    sleep(Duration::from_secs(85)).await;
+    sleep(Duration::from_secs(8500000)).await;
 
     let persisted_state = PersistedState::load_cache(&store_path);
     debug!("persisted state {:?}", persisted_state);

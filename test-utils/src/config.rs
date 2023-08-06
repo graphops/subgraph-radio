@@ -24,17 +24,17 @@ pub struct TestSenderConfig {
 
 pub fn test_config() -> Config {
     Config {
-        indexer_address: String::from("0x7e6528e4ce3055e829a32b5dc4450072bac28bc6"),
+        indexer_address: String::from("0x06f1e799A36f1Cb6aceAb09745dbf1920C7446D3"),
         graph_node_endpoint: String::new(),
         private_key: Some(
-            "ccaea3e3aca412cb3920dbecd77bc725dfe9a5e16f940f19912d9c9dbee01e8f".to_string(),
+            "8c3a4ba32d5b30ca4f016772001b6b118a95f89b8a29e61276c0f48606952b5d".to_string(),
         ),
         mnemonic: None,
         registry_subgraph: String::new(),
         network_subgraph: String::new(),
         graphcast_network: "testnet".to_string(),
         topics: vec![],
-        coverage: CoverageLevel::OnChain,
+        coverage: CoverageLevel::Comprehensive,
         collect_message_duration: 60,
         waku_host: None,
         waku_port: None,

@@ -18,6 +18,11 @@ use waku::{
     waku_new, GossipSubParams, ProtocolId, WakuContentTopic, WakuNodeConfig, WakuPubSubTopic,
 };
 
+// using this for invalid sender
+// 0x06f1e799A36f1Cb6aceAb09745dbf1920C7446D3
+// page increase endorse excess blouse render credit garage saddle anxiety point swear
+// 0x8c3a4ba32d5b30ca4f016772001b6b118a95f89b8a29e61276c0f48606952b5d
+
 async fn start_sender(config: TestSenderConfig) {
     std::env::set_var(
         "RUST_LOG",
@@ -49,7 +54,7 @@ async fn start_sender(config: TestSenderConfig) {
         keep_alive_interval: None,
         relay: Some(false), // Default true - will receive all msg on relay
         min_peers_to_publish: Some(0), // Default 0
-        filter: Some(true), // Default false¡
+        filter: Some(true), // Default false
         log_level: None,
         relay_topics: [].to_vec(),
         discv5: Some(false),
@@ -65,7 +70,7 @@ async fn start_sender(config: TestSenderConfig) {
     let node_handle = waku_new(Some(node_config)).unwrap().start().unwrap();
 
     let wallet =
-        build_wallet("baf5c93f0c8aee3b945f33b9192014e83d50cec25f727a13460f6ef1eb6a5844").unwrap();
+        build_wallet("8c3a4ba32d5b30ca4f016772001b6b118a95f89b8a29e61276c0f48606952b5d").unwrap();
 
     let pubsub_topic_str = "/waku/2/graphcast-v0-testnet/proto";
     let pubsub_topic = WakuPubSubTopic::from_str(pubsub_topic_str).unwrap();
@@ -151,9 +156,9 @@ async fn start_sender(config: TestSenderConfig) {
                 }
             }
 
-            sleep(Duration::from_secs(1));
+            sleep(Duration::from_secs(5));
         }
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs(5));
     }
 }
 

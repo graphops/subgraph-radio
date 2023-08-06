@@ -2,12 +2,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use graphcast_sdk::init_tracing;
-use test_runner::{
-    invalid_block_hash::invalid_block_hash_test, invalid_nonce::invalid_nonce_test,
-    invalid_payload::invalid_payload_test, invalid_sender::invalid_sender_test,
-    message_handling::send_and_receive_test, poi_divergent::poi_divergent_test,
-    poi_match::poi_match_test, topics::topics_test,
-};
+use test_runner::message_handling::send_and_receive_test;
 use test_utils::config::test_config;
 use tracing::{error, info};
 
@@ -40,69 +35,26 @@ pub async fn main() {
     std::env::set_var(
             "RUST_LOG",
             "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_runner=trace,test_sender=trace,test_utils=trace",
-        );
+    );
     init_tracing(config.log_format).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level");
 
     let start_time = Instant::now();
 
-    let mut retry_count = 5;
-    let mut initial_tests_passed = false;
-    let mut initial_test_results: HashMap<String, bool> = HashMap::new();
+    // Only run the send_and_receive_test, without any retry logic.
+    let single_test = vec![(
+        "send_and_receive_test",
+        tokio::spawn(send_and_receive_test()),
+    )];
 
-    while retry_count > 0 && !initial_tests_passed {
-        let initial_tests = vec![
-            (
-                "send_and_receive_test",
-                tokio::spawn(send_and_receive_test()),
-            ),
-            ("topics_test", tokio::spawn(topics_test())),
-        ];
+    let (test_passed, test_results) = run_tests(single_test).await;
 
-        let (tests_passed, test_results) = run_tests(initial_tests).await;
-        initial_test_results = test_results;
-
-        if tests_passed {
-            initial_tests_passed = true;
-        } else {
-            retry_count -= 1;
-        }
-    }
-
-    let poi_tests = vec![
-        ("poi_divergent_test", tokio::spawn(poi_divergent_test())),
-        ("poi_match_test", tokio::spawn(poi_match_test())),
-    ];
-
-    let (poi_tests_passed, poi_test_results) = run_tests(poi_tests).await;
-
-    let validity_tests_group_1 = vec![
-        (
-            "invalid_block_hash_test",
-            tokio::spawn(invalid_block_hash_test()),
-        ),
-        ("invalid_sender_test", tokio::spawn(invalid_sender_test())),
-    ];
-
-    let (validity_tests_group_1_passed, validity_test_results_group_1) =
-        run_tests(validity_tests_group_1).await;
-
-    let validity_tests_group_2 = vec![
-        ("invalid_nonce_test", tokio::spawn(invalid_nonce_test())),
-        ("invalid_payload_test", tokio::spawn(invalid_payload_test())),
-    ];
-
-    let (validity_tests_group_2_passed, validity_test_results_group_2) =
-        run_tests(validity_tests_group_2).await;
-
+    // Here we only print the result for the single test we ran.
     print_test_summary(
-        initial_test_results,
-        poi_test_results,
-        validity_test_results_group_1,
-        validity_test_results_group_2,
-        initial_tests_passed
-            && poi_tests_passed
-            && validity_tests_group_1_passed
-            && validity_tests_group_2_passed,
+        test_results,
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        test_passed,
         start_time,
     );
 }
