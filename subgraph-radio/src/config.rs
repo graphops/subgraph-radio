@@ -53,8 +53,18 @@ pub struct Config {
 impl Config {
     /// Parse config arguments
     pub fn args() -> Self {
-        // TODO: load config file before parse (maybe add new level of subcommands)
-        let config = Config::parse();
+        let config = if let Ok(file_path) = std::env::var("CONFIG_FILE") {
+            confy::load_path::<Config>(file_path.clone()).unwrap_or_else(|e| {
+                panic!(
+                    "{} file cannot be parsed into Config: {}",
+                    file_path.clone(),
+                    e
+                )
+            })
+        } else {
+            Config::parse()
+        };
+
         std::env::set_var("RUST_LOG", config.radio_infrastructure().log_level.clone());
         // Enables tracing under RUST_LOG variable
         init_tracing(config.radio_infrastructure().log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level`");

@@ -1,0 +1,27 @@
+[graph_stack]
+graph_node_status_endpoint = 'http://localhost:8030/graphql'
+indexer_address = '0xgossipssssssssssssssssssssssssssssssssss'
+registry_subgraph = 'https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-goerli'
+network_subgraph = 'https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli'
+private_key = 'abcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefgh'
+indexer_management_server_endpoint = 'http://127.0.0.1:18000'
+
+[waku]
+boot_node_addresses = []
+
+[radio_infrastructure]
+graphcast_network = 'Testnet'
+topics = ['QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB']
+coverage = 'Comprehensive'
+auto_upgrade = 'Comprehensive'
+collect_message_duration = 10
+slack_token = 'xoxb-1231231231231-2312312312312-3abcabcabcabacabcabcabca'
+metrics_host = '0.0.0.0'
+server_host = '0.0.0.0'
+server_port = 7700
+persistence_file_path = 'wooooooow.json'
+radio_name = 'subgraph-radio'
+id_validation = 'ValidAddress'
+topic_update_interval = 600
+log_level = 'warn,hyper=off,graphcast_sdk=debug,subgraph_radio=debug'
+log_format = 'Pretty'
