@@ -17,7 +17,7 @@ chrono = "0.4"
 serde = { version = "1.0.163", features = ["rc"] }
 serde_json = "1.0.96"
 sha3 = "0.10.8"
-derive-getters = "0.2.1"
+derive-getters = "0.3.0"
 tokio = { version = "1.28.1", features = ["full", "rt"] }
 anyhow = "1.0"
 graphql_client = "0.12.0"
