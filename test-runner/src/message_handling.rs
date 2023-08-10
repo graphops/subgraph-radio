@@ -15,7 +15,7 @@ pub async fn send_and_receive_test() {
         "Qmdefault2XyZABCdefGHIjklMNOpqrstuvWXYZabcdefGHIJKLMN".to_string(),
     ];
 
-    let test_sender_topics = vec!["QmU63f6LkM6XDQy2QU8eB5VD2tecRMwE8K59Sb9NnrGoAa".to_string()];
+    let test_sender_topics = vec!["QmZxV9LQmWHqbr4qFuWDvqd4WUuXkATLF2NosDe71JGD4d".to_string()];
 
     let mut config = test_config();
     config.persistence_file_path = Some(store_path.clone());

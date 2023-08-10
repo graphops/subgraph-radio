@@ -245,33 +245,44 @@ pub async fn send_poi_message(
                 .block_hash(&network_name.to_string(), message_block)
                 .await
                 .map_err(OperationError::Query)?;
-            let radio_message = PublicPoiMessage::build(
-                id.clone(),
-                "0xBadPOI".to_string(),
-                nonce,
-                network_name,
-                message_block,
-                block_hash,
-                graphcast_agent.graphcast_identity.graph_account.clone(),
-            );
-            match graphcast_agent
-                .send_message(&id, radio_message, nonce)
-                .await
-            {
-                Ok(msg_id) => {
-                    save_local_attestation(
-                        local_attestations.clone(),
-                        "0xBadPOI".to_string(),
-                        id.clone(),
-                        message_block,
-                    );
-                    trace!("save local attestations: {:#?}", local_attestations);
-                    Ok(msg_id)
+
+            let new_content;
+
+            if id == *"QmczEyLX9aomEvxoEUjEgykGduEgH5eitqxtCiehGFium7" {
+                new_content = "0x4b2c8f6a3d7e09b5f8c6e2a1b4d5f7e8a9b0c1d2e3f4056789a0b1c2d3e4f5a6
+                "
+                .to_string();
+
+                let radio_message = PublicPoiMessage::build(
+                    id.clone(),
+                    new_content,
+                    nonce,
+                    network_name,
+                    message_block,
+                    block_hash,
+                    graphcast_agent.graphcast_identity.graph_account.clone(),
+                );
+                match graphcast_agent
+                    .send_message(&id, radio_message, nonce)
+                    .await
+                {
+                    Ok(msg_id) => {
+                        save_local_attestation(
+                            local_attestations.clone(),
+                            "0xBadPOI".to_string(),
+                            id.clone(),
+                            message_block,
+                        );
+                        trace!("save local attestations: {:#?}", local_attestations);
+                        Ok(msg_id)
+                    }
+                    Err(e) => {
+                        error!(err = tracing::field::debug(&e), "Failed to send message");
+                        Err(OperationError::Agent(e))
+                    }
                 }
-                Err(e) => {
-                    error!(err = tracing::field::debug(&e), "Failed to send message");
-                    Err(OperationError::Agent(e))
-                }
+            } else {
+                Err(OperationError::SendTrigger("hello".to_string()))
             }
         }
         Err(e) => {

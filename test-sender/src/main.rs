@@ -36,7 +36,7 @@ async fn start_sender(config: TestSenderConfig) {
         ..Default::default()
     };
 
-    let pubsub_topic = WakuPubSubTopic::from_str("/waku/2/graphcast-v0-testnet/proto").unwrap();
+    let pubsub_topic = WakuPubSubTopic::from_str("/waku/2/graphcast-v0-mainnet/proto").unwrap();
 
     let discv5_nodes: Vec<String> = get_dns_nodes(&pubsub_topic)
         .into_iter()
@@ -72,7 +72,7 @@ async fn start_sender(config: TestSenderConfig) {
     let wallet =
         build_wallet("8c3a4ba32d5b30ca4f016772001b6b118a95f89b8a29e61276c0f48606952b5d").unwrap();
 
-    let pubsub_topic_str = "/waku/2/graphcast-v0-testnet/proto";
+    let pubsub_topic_str = "/waku/2/graphcast-v0-mainnet/proto";
     let pubsub_topic = WakuPubSubTopic::from_str(pubsub_topic_str).unwrap();
     loop {
         for topic in config.topics.clone() {
@@ -118,7 +118,7 @@ async fn start_sender(config: TestSenderConfig) {
 
                     match graphcast_message.send_to_waku(
                         &node_handle,
-                        WakuPubSubTopic::from_str("/waku/2/graphcast-v0-testnet/proto").unwrap(),
+                        WakuPubSubTopic::from_str("/waku/2/graphcast-v0-mainnet/proto").unwrap(),
                         content_topic,
                     ) {
                         Ok(id) => {
@@ -143,7 +143,7 @@ async fn start_sender(config: TestSenderConfig) {
 
                     match graphcast_message.send_to_waku(
                         &node_handle,
-                        WakuPubSubTopic::from_str("/waku/2/graphcast-v0-testnet/proto").unwrap(),
+                        WakuPubSubTopic::from_str("/waku/2/graphcast-v0-mainnet/proto").unwrap(),
                         content_topic,
                     ) {
                         Ok(id) => {
