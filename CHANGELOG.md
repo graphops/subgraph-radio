@@ -6,6 +6,28 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Effective ctrl+c shutdown
+
+### Features
+
+- Indexer management client basics
+- Allow read config file
+- Version upgrade triggers offchain sync request to indexer
+
+### Miscellaneous Tasks
+
+- Add labels workflow
+- Update labels workflow (#37)
+- Split off one-shot-cli package
+
+### Refactor
+
+- Config groupings
+
+## [0.1.2] - 2023-07-21
+
+### Bug Fixes
+
 - Add metrics label for msg types
 - Remove id verification for self in api service
 
