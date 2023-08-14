@@ -20,7 +20,7 @@ use graphcast_sdk::{
 };
 
 use crate::config::Config;
-use crate::messages::upgrade::VersionUpgradeMessage;
+use crate::messages::upgrade::UpgradeIntentMessage;
 use crate::metrics::handle_serve_metrics;
 use crate::operator::attestation::log_gossip_summary;
 use crate::operator::attestation::process_comparison_results;
@@ -120,7 +120,7 @@ impl RadioOperator {
         let upgrade_notifier = notifier.clone();
         let upgrade_config = config.clone();
 
-        // try message format in order of PublicPOIMessage, VersionUpgradeMessage
+        // try message format in order of PublicPOIMessage, UpgradeIntentMessage
         tokio::spawn(async move {
             for msg in receiver {
                 trace!("Decoding waku message into Graphcast Message with Radio specified payload");
@@ -178,10 +178,10 @@ impl RadioOperator {
                 };
 
                 if !parsed {
-                    if let Ok(msg) = agent.decode::<VersionUpgradeMessage>(msg.payload()).await {
+                    if let Ok(msg) = agent.decode::<UpgradeIntentMessage>(msg.payload()).await {
                         trace!(
                             message = tracing::field::debug(&msg),
-                            "Parseable as Version Upgrade message, now validate",
+                            "Parseable as Upgrade Intent message, now validate",
                         );
                         // Skip general first time sender nonce check and timestamp check
                         let msg = match msg
@@ -213,7 +213,7 @@ impl RadioOperator {
 
                         if let Ok(radio_msg) = is_valid {
                             VALIDATED_MESSAGES
-                                .with_label_values(&[&msg.identifier, "version_upgrade_message"])
+                                .with_label_values(&[&msg.identifier, "upgrade_intent_message"])
                                 .inc();
                             radio_msg
                                 .process_valid_message(&upgrade_config, &upgrade_notifier)

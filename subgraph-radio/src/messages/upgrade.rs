@@ -1,12 +1,11 @@
 use async_graphql::SimpleObject;
-
 use ethers_contract::EthAbiType;
 use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
-use graphcast_sdk::graphql::client_graph_account::owned_subgraphs;
+
 use graphcast_sdk::{
     graphcast_agent::message_typing::{BuildMessageError, GraphcastMessage},
-    networks::NetworkName,
+    graphql::client_graph_account::{owned_subgraphs, subgraph_hash_by_id},
 };
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -18,82 +17,48 @@ use crate::operator::notifier::Notifier;
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize, PartialEq, SimpleObject)]
 #[eip712(
-    name = "VersionUpgradeMessage",
+    name = "UpgradeIntentMessage",
     version = "0",
     chain_id = 1,
     verifying_contract = "0xc944e90c64b2c07662a292be6244bdf05cda44a7"
 )]
-pub struct VersionUpgradeMessage {
-    // identify through the current subgraph deployment
+pub struct UpgradeIntentMessage {
+    /// subgraph id shared by both versions of the subgraph deployment
     #[prost(string, tag = "1")]
-    pub identifier: String,
+    pub subgraph_id: String,
     // new version of the subgraph has a new deployment hash
     #[prost(string, tag = "2")]
     pub new_hash: String,
-    /// subgraph id shared by both versions of the subgraph deployment
-    #[prost(string, tag = "6")]
-    pub subgraph_id: String,
     /// nonce cached to check against the next incoming message
     #[prost(int64, tag = "3")]
     pub nonce: i64,
-    /// blockchain relevant to the message
-    #[prost(string, tag = "4")]
-    pub network: String,
-    /// estimated timestamp for the usage to switch to the new version
-    #[prost(int64, tag = "5")]
-    pub migrate_time: i64,
     /// Graph account sender - expect the sender to be subgraph owner
-    #[prost(string, tag = "7")]
+    #[prost(string, tag = "4")]
     pub graph_account: String,
 }
 
-impl VersionUpgradeMessage {
-    pub fn new(
-        identifier: String,
-        new_hash: String,
-        subgraph_id: String,
-        nonce: i64,
-        network: String,
-        migrate_time: i64,
-        graph_account: String,
-    ) -> Self {
-        VersionUpgradeMessage {
-            identifier,
+impl UpgradeIntentMessage {
+    pub fn new(subgraph_id: String, new_hash: String, nonce: i64, graph_account: String) -> Self {
+        UpgradeIntentMessage {
             new_hash,
             subgraph_id,
             nonce,
-            network,
-            migrate_time,
             graph_account,
         }
     }
 
     pub fn build(
-        identifier: String,
+        subgraph_id: String,
         new_hash: String,
         timestamp: i64,
-        subgraph_id: String,
-        network: NetworkName,
-        migrate_time: i64,
         graph_account: String,
     ) -> Self {
-        VersionUpgradeMessage::new(
-            identifier,
-            new_hash,
-            subgraph_id,
-            timestamp,
-            network.to_string(),
-            migrate_time,
-            graph_account,
-        )
+        UpgradeIntentMessage::new(subgraph_id, new_hash, timestamp, graph_account)
     }
 
     /// Check duplicated fields: payload message has duplicated fields with GraphcastMessage, the values must be the same
     pub fn valid_outer(&self, outer: &GraphcastMessage<Self>) -> Result<&Self, BuildMessageError> {
-        if self.nonce == outer.nonce
-            && self.graph_account == outer.graph_account
-            && self.identifier == outer.identifier
-        {
+        if self.nonce == outer.nonce && self.graph_account == outer.graph_account {
             Ok(self)
         } else {
             Err(BuildMessageError::InvalidFields(anyhow::anyhow!(
@@ -135,11 +100,9 @@ impl VersionUpgradeMessage {
     pub async fn process_valid_message(&self, config: &Config, notifier: &Notifier) {
         // send notifications
         notifier.notify(format!(
-            "Subgraph owner for a deployment has shared version upgrade info:\nold deployment: {}\nnew deployment: {}\nplanned migrate time: {}\nnetwork: {}",
-            self.identifier,
+            "Subgraph owner for a deployment announced an upgrade intent:\nSubgraph ID: {}\nNew deployment hash: {}",
+            self.subgraph_id,
             self.new_hash,
-            self.migrate_time,
-            self.network
         )).await;
         // auto deployment
         // If the identifier satisfy the config coverage level
@@ -148,11 +111,23 @@ impl VersionUpgradeMessage {
             let covered_topics = config
                 .generate_topics(config.graph_stack().indexer_address.clone())
                 .await;
-
+            // Get the current deployment hash by querying network subgraph and take the latest hash of the subgraph id
+            // Should be able to assume valid identifier since the message is valid
+            let identifier = if let Ok(hash) = subgraph_hash_by_id(
+                config.graph_stack().network_subgraph(),
+                &self.graph_account,
+                &self.subgraph_id,
+            )
+            .await
+            {
+                hash
+            } else {
+                return;
+            };
             if covered_topics
                 .clone()
                 .into_iter()
-                .any(|x| x == self.identifier.clone())
+                .any(|x| x == identifier.clone())
             {
                 let res = offchain_sync_indexing_rules(url, &self.new_hash).await;
                 let decision_basis = check_decision_basis(url, &self.new_hash).await;
