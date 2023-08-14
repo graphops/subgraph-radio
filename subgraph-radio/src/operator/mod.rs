@@ -257,7 +257,10 @@ impl RadioOperator {
         // Provide generated topics to Graphcast agent
         let topics = self
             .config
-            .generate_topics(self.config.graph_stack.indexer_address.clone())
+            .generate_topics(
+                &self.config.radio_infrastructure().coverage,
+                &self.config.graph_stack.indexer_address,
+            )
             .await;
         debug!(
             topics = tracing::field::debug(&topics),
@@ -323,7 +326,9 @@ impl RadioOperator {
                     // Update topic subscription
                     let result = timeout(update_timeout,
                         self.graphcast_agent()
-                        .update_content_topics(self.config.generate_topics(self.config.graph_stack().indexer_address.clone()).await)
+                        .update_content_topics(self.config.generate_topics(
+                            &self.config.radio_infrastructure().coverage,
+                            &self.config.graph_stack().indexer_address).await)
                     ).await;
 
                     if result.is_err() {

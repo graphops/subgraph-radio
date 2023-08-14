@@ -167,14 +167,18 @@ impl Config {
 
     /// Generate a set of unique topics along with given static topics
     #[autometrics]
-    pub async fn generate_topics(&self, indexer_address: String) -> Vec<String> {
+    pub async fn generate_topics(
+        &self,
+        coverage: &CoverageLevel,
+        indexer_address: &str,
+    ) -> Vec<String> {
         let static_topics = HashSet::from_iter(self.radio_infrastructure().topics.to_vec());
-        let topics = match self.radio_infrastructure().coverage {
+        let topics = match coverage {
             CoverageLevel::None => HashSet::new(),
             CoverageLevel::Minimal => static_topics,
             CoverageLevel::OnChain => {
                 let mut topics: HashSet<String> =
-                    active_allocation_hashes(self.callbook().graph_network(), &indexer_address)
+                    active_allocation_hashes(self.callbook().graph_network(), indexer_address)
                         .await
                         .into_iter()
                         .collect();
@@ -183,7 +187,7 @@ impl Config {
             }
             CoverageLevel::Comprehensive => {
                 let active_topics: HashSet<String> =
-                    active_allocation_hashes(self.callbook().graph_network(), &indexer_address)
+                    active_allocation_hashes(self.callbook().graph_network(), indexer_address)
                         .await
                         .into_iter()
                         .collect();

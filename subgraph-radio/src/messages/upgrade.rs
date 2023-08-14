@@ -96,7 +96,9 @@ impl UpgradeIntentMessage {
         Ok(self)
     }
 
-    /// process the validated version upgrade messages, currently just notify
+    /// Process the validated upgrade intent messages
+    /// If notification is set up, then notify the indexer
+    /// If indexer management server endpoint is set up, radio checks `auto_upgrade` for
     pub async fn process_valid_message(&self, config: &Config, notifier: &Notifier) {
         // send notifications
         notifier.notify(format!(
@@ -109,7 +111,10 @@ impl UpgradeIntentMessage {
         // and if indexer management server endpoint is provided
         if let Some(url) = &config.graph_stack().indexer_management_server_endpoint {
             let covered_topics = config
-                .generate_topics(config.graph_stack().indexer_address.clone())
+                .generate_topics(
+                    &config.radio_infrastructure().auto_upgrade,
+                    &config.graph_stack().indexer_address,
+                )
                 .await;
             // Get the current deployment hash by querying network subgraph and take the latest hash of the subgraph id
             // Should be able to assume valid identifier since the message is valid
