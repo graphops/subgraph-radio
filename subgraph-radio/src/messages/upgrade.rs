@@ -38,24 +38,6 @@ pub struct UpgradeIntentMessage {
 }
 
 impl UpgradeIntentMessage {
-    pub fn new(subgraph_id: String, new_hash: String, nonce: i64, graph_account: String) -> Self {
-        UpgradeIntentMessage {
-            new_hash,
-            subgraph_id,
-            nonce,
-            graph_account,
-        }
-    }
-
-    pub fn build(
-        subgraph_id: String,
-        new_hash: String,
-        timestamp: i64,
-        graph_account: String,
-    ) -> Self {
-        UpgradeIntentMessage::new(subgraph_id, new_hash, timestamp, graph_account)
-    }
-
     /// Check duplicated fields: payload message has duplicated fields with GraphcastMessage, the values must be the same
     pub fn valid_outer(&self, outer: &GraphcastMessage<Self>) -> Result<&Self, BuildMessageError> {
         if self.nonce == outer.nonce && self.graph_account == outer.graph_account {
