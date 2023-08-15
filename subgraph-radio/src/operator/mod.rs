@@ -1,6 +1,7 @@
 use derive_getters::Getters;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
+    mpsc::Receiver,
     Arc,
 };
 use std::time::Duration;
@@ -17,6 +18,7 @@ use graphcast_sdk::{
         message_typing::check_message_validity, waku_handling::WakuHandlingError, GraphcastAgent,
     },
     graphql::client_graph_node::{subgraph_network_blocks, update_network_chainheads},
+    WakuMessage,
 };
 
 use crate::config::Config;
@@ -93,16 +95,12 @@ pub struct RadioOperator {
 impl RadioOperator {
     /// Create a radio operator with radio configurations, persisted data,
     /// graphcast agent, and control flow
-    pub async fn new(config: &Config) -> RadioOperator {
+    pub async fn new(config: &Config, agent: GraphcastAgent) -> RadioOperator {
         debug!("Initializing program state");
         // Initialize program state
         let persisted_state: PersistedState = config.init_radio_state().await;
 
         debug!("Initializing Graphcast Agent");
-        let (agent, receiver) =
-            GraphcastAgent::new(config.to_graphcast_agent_config().await.unwrap())
-                .await
-                .expect("Initialize Graphcast agent");
         let graphcast_agent = Arc::new(agent);
 
         debug!("Set global static instance of graphcast_agent");
@@ -115,116 +113,6 @@ impl RadioOperator {
                 .expect("Failed to validate the provided indexer management server endpoint");
         };
         let notifier = Notifier::from_config(config);
-
-        let state_ref = persisted_state.clone();
-        let upgrade_notifier = notifier.clone();
-        let upgrade_config = config.clone();
-
-        // try message format in order of PublicPOIMessage, UpgradeIntentMessage
-        tokio::spawn(async move {
-            for msg in receiver {
-                trace!("Decoding waku message into Graphcast Message with Radio specified payload");
-                let agent = GRAPHCAST_AGENT
-                    .get()
-                    .expect("Could not retrieve Graphcast agent");
-                let id_validation = agent.id_validation.clone();
-                let callbook = agent.callbook.clone();
-                let nonces = agent.nonces.clone();
-                let local_sender = agent.graphcast_identity.graphcast_id.clone();
-                let parsed = if let Ok(msg) = agent.decode::<PublicPoiMessage>(msg.payload()).await
-                {
-                    trace!(
-                        message = tracing::field::debug(&msg),
-                        "Parseable as Public PoI message, now validate",
-                    );
-                    match check_message_validity(
-                        msg,
-                        &nonces,
-                        callbook.clone(),
-                        local_sender.clone(),
-                        &id_validation,
-                    )
-                    .await
-                    .map_err(|e| WakuHandlingError::InvalidMessage(e.to_string()))
-                    {
-                        Ok(msg) => {
-                            let is_valid = msg
-                                .payload
-                                .validity_check(
-                                    &msg,
-                                    &upgrade_config.graph_stack.graph_node_status_endpoint,
-                                )
-                                .await
-                                .is_ok();
-
-                            if is_valid {
-                                VALIDATED_MESSAGES
-                                    .with_label_values(&[&msg.identifier, "public_poi_message"])
-                                    .inc();
-                                process_valid_message(msg.clone(), &state_ref).await;
-                            };
-                            is_valid
-                        }
-                        Err(e) => {
-                            debug!(
-                                err = tracing::field::debug(e),
-                                "Failed to validate by Graphcast"
-                            );
-                            false
-                        }
-                    }
-                } else {
-                    false
-                };
-
-                if !parsed {
-                    if let Ok(msg) = agent.decode::<UpgradeIntentMessage>(msg.payload()).await {
-                        trace!(
-                            message = tracing::field::debug(&msg),
-                            "Parseable as Upgrade Intent message, now validate",
-                        );
-                        // Skip general first time sender nonce check and timestamp check
-                        let msg = match msg
-                            .valid_sender(
-                                callbook.graphcast_registry(),
-                                callbook.graph_network(),
-                                local_sender.clone(),
-                                &id_validation,
-                            )
-                            .await
-                            .map_err(|e| WakuHandlingError::InvalidMessage(e.to_string()))
-                        {
-                            Ok(msg) => msg,
-                            Err(e) => {
-                                debug!(
-                                    err = tracing::field::debug(e),
-                                    "Failed to validate Graphcast sender"
-                                );
-                                continue;
-                            }
-                        };
-                        let is_valid = msg
-                            .payload
-                            .validity_check(
-                                msg,
-                                &upgrade_config.graph_stack.network_subgraph.clone(),
-                            )
-                            .await;
-
-                        if let Ok(radio_msg) = is_valid {
-                            VALIDATED_MESSAGES
-                                .with_label_values(&[&msg.identifier, "upgrade_intent_message"])
-                                .inc();
-                            radio_msg
-                                .process_valid_message(&upgrade_config, &upgrade_notifier)
-                                .await;
-                        };
-                    } else {
-                        trace!("Waku message not decoded or validated, skipped message",);
-                    };
-                }
-            }
-        });
 
         GRAPHCAST_AGENT
             .get()
@@ -243,7 +131,7 @@ impl RadioOperator {
 
     /// Preparation for running the radio applications
     /// Expose metrics and subscribe to graphcast topics
-    pub async fn prepare(&self) {
+    pub async fn prepare(&self, receiver: Receiver<WakuMessage>) {
         // Set up Prometheus metrics url if configured
         if let Some(port) = self.config.radio_infrastructure().metrics_port {
             debug!("Initializing metrics port");
@@ -269,6 +157,8 @@ impl RadioOperator {
         self.graphcast_agent
             .update_content_topics(topics.clone())
             .await;
+
+        self.message_processor(receiver).await;
     }
 
     pub fn graphcast_agent(&self) -> &GraphcastAgent {
@@ -466,5 +356,127 @@ impl RadioOperator {
             sleep(Duration::from_secs(5)).await;
             continue;
         }
+    }
+
+    /// Process messages
+    pub async fn message_processor(&self, receiver: Receiver<WakuMessage>) {
+        let state = self.persisted_state.clone();
+        let notifier = self.notifier.clone();
+        let config = self.config.clone();
+
+        tokio::spawn(async move {
+            for msg in receiver {
+                let timeout_duration = Duration::from_secs(1);
+                let process_res = timeout(
+                    timeout_duration,
+                    process_message(state.clone(), notifier.clone(), config.clone(), msg),
+                )
+                .await;
+                match process_res {
+                    Ok(_) => trace!("New message processed"),
+                    Err(e) => debug!(error = e.to_string(), "Message processor timed out"),
+                }
+            }
+        });
+    }
+}
+
+/// Decode message into persistence, notifications, and other handlers
+pub async fn process_message(
+    state: PersistedState,
+    notifier: Notifier,
+    config: Config,
+    msg: WakuMessage,
+) {
+    trace!("Decoding waku message into Graphcast Message with Radio specified payload");
+    let agent = GRAPHCAST_AGENT
+        .get()
+        .expect("Could not retrieve Graphcast agent");
+    let id_validation = agent.id_validation.clone();
+    let callbook = agent.callbook.clone();
+    let nonces = agent.nonces.clone();
+    let local_sender = agent.graphcast_identity.graphcast_id.clone();
+    let parsed = if let Ok(msg) = agent.decode::<PublicPoiMessage>(msg.payload()).await {
+        trace!(
+            message = tracing::field::debug(&msg),
+            "Parseable as Public PoI message, now validate",
+        );
+        match check_message_validity(
+            msg,
+            &nonces,
+            callbook.clone(),
+            local_sender.clone(),
+            &id_validation,
+        )
+        .await
+        .map_err(|e| WakuHandlingError::InvalidMessage(e.to_string()))
+        {
+            Ok(msg) => {
+                let is_valid = msg
+                    .payload
+                    .validity_check(&msg, &config.graph_stack.graph_node_status_endpoint)
+                    .await
+                    .is_ok();
+
+                if is_valid {
+                    VALIDATED_MESSAGES
+                        .with_label_values(&[&msg.identifier, "public_poi_message"])
+                        .inc();
+                    process_valid_message(msg.clone(), &state).await;
+                };
+                is_valid
+            }
+            Err(e) => {
+                debug!(
+                    err = tracing::field::debug(e),
+                    "Failed to validate by Graphcast"
+                );
+                false
+            }
+        }
+    } else {
+        false
+    };
+
+    if !parsed {
+        if let Ok(msg) = agent.decode::<UpgradeIntentMessage>(msg.payload()).await {
+            trace!(
+                message = tracing::field::debug(&msg),
+                "Parseable as Upgrade Intent message, now validate",
+            );
+            // Skip general first time sender nonce check and timestamp check
+            let msg = match msg
+                .valid_sender(
+                    callbook.graphcast_registry(),
+                    callbook.graph_network(),
+                    local_sender.clone(),
+                    &id_validation,
+                )
+                .await
+                .map_err(|e| WakuHandlingError::InvalidMessage(e.to_string()))
+            {
+                Ok(msg) => msg,
+                Err(e) => {
+                    debug!(
+                        err = tracing::field::debug(e),
+                        "Failed to validate Graphcast sender"
+                    );
+                    return;
+                }
+            };
+            let is_valid = msg
+                .payload
+                .validity_check(msg, &config.graph_stack.network_subgraph.clone())
+                .await;
+
+            if let Ok(radio_msg) = is_valid {
+                VALIDATED_MESSAGES
+                    .with_label_values(&[&msg.identifier, "upgrade_intent_message"])
+                    .inc();
+                radio_msg.process_valid_message(&config, &notifier).await;
+            };
+        } else {
+            trace!("Waku message not decoded or validated, skipped message",);
+        };
     }
 }

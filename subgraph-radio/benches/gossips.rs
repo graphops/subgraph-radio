@@ -1,14 +1,16 @@
 use criterion::async_executor::FuturesExecutor;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use graphcast_sdk::graphcast_agent::message_typing::IdentityValidation;
+use graphcast_sdk::graphcast_agent::GraphcastAgent;
 use subgraph_radio::operator::RadioOperator;
 
 use rand::{thread_rng, Rng};
 use secp256k1::SecretKey;
 use std::collections::HashMap;
+use std::sync::mpsc;
 
 use graphcast_sdk::networks::NetworkName;
-use graphcast_sdk::{BlockPointer, GraphcastNetworkName, LogFormat, NetworkPointer};
+use graphcast_sdk::{BlockPointer, GraphcastNetworkName, LogFormat, NetworkPointer, WakuMessage};
 use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioInfrastructure, Waku};
 
 fn gossip_poi_bench(c: &mut Criterion) {
@@ -73,7 +75,12 @@ fn gossip_poi_bench(c: &mut Criterion) {
 
     c.bench_function("gossip_poi", move |b| {
         b.to_async(FuturesExecutor).iter(|| async {
-            RadioOperator::new(&config)
+            let (sender, _) = mpsc::channel::<WakuMessage>();
+            let agent =
+                GraphcastAgent::new(config.to_graphcast_agent_config().await.unwrap(), sender)
+                    .await
+                    .expect("Initialize Graphcast agent");
+            RadioOperator::new(&config, agent)
                 .await
                 .gossip_poi(
                     identifiers.clone(),
