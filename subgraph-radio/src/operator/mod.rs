@@ -9,13 +9,16 @@ use tokio::time::{interval, sleep, timeout};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    chainhead_block_str, messages::poi::process_valid_message,
+    chainhead_block_str,
+    messages::poi::{process_valid_message, PublicPoiMessage},
+    metrics::{CONNECTED_PEERS, GOSSIP_PEERS, RECEIVED_MESSAGES, VALIDATED_MESSAGES},
     operator::indexer_management::health_query,
 };
-use crate::{messages::poi::PublicPoiMessage, metrics::VALIDATED_MESSAGES};
 use graphcast_sdk::{
     graphcast_agent::{
-        message_typing::check_message_validity, waku_handling::WakuHandlingError, GraphcastAgent,
+        message_typing::check_message_validity,
+        waku_handling::{connected_peer_count, WakuHandlingError},
+        GraphcastAgent,
     },
     graphql::client_graph_node::{subgraph_network_blocks, update_network_chainheads},
     WakuMessage,
@@ -221,6 +224,9 @@ impl RadioOperator {
                             &self.config.graph_stack().indexer_address).await)
                     ).await;
 
+                    // Update the number of peers connected
+                    CONNECTED_PEERS.set(connected_peer_count(&self.graphcast_agent().node_handle).unwrap_or_default().try_into().unwrap_or_default());
+                    GOSSIP_PEERS.set(self.graphcast_agent.number_of_peers().try_into().unwrap_or_default());
                     if result.is_err() {
                         warn!("update_content_topics timed out");
                     } else {
@@ -389,6 +395,7 @@ pub async fn process_message(
     msg: WakuMessage,
 ) {
     trace!("Decoding waku message into Graphcast Message with Radio specified payload");
+    RECEIVED_MESSAGES.inc();
     let agent = GRAPHCAST_AGENT
         .get()
         .expect("Could not retrieve Graphcast agent");

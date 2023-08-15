@@ -4,7 +4,7 @@ use axum::routing::get;
 use axum::Router;
 use once_cell::sync::Lazy;
 use prometheus::{core::Collector, Registry};
-use prometheus::{IntCounterVec, IntGauge, IntGaugeVec, Opts};
+use prometheus::{IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::{net::SocketAddr, str::FromStr};
@@ -69,7 +69,47 @@ pub static DIVERGING_SUBGRAPHS: Lazy<IntGauge> = Lazy::new(|| {
     )
     .expect("Failed to create diverging_subgraphs gauge");
     prometheus::register(Box::new(m.clone()))
-        .expect("Failed to register diverging_subgraphs counter");
+        .expect("Failed to register diverging_subgraphs gauge");
+    m
+});
+
+#[allow(dead_code)]
+pub static CONNECTED_PEERS: Lazy<IntGauge> = Lazy::new(|| {
+    let m = IntGauge::with_opts(
+        Opts::new(
+            "connected_peers",
+            "Number of Gossip peers connected with Graphcast agent",
+        )
+        .namespace("graphcast")
+        .subsystem("subgraph_radio"),
+    )
+    .expect("Failed to create connected_peers gauge");
+    prometheus::register(Box::new(m.clone())).expect("Failed to register connected_peers gauge");
+    m
+});
+
+#[allow(dead_code)]
+pub static GOSSIP_PEERS: Lazy<IntGauge> = Lazy::new(|| {
+    let m = IntGauge::with_opts(
+        Opts::new("gossip_peers", "Total number of gossip peers discovered")
+            .namespace("graphcast")
+            .subsystem("subgraph_radio"),
+    )
+    .expect("Failed to create gossip_peers gauge");
+    prometheus::register(Box::new(m.clone())).expect("Failed to register gossip_peers gauge");
+    m
+});
+
+#[allow(dead_code)]
+pub static RECEIVED_MESSAGES: Lazy<IntCounter> = Lazy::new(|| {
+    let m = IntCounter::with_opts(
+        Opts::new("received_messages", "Number of messages received in total")
+            .namespace("graphcast")
+            .subsystem("subgraph_radio"),
+    )
+    .expect("Failed to create received_messages counter");
+    prometheus::register(Box::new(m.clone()))
+        .expect("Failed to register received_messages counter");
     m
 });
 
@@ -110,6 +150,9 @@ pub fn start_metrics() {
             Box::new(CACHED_PPOI_MESSAGES.clone()),
             Box::new(ACTIVE_INDEXERS.clone()),
             Box::new(DIVERGING_SUBGRAPHS.clone()),
+            Box::new(CONNECTED_PEERS.clone()),
+            Box::new(GOSSIP_PEERS.clone()),
+            Box::new(RECEIVED_MESSAGES.clone()),
             Box::new(LOCAL_PPOIS_TO_COMPARE.clone()),
         ],
     );
