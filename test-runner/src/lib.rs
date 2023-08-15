@@ -1,3 +1,4 @@
+pub mod id_validation;
 pub mod invalid_block_hash;
 pub mod invalid_nonce;
 pub mod invalid_payload;

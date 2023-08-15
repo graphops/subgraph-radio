@@ -35,6 +35,7 @@ pub async fn topics_test() {
         nonce: None,
         radio_payload: None,
         poi: None,
+        private_key: None,
     };
 
     let process_manager = setup(&config, test_file_name, &mut test_sender_config).await;

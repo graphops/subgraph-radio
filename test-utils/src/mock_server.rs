@@ -1,12 +1,13 @@
 use axum::{routing::post, Router};
 use chrono::Utc;
-use rand::Rng;
-use std::fmt::Write;
+use serde_json::json;
 use std::sync::Arc;
 use std::{convert::Infallible, net::SocketAddr, str::FromStr};
 use tokio::sync::Mutex;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
+
+use crate::{GRAPHCAST_REGISTERED, INDEXERS};
 
 pub struct ServerState {
     subgraphs: Arc<Mutex<Vec<String>>>,
@@ -23,25 +24,31 @@ pub async fn start_mock_server(
     address: String,
     initial_subgraphs: Vec<String>,
     staked_tokens: Option<String>,
+    sender: String,
 ) -> ServerState {
     let subgraphs = Arc::new(Mutex::new(initial_subgraphs));
 
-    // Define cloned versions of subgraphs here
     let subgraphs_for_graphql = Arc::clone(&subgraphs);
     let subgraphs_for_network_subgraph = Arc::clone(&subgraphs);
+
+    let sender_for_network_subgraph = sender.clone();
 
     let app = Router::new()
         .route(
             "/graphql",
             post(move || handler_graphql(subgraphs_for_graphql.clone())),
         )
-        .route("/registry-subgraph", post(handler_graphcast_registry))
+        .route(
+            "/registry-subgraph",
+            post(move || handler_graphcast_registry(sender.clone())),
+        )
         .route(
             "/network-subgraph",
             post(move || {
                 handler_network_subgraph(
                     subgraphs_for_network_subgraph.clone(),
                     staked_tokens.unwrap_or("10000000000000000000000".to_string()),
+                    sender_for_network_subgraph,
                 )
             }),
         )
@@ -82,42 +89,33 @@ async fn handler_graphql(subgraphs: Arc<Mutex<Vec<String>>>) -> Result<String, I
     Ok(response_body)
 }
 
-async fn handler_graphcast_registry() -> Result<String, Infallible> {
-    // Generate a random Ethereum address
-    let mut rng = rand::thread_rng();
-    let graphcast_id: String = (0..20)
-        .map(|_| rng.gen::<u8>())
-        .collect::<Vec<u8>>()
-        .iter()
-        .fold(String::new(), |mut acc, &n| {
-            write!(&mut acc, "{:02x}", n).unwrap();
-            acc
-        });
-
-    let indexer: String = (0..20)
-        .map(|_| rng.gen::<u8>())
-        .collect::<Vec<u8>>()
-        .iter()
-        .fold(String::new(), |mut acc, &n| {
-            write!(&mut acc, "{:02x}", n).unwrap();
-            acc
-        });
-
-    let response_body = format!(
-        r#"{{
-        "data": {{
-            "graphcast_ids": [
-                {{
-                    "indexer": "0x{}",
-                    "graphcastID": "0x{}"
-                }}
-            ]
-        }},
-        "errors": null,
-        "extensions": null
-    }}"#,
-        indexer, graphcast_id
-    );
+async fn handler_graphcast_registry(sender: String) -> Result<String, Infallible> {
+    let response_body = if GRAPHCAST_REGISTERED.contains(&sender) {
+        format!(
+            r#"{{
+            "data": {{
+                "graphcast_ids": [
+                    {{
+                        "indexer": "{}",
+                        "graphcastID": "{}"
+                    }}
+                ]
+            }},
+            "errors": null,
+            "extensions": null
+        }}"#,
+            sender, sender
+        )
+    } else {
+        r#"{
+            "data": {
+                "graphcast_ids": []
+            },
+            "errors": null,
+            "extensions": null
+        }"#
+        .to_string()
+    };
 
     Ok(response_body)
 }
@@ -125,34 +123,47 @@ async fn handler_graphcast_registry() -> Result<String, Infallible> {
 async fn handler_network_subgraph(
     subgraphs: Arc<Mutex<Vec<String>>>,
     staked_tokens: String,
+    sender: String,
 ) -> Result<String, Infallible> {
     let subgraphs = subgraphs.lock().await;
 
     // Prepare allocations part of the response dynamically from the subgraphs vector
-    let allocations: Vec<String> = subgraphs
+    let allocations: Vec<serde_json::Value> = subgraphs
         .iter()
-        .map(|hash| format!(r#"{{"subgraphDeployment": {{"ipfsHash": "{}"}}}}"#, hash))
+        .map(|hash| json!({"subgraphDeployment": {"ipfsHash": hash}}))
         .collect();
 
-    // Prepare allocations part of the response by joining individual allocation strings with comma
-    let allocations = allocations.join(",");
+    let response_body = if INDEXERS.contains(&sender) {
+        json!({
+            "data": {
+                "indexer": {
+                    "stakedTokens": staked_tokens,
+                    "allocations": allocations,
+                },
+                "graphNetwork": {
+                    "minimumIndexerStake": "10000000000000000000000",
+                },
+                "graphAccounts": [
+                    {
+                        "id": sender,
+                        "operators": [],
+                        "subgraphs": []
+                      },
+                ],            },
+            "errors": null,
+        })
+    } else {
+        json!({
+            "data": {
+                "indexer": null,
+                "graphNetwork": {
+                    "minimumIndexerStake": "10000000000000000000000",
+                },
+                "graphAccounts": [],
+            },
+            "errors": null,
+        })
+    };
 
-    let response_body = format!(
-        r#"
-        {{
-            "data": {{
-                "indexer": {{
-                    "stakedTokens": "{}",
-                    "allocations": [{}]
-                }},
-                "graphNetwork": {{
-                    "minimumIndexerStake": "10000000000000000000000"
-                }}
-            }},
-            "errors": null
-        }}"#,
-        staked_tokens, allocations
-    );
-
-    Ok(response_body)
+    Ok(response_body.to_string())
 }

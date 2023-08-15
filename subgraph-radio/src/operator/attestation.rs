@@ -290,9 +290,13 @@ pub fn clear_local_attestation(
 /// Tracks results indexed by deployment hash and block number
 #[derive(Enum, Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum ComparisonResultType {
+    #[serde(rename = "NOTFOUND")]
     NotFound,
+    #[serde(rename = "DIVERGENT")]
     Divergent,
+    #[serde(rename = "MATCH")]
     Match,
+    #[serde(rename = "BUILDFAILED")]
     BuildFailed,
 }
 

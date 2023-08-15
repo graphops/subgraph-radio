@@ -32,6 +32,7 @@ pub async fn invalid_payload_test() {
         nonce: None,
         radio_payload: Some(DummyMsg::to_json(&dummy_radio_payload)),
         poi: None,
+        private_key: None,
     };
 
     let process_manager = setup(&config, test_file_name, &mut test_sender_config).await;

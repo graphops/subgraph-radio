@@ -9,20 +9,41 @@ use std::{
 };
 
 use config::TestSenderConfig;
-use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
+use ethers::signers::Signer;
 use graphcast_sdk::graphcast_agent::message_typing::IdentityValidation;
+use graphcast_sdk::{build_wallet, graphcast_agent::message_typing::GraphcastMessage};
 use mock_server::{start_mock_server, ServerState};
+use once_cell::sync::Lazy;
 use prost::Message;
 use rand::Rng;
 use subgraph_radio::{
     config::{Config, CoverageLevel},
     messages::poi::PublicPoiMessage,
 };
-use tracing::info;
+use tracing::{debug, info};
 
 pub mod config;
 pub mod dummy_msg;
 pub mod mock_server;
+
+pub static GRAPHCAST_REGISTERED: Lazy<Vec<String>> = Lazy::new(|| {
+    vec![
+        // Private Key: baf5c93f0c8aee3b945f33b9192014e83d50cec25f727a13460f6ef1eb6a5844
+        "0x7e6528e4ce3055e829a32b5dc4450072bac28bc6".to_lowercase(),
+    ]
+});
+pub static INDEXERS: Lazy<Vec<String>> = Lazy::new(|| {
+    vec![
+        // Private Key: baf5c93f0c8aee3b945f33b9192014e83d50cec25f727a13460f6ef1eb6a5844
+        "0x7e6528e4ce3055e829a32b5dc4450072bac28bc6".to_lowercase(),
+        // Private Key: c649c5113a305a04cd9b342beccbbc4cf57198d84d2ef07cea2ce9b887c51f06
+        "0x2dcf8687bf71567be6153f48d2392a398cb406b8".to_lowercase(),
+        // Private Key: 66856be2f0793d8be271cb19af0fabdc93fbc91eb84cdcc2dcf62da78f2046ab
+        "0x1385100a92152d624cdca7a96521e5a37cced98a".to_lowercase(),
+        // Private Key: 3da03a6bd171e7ed35898e5465ce29030655329951a51267dffdd561d52f7e48
+        "0x78615717f5b23a3dbc823b892fa58ca352e6af4b".to_lowercase(),
+    ]
+});
 
 pub struct ProcessManager {
     pub senders: Vec<Arc<Mutex<Child>>>,
@@ -80,6 +101,11 @@ pub async fn setup(
     let radio_name = format!("{}-{}", test_file_name, id);
     test_sender_config.radio_name = radio_name.clone();
 
+    let private_key = test_sender_config
+        .private_key
+        .clone()
+        .unwrap_or("baf5c93f0c8aee3b945f33b9192014e83d50cec25f727a13460f6ef1eb6a5844".to_string());
+
     let basic_sender = Arc::new(Mutex::new(
         Command::new("cargo")
             .arg("run")
@@ -107,6 +133,8 @@ pub async fn setup(
             .arg(&test_sender_config.poi.clone().unwrap_or(
                 "0x25331f98b82ca7f3966256bf508a7ede52e715b631dfa3d73b846bb7617f6b9e".to_string(),
             ))
+            .arg("--private-key")
+            .arg(&private_key)
             .spawn()
             .expect("Failed to start command"),
     ));
@@ -119,10 +147,15 @@ pub async fn setup(
 
     let port = find_random_tcp_port();
     let host = format!("127.0.0.1:{}", port);
+
+    let wallet = build_wallet(&private_key).unwrap();
+    let address = format!("0x{:x}", wallet.address());
+
     let server_state = start_mock_server(
         host.clone(),
         config.radio_infrastructure().topics.clone(),
         test_sender_config.staked_tokens.clone(),
+        address,
     )
     .await;
 
@@ -160,12 +193,16 @@ pub fn teardown(process_manager: ProcessManager, store_path: &str) {
 }
 
 pub fn start_radio(config: &Config) -> Child {
-    Command::new("cargo")
+    debug!("Starting test radio with config {:?}", config);
+
+    let mut command = Command::new("cargo");
+
+    command
         .arg("run")
         .arg("-p")
         .arg("subgraph-radio")
         .arg("--")
-        .arg("--graph-node-endpoint")
+        .arg("--graph-node--status-endpoint")
         .arg(&config.graph_stack().graph_node_status_endpoint)
         .arg("--private-key")
         .arg(
@@ -265,9 +302,13 @@ pub fn start_radio(config: &Config) -> Child {
             IdentityValidation::RegisteredIndexer => "registered-indexer",
             IdentityValidation::Indexer => "indexer",
             IdentityValidation::SubgraphStaker => "subgraph-staker",
-        })
-        .spawn()
-        .expect("Failed to start command")
+        });
+
+    if let Some(port) = config.radio_infrastructure.server_port {
+        command.arg("--server-port").arg(port.to_string());
+    }
+
+    command.spawn().expect("Failed to start command")
 }
 
 pub fn find_random_udp_port() -> u16 {

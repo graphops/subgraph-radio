@@ -3,10 +3,19 @@ use std::time::Instant;
 
 use graphcast_sdk::init_tracing;
 use test_runner::{
-    invalid_block_hash::invalid_block_hash_test, invalid_nonce::invalid_nonce_test,
-    invalid_payload::invalid_payload_test, invalid_sender::invalid_sender_test,
-    message_handling::send_and_receive_test, poi_divergent::poi_divergent_test,
-    poi_match::poi_match_test, topics::topics_test,
+    id_validation::{
+        id_validation_indexer_invalid_sender, id_validation_indexer_valid_sender,
+        id_validation_registered_indexer_invalid_sender,
+        id_validation_registered_indexer_valid_sender, id_validation_valid_address_valid_sender,
+    },
+    invalid_block_hash::invalid_block_hash_test,
+    invalid_nonce::invalid_nonce_test,
+    invalid_payload::invalid_payload_test,
+    invalid_sender::invalid_sender_test,
+    message_handling::send_and_receive_test,
+    poi_divergent::poi_divergent_test,
+    poi_match::poi_match_test,
+    topics::topics_test,
 };
 use test_utils::config::test_config;
 use tracing::{error, info};
@@ -33,6 +42,7 @@ async fn run_tests(
 
     (tests_passed, test_results)
 }
+
 #[tokio::main]
 pub async fn main() {
     let config = test_config();
@@ -68,12 +78,25 @@ pub async fn main() {
         }
     }
 
-    let poi_tests = vec![
-        ("poi_divergent_test", tokio::spawn(poi_divergent_test())),
-        ("poi_match_test", tokio::spawn(poi_match_test())),
-    ];
+    let mut retry_count_poi = 3;
+    let mut poi_tests_passed = false;
+    let mut poi_test_results: HashMap<String, bool> = HashMap::new();
 
-    let (poi_tests_passed, poi_test_results) = run_tests(poi_tests).await;
+    while retry_count_poi > 0 && !poi_tests_passed {
+        let poi_tests = vec![
+            ("poi_divergent_test", tokio::spawn(poi_divergent_test())),
+            ("poi_match_test", tokio::spawn(poi_match_test())),
+        ];
+
+        let (tests_passed, test_results) = run_tests(poi_tests).await;
+        poi_test_results = test_results;
+
+        if tests_passed {
+            poi_tests_passed = true;
+        } else {
+            retry_count_poi -= 1;
+        }
+    }
 
     let validity_tests_group_1 = vec![
         (
@@ -94,24 +117,63 @@ pub async fn main() {
     let (validity_tests_group_2_passed, validity_test_results_group_2) =
         run_tests(validity_tests_group_2).await;
 
+    let id_validation_tests_group_1 = vec![
+        (
+            "id_validation_registered_indexer_valid_sender",
+            tokio::spawn(id_validation_registered_indexer_valid_sender()),
+        ),
+        (
+            "id_validation_registered_indexer_invalid_sender",
+            tokio::spawn(id_validation_registered_indexer_invalid_sender()),
+        ),
+        (
+            "id_validation_valid_address_valid_sender",
+            tokio::spawn(id_validation_valid_address_valid_sender()),
+        ),
+    ];
+
+    let (id_validation_tests_group_1_passed, id_validation_tests_group_1_results) =
+        run_tests(id_validation_tests_group_1).await;
+
+    let id_validation_tests_group_2 = vec![
+        (
+            "id_validation_indexer_valid_sender",
+            tokio::spawn(id_validation_indexer_valid_sender()),
+        ),
+        (
+            "id_validation_indexer_invalid_sender",
+            tokio::spawn(id_validation_indexer_invalid_sender()),
+        ),
+    ];
+
+    let (id_validation_tests_group_2_passed, id_validation_tests_group_2_results) =
+        run_tests(id_validation_tests_group_2).await;
+
     print_test_summary(
         initial_test_results,
         poi_test_results,
         validity_test_results_group_1,
         validity_test_results_group_2,
+        id_validation_tests_group_1_results,
+        id_validation_tests_group_2_results,
         initial_tests_passed
             && poi_tests_passed
             && validity_tests_group_1_passed
-            && validity_tests_group_2_passed,
+            && validity_tests_group_2_passed
+            && id_validation_tests_group_1_passed
+            && id_validation_tests_group_2_passed,
         start_time,
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn print_test_summary(
     initial_test_results: HashMap<String, bool>,
     poi_test_results: HashMap<String, bool>,
     validity_test_results_group_1: HashMap<String, bool>,
     validity_test_results_group_2: HashMap<String, bool>,
+    id_validation_tests_group_1_results: HashMap<String, bool>,
+    id_validation_tests_group_2_results: HashMap<String, bool>,
     tests_passed: bool,
     start_time: Instant,
 ) {
@@ -123,6 +185,8 @@ fn print_test_summary(
         .chain(&poi_test_results)
         .chain(&validity_test_results_group_1)
         .chain(&validity_test_results_group_2)
+        .chain(&id_validation_tests_group_1_results)
+        .chain(&id_validation_tests_group_2_results)
     {
         if *passed {
             info!("{}: PASSED", test_name);

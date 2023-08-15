@@ -27,6 +27,7 @@ pub async fn invalid_nonce_test() {
         nonce: Some("1655850000".to_string()),
         radio_payload: None,
         poi: None,
+        private_key: None,
     };
 
     let process_manager = setup(&config, test_file_name, &mut test_sender_config).await;
