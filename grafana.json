@@ -489,10 +489,7 @@
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -549,7 +546,7 @@
         "x": 12,
         "y": 8
       },
-      "id": 123127,
+      "id": 123129,
       "options": {
         "legend": {
           "calcs": [],
@@ -565,17 +562,32 @@
       "targets": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(graphcast_subgraph_radio_cached_ppoi_messages[5m]))",
+          "expr": "function_calls_concurrent",
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "exemplar": true,
+          "expr": "histogram_quantile(0.95, sum(rate(function_calls_duration_bucket[5m])) by (le))",
           "hide": false,
           "interval": "",
           "legendFormat": "",
-          "range": true,
           "refId": "B"
+        },
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "exemplar": true,
+          "expr": "rate(function_calls_count[5m])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "C"
         }
       ],
-      "title": "Rate of receiving messages",
+      "title": "Function Call Stats",
       "type": "timeseries"
     },
     {
@@ -665,108 +677,6 @@
       "type": "timeseries"
     },
     {
-      "datasource": "${DS_PROMETHEUS}",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "id": 123129,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "exemplar": true,
-          "expr": "function_calls_concurrent",
-          "interval": "",
-          "legendFormat": "",
-          "refId": "A"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "exemplar": true,
-          "expr": "histogram_quantile(0.95, sum(rate(function_calls_duration_bucket[5m])) by (le))",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "",
-          "refId": "B"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "exemplar": true,
-          "expr": "rate(function_calls_count[5m])",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "",
-          "refId": "C"
-        }
-      ],
-      "title": "Function Call Stats",
-      "type": "timeseries"
-    },
-    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -824,8 +734,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 24
+        "x": 12,
+        "y": 16
       },
       "id": 123135,
       "options": {
@@ -905,6 +815,6 @@
   "timezone": "browser",
   "title": "Graphcast Subgraph Radio",
   "uid": "JByAFjeVz",
-  "version": 9,
+  "version": 10,
   "weekStart": ""
 }
