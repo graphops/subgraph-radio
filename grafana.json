@@ -1,4 +1,67 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_SUBGRAPHRADIOGRAPHQL",
+      "label": "SubgraphRadioGraphQL",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "fifemon-graphql-datasource",
+      "pluginName": "GraphQL Data Source"
+    },
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__elements": [],
+  "__requires": [
+    {
+      "type": "datasource",
+      "id": "fifemon-graphql-datasource",
+      "name": "GraphQL Data Source",
+      "version": "1.3.0"
+    },
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "8.3.1"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -24,12 +87,12 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 27,
+  "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
     {
-      "datasource": "SubgraphRadioGraphQL",
+      "datasource": "${DS_SUBGRAPHRADIOGRAPHQL}",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -76,7 +139,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 6,
         "x": 0,
         "y": 0
       },
@@ -84,14 +147,16 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.4.1",
+      "pluginVersion": "8.3.1",
       "targets": [
         {
           "aliasBy": "",
@@ -100,7 +165,7 @@
           "annotationTitle": "",
           "constant": 6.5,
           "dataPath": "data",
-          "datasource": "SubgraphRadioGraphQL",
+          "datasource": "${DS_SUBGRAPHRADIOGRAPHQL}",
           "endTimePath": "endTime",
           "groupBy": "resultType",
           "hide": false,
@@ -109,18 +174,22 @@
           "timePath": "Time"
         }
       ],
-      "title": "Comparison Results",
+      "title": "POI Comparison Overview",
       "transformations": [
         {
           "id": "groupBy",
           "options": {
             "fields": {
               "Count": {
-                "aggregations": ["count"],
+                "aggregations": [
+                  "count"
+                ],
                 "operation": "aggregate"
               },
               "DIVERGENT_deployment": {
-                "aggregations": ["count"],
+                "aggregations": [
+                  "count"
+                ],
                 "operation": "aggregate"
               },
               "DIVERGENT_resultType": {
@@ -132,11 +201,15 @@
                 "operation": "groupby"
               },
               "MATCH_deployment": {
-                "aggregations": ["count"],
+                "aggregations": [
+                  "count"
+                ],
                 "operation": "aggregate"
               },
               "MATCH_resultType": {
-                "aggregations": ["count"],
+                "aggregations": [
+                  "count"
+                ],
                 "operation": "groupby"
               },
               "deployment": {
@@ -145,17 +218,27 @@
               }
             }
           }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+)_deployment.*",
+            "renamePattern": "$1"
+          }
         }
       ],
       "type": "gauge"
     },
     {
-      "datasource": "Prometheus",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
       "description": "Average metrics based on each scrape\n- counter for received valid messages\n- gauge of cached messages\n\n- cached messages \n",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "thresholds"
           },
           "mappings": [],
           "thresholds": {
@@ -172,61 +255,152 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 6,
+        "x": 6,
         "y": 0
       },
       "id": 123139,
       "options": {
-        "displayMode": "basic",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "showUnfilled": true
+        "textMode": "auto"
       },
-      "pluginVersion": "9.4.1",
+      "pluginVersion": "8.3.1",
       "targets": [
         {
-          "datasource": "Prometheus",
+          "datasource": "${DS_PROMETHEUS}",
           "editorMode": "builder",
-          "expr": "avg(graphcast_subgraph_radio_validated_messages{})",
+          "exemplar": true,
+          "expr": "sum(rate(graphcast_subgraph_radio_validated_messages{}[30m])) * 60",
           "hide": false,
-          "legendFormat": "__auto",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "Messages Validated/Minute",
           "range": true,
           "refId": "Received Messages"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "exemplar": false,
-          "expr": "avg(graphcast_subgraph_radio_cached_ppoi_messages{})",
-          "hide": false,
-          "instant": true,
-          "interval": "",
-          "legendFormat": "",
-          "refId": "Cached Messages"
-        },
-        {
-          "datasource": "Prometheus",
           "exemplar": true,
-          "expr": "avg(graphcast_subgraph_radio_local_ppois_to_compare{})",
+          "expr": "sum(graphcast_subgraph_radio_cached_ppoi_messages{})",
           "hide": false,
+          "instant": false,
           "interval": "",
-          "legendFormat": "",
-          "refId": "Local Public POIs"
+          "legendFormat": "Messages In Store",
+          "refId": "Cached Messages"
         }
       ],
-      "title": "Message averages",
+      "title": "Message stats",
       "transformations": [],
-      "type": "bargauge"
+      "type": "stat"
     },
     {
-      "datasource": "SubgraphRadioGraphQL",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 123125,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "min",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "graphcast_subgraph_radio_ACTIVE_INDEXERS",
+          "interval": "",
+          "legendFormat": "{{deployment}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Number of Gossiping Indexers per Subgraph",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "${DS_SUBGRAPHRADIOGRAPHQL}",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -234,10 +408,7 @@
           },
           "custom": {
             "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
+            "displayMode": "auto"
           },
           "mappings": [],
           "thresholds": {
@@ -267,18 +438,20 @@
         "footer": {
           "countRows": false,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "showHeader": true,
         "sortBy": [
           {
             "desc": true,
-            "displayName": "_senderRatio"
+            "displayName": "Count Ratio"
           }
         ]
       },
-      "pluginVersion": "9.4.1",
+      "pluginVersion": "8.3.1",
       "targets": [
         {
           "aliasBy": "",
@@ -287,7 +460,7 @@
           "annotationTitle": "",
           "constant": 6.5,
           "dataPath": "data",
-          "datasource": "SubgraphRadioGraphQL",
+          "datasource": "${DS_SUBGRAPHRADIOGRAPHQL}",
           "endTimePath": "endTime",
           "groupBy": "null",
           "queryText": "query {\n  data:comparisonRatio{\n    deployment\n    blockNumber\n    senderRatio\n    stakeRatio\n  }\n}",
@@ -295,20 +468,34 @@
           "timePath": "Time"
         }
       ],
-      "title": "Result Aggregation",
-      "transformations": [],
+      "title": "POI Comparison Results",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "_stakeRatio": false
+            },
+            "indexByName": {},
+            "renameByName": {
+              "_blockNumber": "Block Number",
+              "_deployment": "Deployment",
+              "_senderRatio": "Count Ratio",
+              "_stakeRatio": "Stake Ratio"
+            }
+          }
+        }
+      ],
       "type": "table"
     },
     {
-      "datasource": "Prometheus",
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -351,462 +538,13 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "graphcast_subgraph_radio_local_ppois_to_compare{deployment=\"QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB\", instance=\"localhost:3010\", job=\"example-api-metrics\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "id": 123135,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "editorMode": "code",
-          "exemplar": true,
-          "expr": "graphcast_subgraph_radio_local_ppois_to_compare",
-          "interval": "",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Locally tracked Public POIs",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "graphcast_subgraph_radio_ACTIVE_INDEXERS{deployment=\"QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB\", instance=\"localhost:3010\", job=\"example-api-metrics\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "id": 123125,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "graphcast_subgraph_radio_ACTIVE_INDEXERS",
-          "interval": "",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Number of active peer indexers",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "{deployment=\"QmeVudaULhhuriTEreJWXrTPBmnGHXTQ8DgUukmhSR7Naa\", instance=\"localhost:3010\", job=\"example-api-metrics\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
-      },
-      "id": 123127,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "editorMode": "code",
-          "exemplar": true,
-          "expr": "rate(graphcast_subgraph_radio_cached_ppoi_messages[5m])",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "Rate of receiving messages",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 24
-      },
-      "id": 123133,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "editorMode": "code",
-          "exemplar": true,
-          "expr": "graphcast_subgraph_radio_diverging_subgraphs",
-          "interval": "",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Number of diverged subgraphs",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "function_calls_concurrent{function=\"gossip_set_up\", instance=\"localhost:3010\", job=\"example-api-metrics\", module=\"subgraph_radio::operator::operation\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 32
+        "y": 8
       },
       "id": 123129,
       "options": {
@@ -823,7 +561,7 @@
       },
       "targets": [
         {
-          "datasource": "Prometheus",
+          "datasource": "${DS_PROMETHEUS}",
           "exemplar": true,
           "expr": "function_calls_concurrent",
           "interval": "",
@@ -831,7 +569,7 @@
           "refId": "A"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": "${DS_PROMETHEUS}",
           "exemplar": true,
           "expr": "histogram_quantile(0.95, sum(rate(function_calls_duration_bucket[5m])) by (le))",
           "hide": false,
@@ -840,7 +578,7 @@
           "refId": "B"
         },
         {
-          "datasource": "Prometheus",
+          "datasource": "${DS_PROMETHEUS}",
           "exemplar": true,
           "expr": "rate(function_calls_count[5m])",
           "hide": false,
@@ -849,24 +587,206 @@
           "refId": "C"
         }
       ],
-      "title": "Function Stats",
+      "title": "Function Call Stats",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 123133,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "graphcast_subgraph_radio_diverging_subgraphs",
+          "interval": "",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Number of diverged subgraphs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 123135,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "min",
+            "max",
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "${DS_PROMETHEUS}",
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "graphcast_subgraph_radio_local_ppois_to_compare",
+          "interval": "",
+          "legendFormat": "{{deployment}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Locally tracked Public POIs",
       "type": "timeseries"
     }
   ],
   "refresh": "",
   "revision": 1,
-  "schemaVersion": 38,
+  "schemaVersion": 33,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {
-    "hidden": true,
+    "hidden": false,
     "refresh_intervals": [
       "5s",
       "10s",
@@ -879,11 +799,22 @@
       "2h",
       "1d"
     ],
-    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ],
     "type": "timepicker"
   },
   "timezone": "browser",
   "title": "Graphcast Subgraph Radio",
-  "version": 9,
+  "uid": "graphcast-subgraph-radio",
+  "version": 10,
   "weekStart": ""
 }
