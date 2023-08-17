@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::{
     config::Config,
-    messages::poi::PublicPoiMessage,
+    messages::{poi::PublicPoiMessage, upgrade::UpgradeIntentMessage},
     operator::attestation::{
         self, attestations_to_vec, compare_attestation, process_ppoi_message, Attestation,
         AttestationEntry, AttestationError, ComparisonResult, ComparisonResultType,
@@ -23,7 +23,7 @@ pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
-    async fn radio_payload_messages(
+    async fn public_poi_messages(
         &self,
         ctx: &Context<'_>,
         identifier: Option<String>,
@@ -32,6 +32,20 @@ impl QueryRoot {
         let msgs = ctx
             .data_unchecked::<Arc<SubgraphRadioContext>>()
             .remote_ppoi_messages_filtered(&identifier, &block);
+        Ok(msgs)
+    }
+
+    async fn upgrade_intent_messages(
+        &self,
+        ctx: &Context<'_>,
+        subgraph_id: Option<String>,
+    ) -> Result<Vec<UpgradeIntentMessage>, HttpServiceError> {
+        let msgs = ctx
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
+            .upgrade_intent_messages_filtered(&subgraph_id)
+            .into_iter()
+            .map(|m| m.payload)
+            .collect();
         Ok(msgs)
     }
 
@@ -255,6 +269,22 @@ impl SubgraphRadioContext {
             .filter(|message| filter_remote_ppoi_messages(message, identifier, block))
             .collect::<Vec<_>>();
         filtered
+    }
+
+    pub fn upgrade_intent_messages(
+        &self,
+    ) -> HashMap<String, GraphcastMessage<UpgradeIntentMessage>> {
+        self.persisted_state.upgrade_intent_messages()
+    }
+
+    pub fn upgrade_intent_messages_filtered(
+        &self,
+        subgraph_id: &Option<String>,
+    ) -> Vec<GraphcastMessage<UpgradeIntentMessage>> {
+        subgraph_id
+            .as_ref()
+            .and_then(|id| self.upgrade_intent_messages().get(id).cloned())
+            .map_or(vec![], |m| vec![m])
     }
 
     pub fn comparison_result(&self, identifier: String) -> Option<ComparisonResult> {

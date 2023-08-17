@@ -480,7 +480,13 @@ pub async fn process_message(
                 VALIDATED_MESSAGES
                     .with_label_values(&[&msg.identifier, "upgrade_intent_message"])
                     .inc();
-                radio_msg.process_valid_message(&config, &notifier).await;
+                if radio_msg
+                    .process_valid_message(&config, &notifier, &state)
+                    .await
+                    .is_ok()
+                {
+                    state.add_upgrade_intent_message(msg.clone());
+                };
             };
         } else {
             trace!("Waku message not decoded or validated, skipped message",);
