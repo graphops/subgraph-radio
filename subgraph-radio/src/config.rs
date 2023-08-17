@@ -153,7 +153,7 @@ impl Config {
             state
         } else {
             debug!("Created new state");
-            PersistedState::new(None, None, None)
+            PersistedState::new(None, None, None, None)
         }
     }
 
@@ -311,6 +311,15 @@ pub struct RadioInfrastructure {
             none: no automatic upgrade, only notifications.\nDefault: comprehensive"
     )]
     pub auto_upgrade: CoverageLevel,
+    #[clap(
+        long,
+        value_parser = value_parser!(i64).range(1..),
+        default_value = "86400",
+        value_name = "RATELIMIT_THRESHOLD",
+        env = "RATELIMIT_THRESHOLD",
+        help = "Set upgrade intent ratelimit in seconds: only one upgrade per subgraph within the threshold (default: 86400 seconds = 1 day)"
+    )]
+    pub ratelimit_threshold: i64,
     #[clap(
         long,
         value_parser = value_parser!(i64).range(1..),

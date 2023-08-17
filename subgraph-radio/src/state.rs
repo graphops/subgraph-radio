@@ -11,10 +11,11 @@ use std::{
     io::{BufReader, Write},
 };
 use std::{fs, panic};
-use tracing::{info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
 
+use crate::messages::upgrade::UpgradeIntentMessage;
 use crate::{
     messages::poi::PublicPoiMessage,
     operator::attestation::{
@@ -26,12 +27,14 @@ use crate::{
 
 type Local = Arc<SyncMutex<HashMap<String, HashMap<u64, Attestation>>>>;
 type Remote = Arc<SyncMutex<Vec<GraphcastMessage<PublicPoiMessage>>>>;
+type UpgradeMessages = Arc<SyncMutex<HashMap<String, GraphcastMessage<UpgradeIntentMessage>>>>;
 type ComparisonResults = Arc<SyncMutex<HashMap<String, ComparisonResult>>>;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PersistedState {
     pub local_attestations: Local,
     pub remote_ppoi_messages: Remote,
+    pub upgrade_intent_messages: UpgradeMessages,
     pub comparison_results: ComparisonResults,
 }
 
@@ -39,16 +42,20 @@ impl PersistedState {
     pub fn new(
         local: Option<Local>,
         remote: Option<Remote>,
+        upgrade_intent_messages: Option<UpgradeMessages>,
         comparison_results: Option<ComparisonResults>,
     ) -> PersistedState {
         let local_attestations = local.unwrap_or(Arc::new(SyncMutex::new(HashMap::new())));
         let remote_ppoi_messages = remote.unwrap_or(Arc::new(SyncMutex::new(vec![])));
+        let upgrade_intent_messages =
+            upgrade_intent_messages.unwrap_or(Arc::new(SyncMutex::new(HashMap::new())));
         let comparison_results =
             comparison_results.unwrap_or(Arc::new(SyncMutex::new(HashMap::new())));
 
         PersistedState {
             local_attestations,
             remote_ppoi_messages,
+            upgrade_intent_messages,
             comparison_results,
         }
     }
@@ -58,6 +65,7 @@ impl PersistedState {
         &mut self,
         local_attestations: Option<Local>,
         remote_ppoi_messages: Option<Remote>,
+        upgrade_intent_messages: Option<UpgradeMessages>,
         comparison_results: Option<ComparisonResults>,
     ) -> PersistedState {
         let local_attestations = match local_attestations {
@@ -68,6 +76,10 @@ impl PersistedState {
             None => self.remote_ppoi_messages.clone(),
             Some(r) => r,
         };
+        let upgrade_intent_messages = match upgrade_intent_messages {
+            None => self.upgrade_intent_messages.clone(),
+            Some(r) => r,
+        };
         let comparison_results = match comparison_results {
             None => self.comparison_results.clone(),
             Some(r) => r,
@@ -75,6 +87,7 @@ impl PersistedState {
         PersistedState {
             local_attestations,
             remote_ppoi_messages,
+            upgrade_intent_messages,
             comparison_results,
         }
     }
@@ -92,9 +105,28 @@ impl PersistedState {
         }
     }
 
-    /// Getter for remote_messages
+    /// Getter for Public POI messages
     pub fn remote_ppoi_messages(&self) -> Vec<GraphcastMessage<PublicPoiMessage>> {
         self.remote_ppoi_messages.lock().unwrap().clone()
+    }
+
+    /// Getter for upgrade intent messages
+    pub fn upgrade_intent_messages(
+        &self,
+    ) -> HashMap<String, GraphcastMessage<UpgradeIntentMessage>> {
+        self.upgrade_intent_messages.lock().unwrap().clone()
+    }
+
+    /// Getter for upgrade intent messages for subgraph
+    pub fn upgrade_intent_message(
+        &self,
+        subgraph_id: &str,
+    ) -> Option<GraphcastMessage<UpgradeIntentMessage>> {
+        self.upgrade_intent_messages
+            .lock()
+            .unwrap()
+            .get(subgraph_id)
+            .cloned()
     }
 
     /// Getter for comparison_results
@@ -128,8 +160,45 @@ impl PersistedState {
     /// Add message to remote_ppoi_messages
     /// Generalize PublicPoiMessage
     pub fn add_remote_ppoi_message(&self, msg: GraphcastMessage<PublicPoiMessage>) {
-        trace!(msg = tracing::field::debug(&msg), "adding remote message");
+        trace!(
+            msg = tracing::field::debug(&msg),
+            "Adding remote ppoi message"
+        );
         self.remote_ppoi_messages.lock().unwrap().push(msg)
+    }
+
+    /// Add message to remote_ppoi_messages
+    pub fn add_upgrade_intent_message(&self, msg: GraphcastMessage<UpgradeIntentMessage>) {
+        let key = msg.payload.subgraph_id.clone();
+        if let Some(_existing) = self.upgrade_intent_message(&key) {
+            // replace the existing "outdated" record of ratelimit
+            debug!(
+                msg = tracing::field::debug(&msg),
+                "Replace the outdated upgrade message with new message"
+            );
+            let mut msgs = self.upgrade_intent_messages.lock().unwrap();
+            msgs.insert(key, msg);
+        } else {
+            trace!(
+                msg = tracing::field::debug(&msg),
+                "Adding upgrade intent message"
+            );
+            self.upgrade_intent_messages
+                .lock()
+                .unwrap()
+                .entry(key.clone())
+                .or_insert(msg);
+        }
+    }
+
+    /// Check if there is a recent upgrade message for the subgraph
+    pub fn recent_upgrade(&self, msg: &UpgradeIntentMessage, upgrade_threshold: i64) -> bool {
+        self.upgrade_intent_messages()
+            .iter()
+            .any(|(matching_id, existing)| {
+                // there is a upgrade msg of the same subgraph id within the upgrade threshold
+                matching_id == &msg.subgraph_id && existing.nonce > msg.nonce - upgrade_threshold
+            })
     }
 
     /// Add entry to comparison_results
@@ -259,7 +328,7 @@ impl PersistedState {
                     "No persisted state file provided, create an empty state"
                 );
                 // No state persisted, create new
-                let state = PersistedState::new(None, None, None);
+                let state = PersistedState::new(None, None, None, None);
                 state.update_cache(path);
                 return state;
             }
@@ -274,7 +343,7 @@ impl PersistedState {
                     err = e.to_string(),
                     "Could not parse persisted state file, created an empty state",
                 );
-                PersistedState::new(None, None, None)
+                PersistedState::new(None, None, None, None)
             }
         };
         state
@@ -322,7 +391,7 @@ mod tests {
         assert!(state.comparison_results().is_empty());
 
         let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
-        let messages = Arc::new(SyncMutex::new(Vec::new()));
+        let ppoi_messages = Arc::new(SyncMutex::new(Vec::new()));
         let comparison_results = Arc::new(SyncMutex::new(HashMap::new()));
 
         save_local_attestation(
@@ -364,7 +433,7 @@ mod tests {
         let nonce: i64 = 123321;
         let block_number: u64 = 0;
         let block_hash: String = "0xblahh".to_string();
-        let radio_msg = PublicPoiMessage::build(
+        let ppoi_msg = PublicPoiMessage::build(
             hash.clone(),
             content,
             nonce,
@@ -375,26 +444,45 @@ mod tests {
         );
         let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
         let msg = GraphcastMessage::new(
-            hash,
+            hash.clone(),
             nonce,
             String::from("0xe9a1cabd57700b17945fd81feefba82340d9568f"),
-            radio_msg,
+            ppoi_msg,
             sig,
         )
         .expect("Shouldn't get here since the message is purposefully constructed for testing");
-        messages.lock().unwrap().push(msg);
+        ppoi_messages.lock().unwrap().push(msg);
 
         state = state
             .update(
                 Some(local_attestations.clone()),
-                Some(messages.clone()),
+                Some(ppoi_messages.clone()),
+                None,
                 Some(comparison_results.clone()),
             )
             .await;
+
+        let ui_msg = UpgradeIntentMessage {
+            subgraph_id: String::from("CnJMdCkW3pr619gsJVtUPAWxspALPdCMw6o7obzYBNp3"),
+            new_hash: String::from("QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWAA"),
+            nonce,
+            graph_account: String::from("0xe9a1cabd57700b17945fd81feefba82340d9568f"),
+        };
+        let sig: String = "4be6a6b7f27c4086f22e8be364cbdaeddc19c1992a42b08cbe506196b0aafb0a68c8c48a730b0e3155f4388d7cc84a24b193d091c4a6a4e8cd6f1b305870fae61b".to_string();
+        let msg = GraphcastMessage::new(
+            "QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB".to_string(),
+            nonce,
+            String::from("0xe9a1cabd57700b17945fd81feefba82340d9568f"),
+            ui_msg,
+            sig,
+        )
+        .expect("Shouldn't get here since the message is purposefully constructed for testing");
+        state.add_upgrade_intent_message(msg);
         state.update_cache(path);
 
         let state = PersistedState::load_cache(path);
         assert_eq!(state.remote_ppoi_messages.lock().unwrap().len(), 1);
+        assert_eq!(state.upgrade_intent_messages.lock().unwrap().len(), 1);
         assert!(!state.local_attestations.lock().unwrap().is_empty());
         assert!(state.local_attestations.lock().unwrap().len() == 2);
         assert!(
@@ -460,10 +548,12 @@ mod tests {
         let notifier = Notifier::new("not-a-real-radio".to_string(), None, None, None, None, None);
         let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
         let remote_ppoi_messages = Arc::new(SyncMutex::new(Vec::new()));
+        let upgrade_intent_messages = Arc::new(SyncMutex::new(HashMap::new()));
         let comparison_results = Arc::new(SyncMutex::new(HashMap::new()));
         let state = PersistedState {
             local_attestations,
             remote_ppoi_messages,
+            upgrade_intent_messages,
             comparison_results,
         };
 
@@ -486,10 +576,12 @@ mod tests {
         let notifier = Notifier::new("not-a-real-radio".to_string(), None, None, None, None, None);
         let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
         let remote_ppoi_messages = Arc::new(SyncMutex::new(Vec::new()));
+        let upgrade_intent_messages = Arc::new(SyncMutex::new(HashMap::new()));
         let comparison_results = Arc::new(SyncMutex::new(HashMap::new()));
         let state = PersistedState {
             local_attestations,
             remote_ppoi_messages,
+            upgrade_intent_messages,
             comparison_results,
         };
 
@@ -521,5 +613,95 @@ mod tests {
             .get(&String::from("existing_deployment"))
             .unwrap();
         assert_eq!(result.result_type, ComparisonResultType::Divergent);
+    }
+
+    #[tokio::test]
+    async fn upgrade_ratelimiting() {
+        let upgrade_threshold = 86400;
+        let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
+        let remote_ppoi_messages = Arc::new(SyncMutex::new(Vec::new()));
+        let upgrade_intent_messages = Arc::new(SyncMutex::new(HashMap::new()));
+        let comparison_results = Arc::new(SyncMutex::new(HashMap::new()));
+        let test_id = "AAAMdCkW3pr619gsJVtUPAWxspALPdCMw6o7obzYBNp3".to_string();
+        let state = PersistedState {
+            local_attestations,
+            remote_ppoi_messages,
+            upgrade_intent_messages,
+            comparison_results,
+        };
+
+        // Make 2 msgs
+        let msg0 = UpgradeIntentMessage {
+            subgraph_id: test_id.clone(),
+            new_hash: "QmVVfLWowm1xkqc41vcygKNwFUvpsDSMbHdHghxmDVmH9x".to_string(),
+            nonce: 1692307513,
+            graph_account: "0xe9a1cabd57700b17945fd81feefba82340d9568f".to_string(),
+        };
+        let gc_msg0 = GraphcastMessage {
+            identifier: "A0".to_string(),
+            nonce: 1692307513,
+            graph_account: "0xe9a1cabd57700b17945fd81feefba82340d9568f".to_string(),
+            payload: msg0,
+            signature: "0xA".to_string(),
+        };
+        let msg1 = UpgradeIntentMessage {
+            subgraph_id: "BBBMdCkW3pr619gsJVtUPAWxspALPdCMw6o7obzYBNp3".to_string(),
+            new_hash: "QmVVfLWowm1xkqc41vcygKNwFUvpsDSMbHdHghxmDVmH9x".to_string(),
+            nonce: 1691307513,
+            graph_account: "0xe9a1cabd57700b17945fd81feefba82340d9568f".to_string(),
+        };
+        let gc_msg1 = GraphcastMessage {
+            identifier: "B".to_string(),
+            nonce: 1691307513,
+            graph_account: "0xe9a1cabd57700b17945fd81feefba82340d9568f".to_string(),
+            payload: msg1,
+            signature: "0xB".to_string(),
+        };
+
+        state.add_upgrade_intent_message(gc_msg0);
+        state.add_upgrade_intent_message(gc_msg1);
+
+        assert_eq!(state.upgrade_intent_messages().len(), 2);
+
+        // Ratelimited by nonce
+        let msg0 = UpgradeIntentMessage {
+            subgraph_id: test_id.clone(),
+            new_hash: "QmVVfLWowm1xkqc41vcygKNwFUvpsDSMbHdHghxmDVmH9x".to_string(),
+            nonce: 1692307600,
+            graph_account: "0xe9a1cabd57700b17945fd81feefba82340d9568f".to_string(),
+        };
+
+        assert!(state.recent_upgrade(&msg0, upgrade_threshold));
+
+        // Update to new upgrade message
+        let msg0 = UpgradeIntentMessage {
+            subgraph_id: test_id.clone(),
+            new_hash: "QmAAfLWowm1xkqc41vcygKNwFUvpsDSMbHdHghxmDVmH9x".to_string(),
+            nonce: 1692407600,
+            graph_account: "0xe9a1cabd57700b17945fd81feefba82340d9568f".to_string(),
+        };
+        assert!(!state.recent_upgrade(&msg0, upgrade_threshold));
+
+        let gc_msg0 = GraphcastMessage {
+            identifier: "A2".to_string(),
+            nonce: 1692407600,
+            graph_account: "0xe9a1cabd57700b17945fd81feefba82340d9568f".to_string(),
+            payload: msg0,
+            signature: "0xA".to_string(),
+        };
+        state.add_upgrade_intent_message(gc_msg0);
+
+        assert_eq!(
+            state.upgrade_intent_message(&test_id).unwrap().nonce,
+            1692407600
+        );
+        assert_eq!(
+            state
+                .upgrade_intent_message(&test_id)
+                .unwrap()
+                .payload
+                .new_hash,
+            "QmAAfLWowm1xkqc41vcygKNwFUvpsDSMbHdHghxmDVmH9x".to_string()
+        );
     }
 }

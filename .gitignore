@@ -11,3 +11,4 @@ data
 .vscode
 *.json
 .DS_Store
+configs

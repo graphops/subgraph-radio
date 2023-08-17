@@ -53,6 +53,7 @@ fn gossip_poi_bench(c: &mut Criterion) {
             )],
             coverage: CoverageLevel::Comprehensive,
             collect_message_duration: 10,
+            ratelimit_threshold: 60000,
             log_level: String::from("info"),
             slack_token: None,
             slack_channel: None,

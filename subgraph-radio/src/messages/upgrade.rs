@@ -2,18 +2,21 @@ use async_graphql::SimpleObject;
 use ethers_contract::EthAbiType;
 use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
+use prost::Message;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, info};
 
 use graphcast_sdk::{
     graphcast_agent::message_typing::{BuildMessageError, GraphcastMessage},
     graphql::client_graph_account::{owned_subgraphs, subgraph_hash_by_id},
 };
-use prost::Message;
-use serde::{Deserialize, Serialize};
-use tracing::debug;
 
-use crate::config::Config;
-use crate::operator::indexer_management::{check_decision_basis, offchain_sync_indexing_rules};
 use crate::operator::notifier::Notifier;
+use crate::{config::Config, state::PersistedState};
+use crate::{
+    operator::indexer_management::{check_decision_basis, offchain_sync_indexing_rules},
+    OperationError,
+};
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize, PartialEq, SimpleObject)]
 #[eip712(
@@ -78,20 +81,36 @@ impl UpgradeIntentMessage {
         Ok(self)
     }
 
-    /// Process the validated upgrade intent messages
-    /// If notification is set up, then notify the indexer
-    /// If indexer management server endpoint is set up, radio checks `auto_upgrade` for
-    pub async fn process_valid_message(&self, config: &Config, notifier: &Notifier) {
-        // send notifications
-        notifier.notify(format!(
+    /// Format the notification for an UpgradeIntentMessage
+    fn notification_formatter(&self) -> String {
+        format!(
             "Subgraph owner for a deployment announced an upgrade intent:\nSubgraph ID: {}\nNew deployment hash: {}",
             self.subgraph_id,
             self.new_hash,
-        )).await;
-        // auto deployment
-        // If the identifier satisfy the config coverage level
-        // and if indexer management server endpoint is provided
+        )
+    }
+
+    /// Process the validated upgrade intent messages
+    /// If notification is set up, then notify the indexer
+    /// If indexer management server endpoint is set up, radio checks `auto_upgrade` for
+    pub async fn process_valid_message(
+        &self,
+        config: &Config,
+        notifier: &Notifier,
+        state: &PersistedState,
+    ) -> Result<&Self, OperationError> {
+        // ratelimit upgrades: return early if there was a recent upgrade
+        if state.recent_upgrade(self, config.radio_infrastructure.ratelimit_threshold) {
+            info!(subgraph = &self.subgraph_id, "Received an Upgrade Intent Message for a recently upgraded subgraph, skiping notification and auto deployment");
+            return Ok(self);
+        }
+        // send notifications
+        notifier.notify(self.notification_formatter()).await;
+
+        // auto-deployment
+        // require configured indexer management server endpoint
         if let Some(url) = &config.graph_stack().indexer_management_server_endpoint {
+            // If the identifier satisfy the config coverage level
             let covered_topics = config
                 .generate_topics(
                     &config.radio_infrastructure().auto_upgrade,
@@ -100,17 +119,14 @@ impl UpgradeIntentMessage {
                 .await;
             // Get the current deployment hash by querying network subgraph and take the latest hash of the subgraph id
             // Should be able to assume valid identifier since the message is valid
-            let identifier = if let Ok(hash) = subgraph_hash_by_id(
+            let identifier = subgraph_hash_by_id(
                 config.graph_stack().network_subgraph(),
                 &self.graph_account,
                 &self.subgraph_id,
             )
             .await
-            {
-                hash
-            } else {
-                return;
-            };
+            .map_err(OperationError::Query)?;
+
             if covered_topics
                 .clone()
                 .into_iter()
@@ -122,7 +138,8 @@ impl UpgradeIntentMessage {
                     res = tracing::field::debug(&res),
                     decision_basis, "New deployment setting"
                 );
-            }
+            };
         }
+        Ok(self)
     }
 }
