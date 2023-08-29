@@ -6,6 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Use auto_upgrade for offchain sync coverage
+
+### Features
+
+- Improved grafana dashboard ux (#50)
+- Peer count and received msgs metrics
+- Persist and clean upgrade intent msg, ratelimit, and API
+
+### Refactor
+
+- Workspace shares graphcast-sdk dep
+- Rename UpgradeIntentMessage, remove unnecessary fields
+- Remove unnecessarily new and build for upgradeIntent
+- Move msg processing to use timeouts
+
+## [0.1.3] - 2023-08-14
+
+### Bug Fixes
+
 - Effective ctrl+c shutdown
 
 ### Features
