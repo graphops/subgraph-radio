@@ -1056,11 +1056,6 @@ mod tests {
         let mut local_attestations: HashMap<String, HashMap<u64, Attestation>> = HashMap::new();
         local_attestations.insert("hash".to_string(), local_blocks.clone());
         local_attestations.insert("hash2".to_string(), local_blocks);
-        println!(
-            "find local comparison point: {:#?}\n{:#?}",
-            &local_attestations,
-            &test_msg_vec()
-        );
         let (block_num, collect_window_end) = local_comparison_point(
             &local_attestations,
             &test_msg_vec(),
