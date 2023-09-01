@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Add local attestation without matching with remote
+
+## [0.1.4] - 2023-08-29
+
+### Bug Fixes
+
 - Use auto_upgrade for offchain sync coverage
 
 ### Features
