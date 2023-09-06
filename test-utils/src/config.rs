@@ -37,6 +37,7 @@ pub fn test_config() -> Config {
                 registry_subgraph: String::new(),
                 network_subgraph: String::new(),
                 indexer_management_server_endpoint: None,
+                protocol_network: None,
             }
         },
         waku: {
