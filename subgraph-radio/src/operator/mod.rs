@@ -372,7 +372,7 @@ impl RadioOperator {
 
         tokio::spawn(async move {
             for msg in receiver {
-                let timeout_duration = Duration::from_secs(1);
+                let timeout_duration = Duration::from_secs(10);
                 let process_res = timeout(
                     timeout_duration,
                     process_message(state.clone(), notifier.clone(), config.clone(), msg),

@@ -204,6 +204,26 @@ impl Config {
         };
         topics.into_iter().collect::<Vec<String>>()
     }
+
+    /// Supprot multiple protocol networks, first from the user configured protocol_network or
+    /// resolve to utilize the network subgraph endpoint
+    pub fn protocol_network(&self) -> Result<String, ConfigError> {
+        let network = if let Some(network) = self.graph_stack().protocol_network().clone() {
+            network
+        } else {
+            self.graph_stack()
+                .network_subgraph()
+                .split_terminator('/')
+                .last()
+                .and_then(|suf| suf.strip_prefix("graph-network-"))
+                .ok_or(ConfigError::ValidateInput(
+                    "Not a conventionally parseable API, need a protocol network specification"
+                        .to_string(),
+                ))?
+                .to_string()
+        };
+        Ok(network)
+    }
 }
 
 #[derive(Clone, Debug, Args, Serialize, Deserialize, Getters, Default)]
@@ -266,6 +286,13 @@ pub struct GraphStack {
         help = "API endpoint to the Indexer management server endpoint"
     )]
     pub indexer_management_server_endpoint: Option<String>,
+    #[clap(
+        long,
+        value_name = "NETWORK",
+        env = "PROTOCOL_NETWORK",
+        help = "The protocol network for The Graph (currently match with suffix of the network subgraph API)"
+    )]
+    pub protocol_network: Option<String>,
 }
 
 #[derive(Clone, Debug, Args, Serialize, Deserialize, Default)]
@@ -527,4 +554,77 @@ pub enum ConfigError {
     ReadStr(std::io::Error),
     #[error("Unknown error: {0}")]
     Other(anyhow::Error),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_config() -> Config {
+        Config {
+            graph_stack: GraphStack {
+                indexer_address: String::from("indexer_address"),
+                graph_node_status_endpoint: String::from("http://localhost:8030/graphql"),
+                private_key: Some(
+                    "ccaea3e3aca412cb3920dbecd77bc725dfe9a5e16f940f19912d9c9dbee01e8f".to_string(),
+                ),
+                mnemonic: None,
+                registry_subgraph: String::from(
+                    "https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-goerli",
+                ),
+                network_subgraph: String::from(
+                    "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli",
+                ),
+                indexer_management_server_endpoint: None,
+                protocol_network: None,
+            },
+            waku: Waku {
+                waku_host: None,
+                waku_port: None,
+                waku_node_key: None,
+                boot_node_addresses: vec![],
+                waku_log_level: None,
+                waku_addr: None,
+                discv5_enrs: None,
+                discv5_port: None,
+                filter_protocol: None,
+            },
+            radio_infrastructure: RadioInfrastructure {
+                radio_name: String::from("test"),
+                topics: vec![String::from(
+                    "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",
+                )],
+                coverage: CoverageLevel::Comprehensive,
+                collect_message_duration: 10,
+                ratelimit_threshold: 60000,
+                log_level: String::from("info"),
+                slack_token: None,
+                slack_channel: None,
+                discord_webhook: None,
+                telegram_token: None,
+                telegram_chat_id: None,
+                metrics_host: String::from("0.0.0.0"),
+                metrics_port: None,
+                server_host: String::from("0.0.0.0"),
+                server_port: None,
+                persistence_file_path: None,
+                id_validation: IdentityValidation::NoCheck,
+                topic_update_interval: 600,
+                log_format: LogFormat::Pretty,
+                graphcast_network: GraphcastNetworkName::Testnet,
+                auto_upgrade: CoverageLevel::Comprehensive,
+            },
+            config_file: None,
+        }
+    }
+
+    #[test]
+    fn protocol_network() {
+        let mut config = test_config();
+
+        assert_eq!(&config.protocol_network().unwrap(), "goerli");
+
+        config.graph_stack.protocol_network = Some("arbitrum-one".to_string());
+        assert_eq!(&config.protocol_network().unwrap(), "arbitrum-one");
+    }
 }

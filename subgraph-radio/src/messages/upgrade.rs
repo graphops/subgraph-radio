@@ -132,7 +132,11 @@ impl UpgradeIntentMessage {
                 .into_iter()
                 .any(|x| x == identifier.clone())
             {
-                let res = offchain_sync_indexing_rules(url, &self.new_hash).await;
+                // Get protocol network
+                let network = config
+                    .protocol_network()
+                    .map_err(|e| OperationError::Others(e.to_string()))?;
+                let res = offchain_sync_indexing_rules(url, &self.new_hash, &network).await;
                 let decision_basis = check_decision_basis(url, &self.new_hash).await;
                 debug!(
                     res = tracing::field::debug(&res),

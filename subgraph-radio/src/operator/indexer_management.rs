@@ -68,6 +68,7 @@ pub async fn indexing_rules(url: &str) -> Result<serde_json::Value, OperationErr
 pub async fn offchain_sync_indexing_rules(
     url: &str,
     deployment: &str,
+    network: &str,
 ) -> Result<serde_json::Value, OperationError> {
     let graphql_mutation = json!({
         "query": r#"mutation updateIndexingRule($rule: IndexingRuleInput!) {
@@ -87,13 +88,15 @@ pub async fn offchain_sync_indexing_rules(
                 decisionBasis
                 requireSupported
                 safety
+                protocolNetwork
             }
         }"#,
         "variables": {
             "rule": {
                 "identifier": deployment,
                 "decisionBasis": "offchain",
-                "identifierType": "deployment"
+                "identifierType": "deployment",
+                "protocolNetwork": network
             }
         }
     });

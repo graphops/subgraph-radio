@@ -34,6 +34,7 @@ fn gossip_poi_bench(c: &mut Criterion) {
                 "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli",
             ),
             indexer_management_server_endpoint: None,
+            protocol_network: None,
         },
         waku: Waku {
             waku_host: None,
