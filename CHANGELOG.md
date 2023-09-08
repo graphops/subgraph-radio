@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Adding sh for p2pNodePort in Kubernetes (#66)
+
+### Features
+
+- Add network field in offchain request
+
+## [0.1.5] - 2023-09-01
+
+### Bug Fixes
+
 - Add local attestation without matching with remote
 
 ## [0.1.4] - 2023-08-29

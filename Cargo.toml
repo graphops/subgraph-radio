@@ -12,4 +12,4 @@ panic = 'unwind'
 opt-level = 3
 
 [workspace.dependencies]
-graphcast-sdk = "0.4.2"
+graphcast-sdk = "0.4.3"
