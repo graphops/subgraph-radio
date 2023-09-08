@@ -2328,9 +2328,9 @@ dependencies = [
 
 [[package]]
 name = "graphcast-sdk"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8afa03c095257be7de635fd67f33be36e0f196c138207f6a0713e4cde65dacf9"
+checksum = "435c13885005fdd7bdde019e4565aa54141460008576d76836ed81b68aa37c80"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -5045,7 +5045,7 @@ dependencies = [
 
 [[package]]
 name = "subgraph-radio"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "async-graphql",
