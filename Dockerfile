@@ -36,4 +36,5 @@ COPY --from=build-image /etc/passwd /etc/passwd
 COPY --from=build-image /etc/group /etc/group
 COPY --from=alpine /usr/bin/dumb-init /usr/bin/dumb-init
 COPY --from=alpine "/subgraph-radio/target/release/subgraph-radio" "/usr/local/bin/subgraph-radio"
+COPY --from=busybox:1.35.0-uclibc /bin/sh /bin/sh
 ENTRYPOINT [ "/usr/bin/dumb-init", "--", "/usr/local/bin/subgraph-radio" ]
