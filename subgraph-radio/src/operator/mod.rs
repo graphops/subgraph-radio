@@ -185,7 +185,7 @@ impl RadioOperator {
             self.config.radio_infrastructure.topic_update_interval,
         ));
 
-        let mut state_update_interval = interval(Duration::from_secs(60));
+        let mut state_update_interval = interval(Duration::from_secs(10));
         let mut gossip_poi_interval = interval(Duration::from_secs(30));
         let mut comparison_interval = interval(Duration::from_secs(30));
 
@@ -224,9 +224,6 @@ impl RadioOperator {
                             &self.config.graph_stack().indexer_address).await)
                     ).await;
 
-                    // Update the number of peers connected
-                    CONNECTED_PEERS.set(connected_peer_count(&self.graphcast_agent().node_handle).unwrap_or_default().try_into().unwrap_or_default());
-                    GOSSIP_PEERS.set(self.graphcast_agent.number_of_peers().try_into().unwrap_or_default());
                     if result.is_err() {
                         warn!("update_content_topics timed out");
                     } else {
@@ -238,6 +235,9 @@ impl RadioOperator {
                         skip_iteration.store(false, Ordering::SeqCst);
                         continue;
                     }
+                    // Update the number of peers connected
+                    CONNECTED_PEERS.set(connected_peer_count(&self.graphcast_agent().node_handle).unwrap_or_default().try_into().unwrap_or_default());
+                    GOSSIP_PEERS.set(self.graphcast_agent.number_of_peers().try_into().unwrap_or_default());
 
                     // Save cache if path provided
                     let _ = &self.config.radio_infrastructure().persistence_file_path.as_ref().map(|path| {
