@@ -13,7 +13,6 @@ use graphcast_sdk::{
 use crate::messages::poi::{poi_message_comparison, send_poi_message};
 
 use crate::{
-    metrics::CACHED_PPOI_MESSAGES,
     operator::{attestation::ComparisonResult, RadioOperator},
     OperationError, GRAPHCAST_AGENT,
 };
@@ -120,12 +119,7 @@ impl RadioOperator {
         identifiers: Vec<String>,
     ) -> Vec<Result<ComparisonResult, OperationError>> {
         let mut compare_handles = vec![];
-
-        // Additional radio message check happens here since messages are synchronously stored to state cache in msg handler
-        let remote_ppoi_messages = self
-            .state()
-            .valid_ppoi_messages(&self.config.graph_stack().graph_node_status_endpoint)
-            .await;
+        let remote_ppoi_messages = self.state().remote_ppoi_messages();
 
         for id in identifiers.clone() {
             /* Set up */
@@ -173,15 +167,6 @@ impl RadioOperator {
                             .clean_local_attestations(r.block(), r.deployment_hash());
                         self.persisted_state
                             .clean_remote_ppoi_messages(r.block(), r.deployment_hash());
-                        CACHED_PPOI_MESSAGES
-                            .with_label_values(&[&r.deployment_hash()])
-                            .set(
-                                self.state()
-                                    .remote_ppoi_messages()
-                                    .len()
-                                    .try_into()
-                                    .unwrap(),
-                            );
                     }
                     Err(e) => {
                         trace!(err = tracing::field::debug(&e), "Compare handles");

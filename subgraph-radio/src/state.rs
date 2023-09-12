@@ -16,6 +16,7 @@ use tracing::{debug, info, trace, warn};
 use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
 
 use crate::messages::upgrade::UpgradeIntentMessage;
+use crate::metrics::CACHED_PPOI_MESSAGES;
 use crate::{
     messages::poi::PublicPoiMessage,
     operator::attestation::{
@@ -292,7 +293,19 @@ impl PersistedState {
         self.remote_ppoi_messages
             .lock()
             .unwrap()
-            .retain(|msg| msg.payload.block_number >= block_number || msg.identifier != deployment)
+            .retain(|msg| msg.payload.block_number >= block_number || msg.identifier != deployment);
+
+        CACHED_PPOI_MESSAGES.with_label_values(&[&deployment]).set(
+            self.remote_ppoi_messages
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m: &&GraphcastMessage<PublicPoiMessage>| m.identifier == deployment)
+                .collect::<Vec<&GraphcastMessage<PublicPoiMessage>>>()
+                .len()
+                .try_into()
+                .unwrap(),
+        );
     }
 
     /// Clean local_attestations

@@ -241,10 +241,6 @@ pub async fn send_poi_message(
     {
         Ok(content) => {
             let nonce = Utc::now().timestamp();
-            let block_hash = callbook
-                .block_hash(&network_name.to_string(), message_block)
-                .await
-                .map_err(OperationError::Query)?;
             let radio_message = PublicPoiMessage::build(
                 id.clone(),
                 content.clone(),
@@ -339,10 +335,10 @@ pub async fn poi_message_comparison(
         }
         _ => {
             let err_msg = format!(
-                "Deployment {} comparison not triggered: no matching attestation to compare",
+                "Deployment {} comparison not triggered: no local attestation to compare",
                 id.clone()
             );
-            debug!(err = err_msg, "No matching attestations",);
+            debug!(err = err_msg, "No local attestations for comparison",);
             return Err(OperationError::CompareTrigger(id.clone(), 0, err_msg));
         }
     };

@@ -150,7 +150,6 @@ pub async fn process_ppoi_message(
                 *existing_attestation = updated_attestation;
             }
         } else {
-            // Unwrap is okay because bytes (Vec<u8>) is a valid utf-8 sequence
             attestations.push(Attestation::new(
                 radio_msg.payload_content().to_string(),
                 sender_stake,
@@ -418,7 +417,9 @@ pub fn compare_attestations(
     let blocks = match local.get(ipfs_hash) {
         Some(blocks) => blocks,
         None => {
-            debug!(ipfs_hash, "No local attestation stored for any blocks",);
+            debug!(ipfs_hash, local = tracing::field::debug(&local),
+            remote = tracing::field::debug(&remote),
+            "No local attestation stored for any blocks (Should not get here as attestation_block is determined by local_attestations)",);
             return ComparisonResult {
                 deployment: ipfs_hash.to_string(),
                 block_number: attestation_block,
@@ -431,7 +432,9 @@ pub fn compare_attestations(
     let local_attestation = match blocks.get(&attestation_block) {
         Some(attestations) => attestations,
         None => {
-            debug!(ipfs_hash, attestation_block, "No local attestation stored",);
+            debug!(ipfs_hash, attestation_block, local = tracing::field::debug(&local),
+            remote = tracing::field::debug(&remote),
+            "No local attestation stored for the block (Should not get here as attestation_block is determined by local_attestations)",);
             return ComparisonResult {
                 deployment: ipfs_hash.to_string(),
                 block_number: attestation_block,
@@ -471,11 +474,6 @@ pub fn compare_attestations(
 
     let mut remote_attestations = remote_attestations.clone();
     remote_attestations.sort_by(|a, b| a.stake_weight.partial_cmp(&b.stake_weight).unwrap());
-
-    let sender_gauge = ACTIVE_INDEXERS.with_label_values(&[ipfs_hash]);
-    // The value is the total number of senders that are attesting for that subgraph
-    let senders: Vec<String> = combine_senders(&remote_attestations);
-    sender_gauge.set(senders.len().try_into().unwrap());
 
     if remote_attestations.len() > 1 {
         warn!(
