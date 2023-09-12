@@ -242,37 +242,41 @@ impl PersistedState {
             let mut results = self.comparison_results.lock().unwrap();
             let deployment = &new_comparison_result.deployment;
 
-            let current_result = results.get(deployment).cloned();
+            // Only notify users if there is a switch between match<->diverged, and if notFound become diverged
+            let mut should_notify = false;
+            // let current_result = results.get(deployment).cloned();
+            let result_type = match results.get(deployment).cloned() {
+                // If there's no existing result, simply update and return new result
+                None => {
+                    results.insert(deployment.clone(), new_comparison_result.clone());
+                    new_comparison_result.result_type
+                }
 
-            let result_type = if !results.contains_key(deployment) {
-                results.insert(deployment.clone(), new_comparison_result.clone());
-                new_comparison_result.result_type
-            } else {
-                match &current_result {
-                    Some(current_result)
-                        if current_result.result_type != new_comparison_result.result_type
-                            && new_comparison_result.result_type
-                                != ComparisonResultType::NotFound =>
+                // If previous type and current type switch
+                // update and return result type
+                Some(current_result)
+                    if current_result.result_type != new_comparison_result.result_type
+                        && new_comparison_result.result_type != ComparisonResultType::NotFound =>
+                {
+                    results.insert(deployment.clone(), new_comparison_result.clone());
+                    // Skip notification if notFound becomes match, otherwise notify for
+                    // diverged<->match, notFound->diverged
+                    if new_comparison_result.result_type != ComparisonResultType::Match {
+                        should_notify = true;
+                    }
+                    new_comparison_result.result_type
+                }
+                // New result is not found or same as previous result
+                Some(current_result) => {
+                    // Do not update result if the type is divergence so we keep track of the first diverged block
+                    if let ComparisonResultType::Match | ComparisonResultType::NotFound =
+                        new_comparison_result.result_type
                     {
                         results.insert(deployment.clone(), new_comparison_result.clone());
-                        new_comparison_result.result_type
                     }
-                    Some(current_result) => {
-                        if let ComparisonResultType::Match | ComparisonResultType::NotFound =
-                            new_comparison_result.result_type
-                        {
-                            results.insert(deployment.clone(), new_comparison_result.clone());
-                        }
-                        current_result.result_type
-                    }
-                    None => {
-                        results.insert(deployment.clone(), new_comparison_result.clone());
-                        new_comparison_result.result_type
-                    }
+                    current_result.result_type
                 }
             };
-
-            let should_notify = result_type != ComparisonResultType::NotFound;
 
             (should_notify, new_comparison_result.clone(), result_type)
         };
