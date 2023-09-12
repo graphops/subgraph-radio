@@ -92,7 +92,7 @@ impl QueryRoot {
         Ok(res.clone())
     }
 
-    /// Return the sender ratio for remote attestations, with a "!" for the attestation matching local
+    /// Return the sender ratio for remote attestations, with a "*" for the attestation matching local
     async fn comparison_ratio(
         &self,
         ctx: &Context<'_>,
@@ -109,8 +109,12 @@ impl QueryRoot {
         for r in res {
             let (aggregated_attestations, local_ppoi) =
                 aggregate_attestation(r.clone(), &local_info);
-            let sender_ratio = sender_count_str(&aggregated_attestations, &local_ppoi);
-            let stake_ratio = stake_weight_str(&aggregated_attestations, &local_ppoi);
+            let sender_ratio = sender_count_str(&aggregated_attestations, local_ppoi.as_deref());
+            let stake_ratio = stake_weight_str(
+                &aggregated_attestations,
+                local_ppoi.as_deref(),
+                local_info.stake,
+            );
             ratios.push(CompareRatio::new(
                 r.deployment,
                 r.block_number,
@@ -138,28 +142,29 @@ impl QueryRoot {
 }
 
 /// Helper function to order attestations by stake weight and then find the number of unique senders
-pub fn sender_count_str(attestations: &[Attestation], local_ppoi: &str) -> String {
-    // Create a HashMap to store the attestation and senders
+pub fn sender_count_str(attestations: &[Attestation], local_ppoi: Option<&str>) -> String {
+    // Clone and sort the attestations by descending stake weight
     let mut temp_attestations = attestations.to_owned();
-    let mut output = String::new();
-
-    // Sort the attestations by descending stake weight
     temp_attestations.sort_by(|a, b| b.stake_weight.cmp(&a.stake_weight));
-    // Iterate through the attestations and populate the maps
-    // No set is needed since uniqueness is garuanteeded by validation
+
+    let mut output = String::new();
     let mut matched = false;
+
     for att in temp_attestations.iter() {
-        let separator = if att.ppoi == local_ppoi {
+        let separator = if Some(att.ppoi.as_str()) == local_ppoi {
             matched = true;
             "*:"
         } else {
             ":"
         };
-
         output.push_str(&format!("{}{}", att.senders.len(), separator));
     }
+
     if !matched {
-        output.push_str("0*");
+        match local_ppoi {
+            Some(_) => output.push_str("1*"),
+            None => output.push_str("0*"),
+        }
     } else {
         output.pop(); // Remove the trailing ':'
     }
@@ -168,17 +173,20 @@ pub fn sender_count_str(attestations: &[Attestation], local_ppoi: &str) -> Strin
 }
 
 /// Helper function to order attestations by stake weight and then find the number of unique senders
-pub fn stake_weight_str(attestations: &[Attestation], local_ppoi: &str) -> String {
-    // Create a HashMap to store the attestation and senders
+pub fn stake_weight_str(
+    attestations: &[Attestation],
+    local_ppoi: Option<&str>,
+    local_stake: f32,
+) -> String {
+    // Clone and sort the attestations by descending stake weight
     let mut temp_attestations = attestations.to_owned();
+    temp_attestations.sort_by(|a, b| b.stake_weight.cmp(&a.stake_weight));
+
     let mut output = String::new();
     let mut matched = false;
-    // Sort the attestations by descending stake weight
-    temp_attestations.sort_by(|a, b| b.stake_weight.cmp(&a.stake_weight));
-    // Iterate through the attestations and populate the maps
-    // No set is needed since uniqueness is garuanteeded by validation
+
     for att in temp_attestations.iter() {
-        let separator = if att.ppoi == local_ppoi {
+        let separator = if Some(att.ppoi.as_str()) == local_ppoi {
             matched = true;
             "*:"
         } else {
@@ -186,8 +194,12 @@ pub fn stake_weight_str(attestations: &[Attestation], local_ppoi: &str) -> Strin
         };
         output.push_str(&format!("{}{}", att.stake_weight, separator));
     }
+
     if !matched {
-        output.push_str("0*");
+        match local_ppoi {
+            Some(_) => output.push_str(&format!("{}*", local_stake,)),
+            None => output.push_str("0*"),
+        }
     } else {
         output.pop(); // Remove the trailing ':'
     }
@@ -361,13 +373,13 @@ fn filter_remote_ppoi_messages(
 fn aggregate_attestation(
     r: ComparisonResult,
     local_info: &IndexerInfo,
-) -> (Vec<Attestation>, String) {
+) -> (Vec<Attestation>, Option<String>) {
     // Double check for local attestations to ensure there will be no divide by 0 during the ratio
     let local_attestation = if let Some(local_attestation) = r.local_attestation {
         local_attestation
     } else {
         // Simply return remote attestations
-        return (r.attestations, String::from("n/a"));
+        return (r.attestations, None);
     };
 
     let local_ppoi = local_attestation.ppoi.clone();
@@ -393,7 +405,7 @@ fn aggregate_attestation(
     if !matched {
         aggregated_attestations.push(local_attestation);
     }
-    (aggregated_attestations, local_ppoi)
+    (aggregated_attestations, Some(local_ppoi))
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, SimpleObject)]
@@ -450,14 +462,13 @@ pub enum HttpServiceError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_aggregate_attestations() {
         let attestation1 =
             Attestation::new("ppoi-1".to_string(), 1.0, vec!["0xa1".to_string()], vec![0]);
-
         let attestation2 =
             Attestation::new("ppoi-2".to_string(), 2.0, vec!["0xa2".to_string()], vec![1]);
-
         let attestation3 =
             Attestation::new("ppoi-3".to_string(), 3.0, vec!["0xa3".to_string()], vec![2]);
 
@@ -479,9 +490,19 @@ mod tests {
 
         let aggregated_attestation = aggregate_attestation(r, &local_info);
         assert_eq!(aggregated_attestation.0.len(), 3);
-        assert_eq!(&aggregated_attestation.1, &local_attestation.ppoi);
-        let sender_ratio = sender_count_str(&aggregated_attestation.0, &aggregated_attestation.1);
-        let stake_ratio = stake_weight_str(&aggregated_attestation.0, &aggregated_attestation.1);
+        assert_eq!(
+            aggregated_attestation.clone().1.unwrap(),
+            local_attestation.ppoi
+        );
+        let sender_ratio = sender_count_str(
+            &aggregated_attestation.0,
+            aggregated_attestation.1.as_deref(),
+        );
+        let stake_ratio = stake_weight_str(
+            &aggregated_attestation.0,
+            aggregated_attestation.1.as_deref(),
+            local_info.stake,
+        );
         assert_eq!(sender_ratio, "1:2*:1");
         assert_eq!(stake_ratio, "3:2*:2");
 
@@ -499,15 +520,14 @@ mod tests {
             attestations: attestations.clone(),
         };
 
-        let local_info = IndexerInfo {
-            address: String::from("0xa0"),
-            stake: 1.0,
-        };
-
         let aggregated_attestation = aggregate_attestation(r, &local_info);
         assert_eq!(aggregated_attestation.0.len(), 4);
-        let stake_ratio = stake_weight_str(&aggregated_attestation.0, &aggregated_attestation.1);
-        assert!((&stake_ratio == "3:2:1:1*" || &stake_ratio == "3:2:1*:1"));
+        let stake_ratio = stake_weight_str(
+            &aggregated_attestation.0,
+            aggregated_attestation.1.as_deref(),
+            local_info.stake,
+        );
+        assert_eq!(stake_ratio, "3:2:1:1*");
 
         // Missing local attestation, not found
         let r = ComparisonResult {
@@ -520,9 +540,16 @@ mod tests {
 
         let aggregated_attestation = aggregate_attestation(r, &local_info);
         assert_eq!(aggregated_attestation.0.len(), 3);
-        assert_eq!(&aggregated_attestation.1, "n/a");
-        let sender_ratio = sender_count_str(&aggregated_attestation.0, &aggregated_attestation.1);
-        let stake_ratio = stake_weight_str(&aggregated_attestation.0, &aggregated_attestation.1);
+        assert_eq!(aggregated_attestation.1, None);
+        let sender_ratio = sender_count_str(
+            &aggregated_attestation.0,
+            aggregated_attestation.1.as_deref(),
+        );
+        let stake_ratio = stake_weight_str(
+            &aggregated_attestation.0,
+            aggregated_attestation.1.as_deref(),
+            local_info.stake,
+        );
         assert_eq!(sender_ratio, "1:1:1:0*");
         assert_eq!(stake_ratio, "3:2:1:0*");
     }
