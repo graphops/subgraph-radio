@@ -141,6 +141,12 @@ impl QueryRoot {
     }
 }
 
+enum Matched {
+    Uninit,
+    Match,
+    Unmatched,
+}
+
 /// Helper function to order attestations by stake weight and then calculate stake and sender ratios
 pub fn calc_ratios(
     attestations: &[Attestation],
@@ -154,8 +160,13 @@ pub fn calc_ratios(
     let mut stakes: Vec<String> = Vec::new();
     let mut senders: Vec<String> = Vec::new();
 
+    // let mut matched_once = false;
+
+    let mut matched = Matched::Uninit;
+
     for att in temp_attestations.iter() {
         if local_ppoi.is_some() && att.ppoi.as_str() == local_ppoi.unwrap() {
+            matched = Matched::Match;
             stakes.push(format!("{}*", att.stake_weight + local_stake as i64));
             senders.push(format!("{}*", att.senders.len() + 1));
         } else {
@@ -165,9 +176,22 @@ pub fn calc_ratios(
         };
     }
 
-    // Add zeros at the end if there is no local attestation
+    if let Matched::Uninit = matched {
+        matched = Matched::Unmatched;
+    }
+
+    if let Matched::Unmatched = matched {
+        if local_ppoi.is_some() {
+            stakes.push(format!("{}*", local_stake));
+        }
+    }
+
+    // // Add zeros at the end if there is no local attestation
+    // if local_ppoi.is_some() && !matched_once {}
+
     if local_ppoi.is_none() {
-        stakes.push("0*".to_string());
+        // check this out, this would be really weird
+        stakes.push("777777777".to_string());
         senders.push("0*".to_string());
     }
 
