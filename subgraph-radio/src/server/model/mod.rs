@@ -109,8 +109,8 @@ impl QueryRoot {
         for r in res {
             let (aggregated_attestations, local_ppoi) =
                 aggregate_attestation(r.clone(), &local_info);
-            let sender_ratio = sender_count_str(&aggregated_attestations, local_ppoi.as_deref());
-            let stake_ratio = stake_weight_str(
+
+            let (stake_ratio, sender_ratio) = calc_ratios(
                 &aggregated_attestations,
                 local_ppoi.as_deref(),
                 local_info.stake,
@@ -141,70 +141,40 @@ impl QueryRoot {
     }
 }
 
-/// Helper function to order attestations by stake weight and then find the number of unique senders
-pub fn sender_count_str(attestations: &[Attestation], local_ppoi: Option<&str>) -> String {
-    // Clone and sort the attestations by descending stake weight
-    let mut temp_attestations = attestations.to_owned();
-    temp_attestations.sort_by(|a, b| b.stake_weight.cmp(&a.stake_weight));
-
-    let mut output = String::new();
-    let mut matched = false;
-
-    for att in temp_attestations.iter() {
-        let separator = if Some(att.ppoi.as_str()) == local_ppoi {
-            matched = true;
-            "*:"
-        } else {
-            ":"
-        };
-        output.push_str(&format!("{}{}", att.senders.len(), separator));
-    }
-
-    if !matched {
-        match local_ppoi {
-            Some(_) => output.push_str("1*"),
-            None => output.push_str("0*"),
-        }
-    } else {
-        output.pop(); // Remove the trailing ':'
-    }
-
-    output
-}
-
-/// Helper function to order attestations by stake weight and then find the number of unique senders
-pub fn stake_weight_str(
+/// Helper function to order attestations by stake weight and then calculate stake and sender ratios
+pub fn calc_ratios(
     attestations: &[Attestation],
     local_ppoi: Option<&str>,
     local_stake: f32,
-) -> String {
+) -> (String, String) {
     // Clone and sort the attestations by descending stake weight
     let mut temp_attestations = attestations.to_owned();
     temp_attestations.sort_by(|a, b| b.stake_weight.cmp(&a.stake_weight));
 
-    let mut output = String::new();
-    let mut matched = false;
+    let mut stakes: Vec<String> = Vec::new();
+    let mut senders: Vec<String> = Vec::new();
 
     for att in temp_attestations.iter() {
-        let separator = if Some(att.ppoi.as_str()) == local_ppoi {
-            matched = true;
-            "*:"
+        if local_ppoi.is_some() && att.ppoi.as_str() == local_ppoi.unwrap() {
+            stakes.push(format!("{}*", att.stake_weight + local_stake as i64));
+            senders.push(format!("{}*", att.senders.len() + 1));
         } else {
-            ":"
+            // There is a local ppoi, but it's different compared to att.ppoi
+            stakes.push(att.stake_weight.to_string());
+            senders.push(att.senders.len().to_string());
         };
-        output.push_str(&format!("{}{}", att.stake_weight, separator));
     }
 
-    if !matched {
-        match local_ppoi {
-            Some(_) => output.push_str(&format!("{}*", local_stake,)),
-            None => output.push_str("0*"),
-        }
-    } else {
-        output.pop(); // Remove the trailing ':'
+    // Add zeros at the end if there is no local attestation
+    if local_ppoi.is_none() {
+        stakes.push("0*".to_string());
+        senders.push("0*".to_string());
     }
 
-    output
+    let stake_ratio: String = stakes.to_vec().join(":");
+    let sender_ratio: String = senders.to_vec().join(":");
+
+    (stake_ratio, sender_ratio)
 }
 
 pub async fn build_schema(ctx: Arc<SubgraphRadioContext>) -> SubgraphRadioSchema {
@@ -494,17 +464,13 @@ mod tests {
             aggregated_attestation.clone().1.unwrap(),
             local_attestation.ppoi
         );
-        let sender_ratio = sender_count_str(
-            &aggregated_attestation.0,
-            aggregated_attestation.1.as_deref(),
-        );
-        let stake_ratio = stake_weight_str(
+        let (stake_ratio, sender_ratio) = calc_ratios(
             &aggregated_attestation.0,
             aggregated_attestation.1.as_deref(),
             local_info.stake,
         );
-        assert_eq!(sender_ratio, "1:2*:1");
-        assert_eq!(stake_ratio, "3:2*:2");
+        assert_eq!(sender_ratio, "1:3*:1");
+        assert_eq!(stake_ratio, "3:3*:2");
 
         // Uniquely diverged local attestation
         let r = ComparisonResult {
@@ -522,12 +488,12 @@ mod tests {
 
         let aggregated_attestation = aggregate_attestation(r, &local_info);
         assert_eq!(aggregated_attestation.0.len(), 4);
-        let stake_ratio = stake_weight_str(
+        let (stake_ratio, _) = calc_ratios(
             &aggregated_attestation.0,
             aggregated_attestation.1.as_deref(),
             local_info.stake,
         );
-        assert_eq!(stake_ratio, "3:2:1:1*");
+        assert_eq!(stake_ratio, "3:2:1:2*");
 
         // Missing local attestation, not found
         let r = ComparisonResult {
@@ -541,11 +507,7 @@ mod tests {
         let aggregated_attestation = aggregate_attestation(r, &local_info);
         assert_eq!(aggregated_attestation.0.len(), 3);
         assert_eq!(aggregated_attestation.1, None);
-        let sender_ratio = sender_count_str(
-            &aggregated_attestation.0,
-            aggregated_attestation.1.as_deref(),
-        );
-        let stake_ratio = stake_weight_str(
+        let (stake_ratio, sender_ratio) = calc_ratios(
             &aggregated_attestation.0,
             aggregated_attestation.1.as_deref(),
             local_info.stake,
