@@ -436,7 +436,7 @@ pub async fn process_message(
             Err(e) => {
                 debug!(
                     err = tracing::field::debug(e),
-                    "Failed to validate by Graphcast"
+                    "Failed to validate incoming message"
                 );
                 false
             }
@@ -466,7 +466,7 @@ pub async fn process_message(
                 Err(e) => {
                     debug!(
                         err = tracing::field::debug(e),
-                        "Failed to validate Graphcast sender"
+                        "Failed to validate incoming message, sender address is invalid"
                     );
                     return;
                 }
