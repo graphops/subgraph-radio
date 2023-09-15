@@ -2,7 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.1.7] - 2023-09-15
+
+### Bug Fixes
+
+- Update comparison results ratios to properly reflect local attestation
+- Reposition some metrics and remove redundant code
+- Notification on result types
+- Fix ratios
+
+### Features
+
+- Improve invalid message log
+
+## [0.1.6] - 2023-09-08
 
 ### Bug Fixes
 
