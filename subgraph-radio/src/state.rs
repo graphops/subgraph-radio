@@ -144,6 +144,20 @@ impl PersistedState {
             .cloned()
     }
 
+    /// Getter for comparison results with a certain result type
+    pub fn comparison_result_typed(
+        &self,
+        result_type: ComparisonResultType,
+    ) -> Vec<ComparisonResult> {
+        let mut matched_type = vec![];
+        for (_key, value) in self.comparison_results() {
+            if value.result_type == result_type {
+                matched_type.push(value.clone());
+            }
+        }
+        matched_type
+    }
+
     /// Update local_attestations
     pub async fn update_local(&mut self, local_attestations: Local) {
         self.local_attestations = local_attestations;
@@ -720,5 +734,86 @@ mod tests {
                 .new_hash,
             "QmAAfLWowm1xkqc41vcygKNwFUvpsDSMbHdHghxmDVmH9x".to_string()
         );
+    }
+
+    #[test]
+    fn test_comparison_result_typed_not_found() {
+        let mut comparison_results = HashMap::new();
+        comparison_results.insert(
+            "a".to_string(),
+            ComparisonResult {
+                result_type: ComparisonResultType::NotFound,
+                deployment: String::from("Qmhash"),
+                block_number: 100,
+                local_attestation: None,
+                attestations: vec![],
+            },
+        );
+        comparison_results.insert(
+            "b".to_string(),
+            ComparisonResult {
+                result_type: ComparisonResultType::Match,
+                deployment: String::from("Qmhash"),
+                block_number: 100,
+                local_attestation: None,
+                attestations: vec![],
+            },
+        );
+        comparison_results.insert(
+            "c".to_string(),
+            ComparisonResult {
+                result_type: ComparisonResultType::Match,
+                deployment: String::from("Qmhash"),
+                block_number: 100,
+                local_attestation: None,
+                attestations: vec![],
+            },
+        );
+        comparison_results.insert(
+            "d".to_string(),
+            ComparisonResult {
+                result_type: ComparisonResultType::Match,
+                deployment: String::from("Qmhash"),
+                block_number: 100,
+                local_attestation: None,
+                attestations: vec![],
+            },
+        );
+        comparison_results.insert(
+            "e".to_string(),
+            ComparisonResult {
+                result_type: ComparisonResultType::Divergent,
+                deployment: String::from("Qmhash"),
+                block_number: 100,
+                local_attestation: None,
+                attestations: vec![],
+            },
+        );
+        comparison_results.insert(
+            "f".to_string(),
+            ComparisonResult {
+                result_type: ComparisonResultType::NotFound,
+                deployment: String::from("Qmhash"),
+                block_number: 100,
+                local_attestation: None,
+                attestations: vec![],
+            },
+        );
+
+        let state = PersistedState {
+            comparison_results: Arc::new(SyncMutex::new(comparison_results)),
+            local_attestations: Arc::new(SyncMutex::new(HashMap::new())),
+            remote_ppoi_messages: Arc::new(SyncMutex::new(Vec::new())),
+            upgrade_intent_messages: Arc::new(SyncMutex::new(HashMap::new())),
+        };
+
+        let results = state.comparison_result_typed(ComparisonResultType::Match);
+        assert_eq!(results.len(), 3);
+        let results = state.comparison_result_typed(ComparisonResultType::NotFound);
+        assert_eq!(results.len(), 2);
+        let results = state.comparison_result_typed(ComparisonResultType::Divergent);
+        assert_eq!(results.len(), 1);
+        let results = state.comparison_result_typed(ComparisonResultType::BuildFailed);
+        assert_eq!(results.len(), 0);
     }
 }

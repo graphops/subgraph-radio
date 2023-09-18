@@ -11,8 +11,10 @@ use tracing::{debug, error, info, trace, warn};
 use crate::{
     chainhead_block_str,
     messages::poi::{process_valid_message, PublicPoiMessage},
-    metrics::{CONNECTED_PEERS, GOSSIP_PEERS, RECEIVED_MESSAGES, VALIDATED_MESSAGES},
-    operator::indexer_management::health_query,
+    metrics::{
+        CONNECTED_PEERS, DIVERGING_SUBGRAPHS, GOSSIP_PEERS, RECEIVED_MESSAGES, VALIDATED_MESSAGES,
+    },
+    operator::{attestation::ComparisonResultType, indexer_management::health_query},
 };
 use graphcast_sdk::{
     graphcast_agent::{
@@ -238,6 +240,9 @@ impl RadioOperator {
                     // Update the number of peers connected
                     CONNECTED_PEERS.set(connected_peer_count(&self.graphcast_agent().node_handle).unwrap_or_default().try_into().unwrap_or_default());
                     GOSSIP_PEERS.set(self.graphcast_agent.number_of_peers().try_into().unwrap_or_default());
+
+                    let diverged_num = self.persisted_state.comparison_result_typed(ComparisonResultType::Divergent);
+                    DIVERGING_SUBGRAPHS.set(diverged_num.len().try_into().unwrap());
 
                     // Save cache if path provided
                     let _ = &self.config.radio_infrastructure().persistence_file_path.as_ref().map(|path| {
