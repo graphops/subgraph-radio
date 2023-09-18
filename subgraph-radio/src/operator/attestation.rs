@@ -18,9 +18,7 @@ use graphcast_sdk::{
 };
 
 use crate::{
-    messages::poi::PublicPoiMessage,
-    metrics::{ACTIVE_INDEXERS, DIVERGING_SUBGRAPHS, LOCAL_PPOIS_TO_COMPARE},
-    state::PersistedState,
+    messages::poi::PublicPoiMessage, metrics::ACTIVE_INDEXERS, state::PersistedState,
     OperationError,
 };
 
@@ -259,11 +257,6 @@ pub fn save_local_attestation(
         .entry(block_number)
         .and_modify(|existing_attestation| *existing_attestation = attestation.clone())
         .or_insert(attestation);
-
-    let ppoi_gauge = LOCAL_PPOIS_TO_COMPARE.with_label_values(&[&ipfs_hash]);
-
-    // The value is the total number of senders that are attesting for that subgraph
-    ppoi_gauge.set(local_attestations.len().try_into().unwrap());
 }
 
 /// Clear the expired local attestations after comparing with remote results
@@ -279,9 +272,6 @@ pub fn clear_local_attestation(
         let mut blocks_clone: HashMap<u64, Attestation> = HashMap::new();
         blocks_clone.extend(blocks.clone());
         blocks_clone.remove(&block_number);
-        let ppoi_gauge = LOCAL_PPOIS_TO_COMPARE.with_label_values(&[&ipfs_hash]);
-        // The value is the total number of senders that are attesting for that subgraph
-        ppoi_gauge.set(blocks_clone.len().try_into().unwrap());
         local_attestations.insert(ipfs_hash, blocks_clone);
     };
 }
@@ -657,7 +647,6 @@ pub async fn process_comparison_results(
             Err(e) => cmp_errors.push(e.to_string()),
         }
     }
-    DIVERGING_SUBGRAPHS.set(divergent_strings.len().try_into().unwrap());
 
     info!(
         chainhead_blocks = blocks_str,

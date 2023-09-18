@@ -114,23 +114,6 @@ pub static RECEIVED_MESSAGES: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 #[allow(dead_code)]
-pub static LOCAL_PPOIS_TO_COMPARE: Lazy<IntGaugeVec> = Lazy::new(|| {
-    let m = IntGaugeVec::new(
-        Opts::new(
-            "local_ppois_to_compare",
-            "Number of pPOIs stored locally for each subgraph",
-        )
-        .namespace("graphcast")
-        .subsystem("subgraph_radio"),
-        &["deployment"],
-    )
-    .expect("Failed to create LOCAL_PPOIS_TO_COMPARE gauges");
-    prometheus::register(Box::new(m.clone()))
-        .expect("Failed to register local_ppois_to_compare gauge");
-    m
-});
-
-#[allow(dead_code)]
 pub static REGISTRY: Lazy<prometheus::Registry> = Lazy::new(prometheus::Registry::new);
 
 #[allow(dead_code)]
@@ -153,7 +136,6 @@ pub fn start_metrics() {
             Box::new(CONNECTED_PEERS.clone()),
             Box::new(GOSSIP_PEERS.clone()),
             Box::new(RECEIVED_MESSAGES.clone()),
-            Box::new(LOCAL_PPOIS_TO_COMPARE.clone()),
         ],
     );
 }
