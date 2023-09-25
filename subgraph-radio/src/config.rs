@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tracing::{debug, info, trace};
 
+use crate::operator::notifier::NotificationMode;
 use crate::state::{panic_hook, PersistedState};
 use crate::{active_allocation_hashes, syncing_deployment_hashes};
 
@@ -470,11 +471,28 @@ pub struct RadioInfrastructure {
         long,
         value_name = "LOG_FORMAT",
         env = "LOG_FORMAT",
-        help = "Support logging formats: pretty, json, full, compact",
-        long_help = "pretty: verbose and human readable; json: not verbose and parsable; compact:  not verbose and not parsable; full: verbose and not parsible",
+        help = "Supported logging formats: pretty, json, full, compact",
+        long_help = "pretty: verbose and human readable; json: not verbose and parsable; compact:  not verbose and not parsable; full: verbose and not parseable",
         default_value = "pretty"
     )]
     pub log_format: LogFormat,
+    #[clap(
+        long,
+        value_name = "NOTIFICATION_MODE",
+        env = "NOTIFICATION_MODE",
+        help = "Supported: live, interval",
+        long_help = "live: send a notification as soon as it finds a divergence; interval: send a notification on a specified interval (default is 24 hours but can be configured with ) with a list of divergent subgraphs",
+        default_value = "live"
+    )]
+    pub notification_mode: NotificationMode,
+    #[clap(
+        long,
+        value_name = "NOTIFICATION_INTERVAL",
+        env = "NOTIFICATION_INTERVAL",
+        help = "Interval (in hours) between sending a divergence summary notification",
+        default_value = "24"
+    )]
+    pub notification_interval: u64,
 }
 
 #[derive(Clone, Debug, Args, Serialize, Deserialize, Default)]
@@ -613,6 +631,8 @@ mod tests {
                 log_format: LogFormat::Pretty,
                 graphcast_network: GraphcastNetworkName::Testnet,
                 auto_upgrade: CoverageLevel::Comprehensive,
+                notification_mode: NotificationMode::Live,
+                notification_interval: 24,
             },
             config_file: None,
         }

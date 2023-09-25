@@ -31,6 +31,7 @@ use crate::messages::upgrade::UpgradeIntentMessage;
 use crate::metrics::handle_serve_metrics;
 use crate::operator::attestation::log_gossip_summary;
 use crate::operator::attestation::process_comparison_results;
+use crate::operator::notifier::NotificationMode;
 use crate::server::run_server;
 use crate::state::PersistedState;
 use crate::GRAPHCAST_AGENT;
@@ -190,6 +191,11 @@ impl RadioOperator {
         let mut state_update_interval = interval(Duration::from_secs(10));
         let mut gossip_poi_interval = interval(Duration::from_secs(30));
         let mut comparison_interval = interval(Duration::from_secs(30));
+
+        let mut notification_interval = tokio::time::interval(Duration::from_secs(
+            self.config.radio_infrastructure.notification_interval * 3600,
+        ));
+        let mut first_tick = true;
 
         let iteration_timeout = Duration::from_secs(180);
         let update_timeout = Duration::from_secs(5);
@@ -351,7 +357,8 @@ impl RadioOperator {
                             identifiers.len(),
                             comparison_res,
                             self.notifier.clone(),
-                            self.persisted_state.clone()
+                            self.persisted_state.clone(),
+                            self.config.radio_infrastructure.notification_mode.clone()
                         )
                     }).await;
 
@@ -361,6 +368,26 @@ impl RadioOperator {
                         debug!("compare_poi completed");
                     }
                 },
+                _ = notification_interval.tick() => {
+                    if first_tick {
+                        first_tick = false;
+                        continue;
+                    }
+                    if self.config.radio_infrastructure.notification_mode == NotificationMode::Daily {
+                        let lines = {
+                            let comparison_results = self.persisted_state.comparison_results.lock().unwrap();
+                            let mut lines = Vec::new();
+                            for (identifier, res) in comparison_results.iter() {
+                                if res.result_type == ComparisonResultType::Divergent {
+                                    lines.push(format!("Deployment {} diverging as on block {}.", identifier, res.block_number));
+                                }
+                            }
+                            lines
+                        };
+                        self.notifier.notify(lines.join("\n")).await;
+                    }
+                },
+
                 else => break,
             }
 
