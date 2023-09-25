@@ -238,12 +238,15 @@ impl RadioOperator {
                         continue;
                     }
                     // Update the number of peers connected
-                    CONNECTED_PEERS.set(connected_peer_count(&self.graphcast_agent().node_handle).unwrap_or_default().try_into().unwrap_or_default());
-                    GOSSIP_PEERS.set(self.graphcast_agent.number_of_peers().try_into().unwrap_or_default());
+                    let connected_peers = connected_peer_count(&self.graphcast_agent().node_handle).unwrap_or_default();
+                    let gossip_peers = self.graphcast_agent.number_of_peers();
+                    CONNECTED_PEERS.set(connected_peers.try_into().unwrap_or_default());
+                    GOSSIP_PEERS.set(gossip_peers.try_into().unwrap_or_default());
 
-                    let diverged_num = self.persisted_state.comparison_result_typed(ComparisonResultType::Divergent);
-                    DIVERGING_SUBGRAPHS.set(diverged_num.len().try_into().unwrap());
+                    let diverged_num = self.persisted_state.comparison_result_typed(ComparisonResultType::Divergent).len();
+                    DIVERGING_SUBGRAPHS.set(diverged_num.try_into().unwrap());
 
+                    info!(connected_peers, gossip_peers, diverged_num, "State update summary");
                     // Save cache if path provided
                     let _ = &self.config.radio_infrastructure().persistence_file_path.as_ref().map(|path| {
                         self.persisted_state.update_cache(path);
@@ -291,6 +294,7 @@ impl RadioOperator {
                         info!(
                             chainhead = blocks_str.clone(),
                             num_gossip_peers = self.graphcast_agent.number_of_peers(),
+                            num_connected_peers = connected_peer_count(&self.graphcast_agent.node_handle).unwrap_or_default(),
                             num_topics,
                             "Network statuses",
                         );
