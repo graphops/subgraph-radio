@@ -17,6 +17,7 @@ use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
 
 use crate::messages::upgrade::UpgradeIntentMessage;
 use crate::metrics::CACHED_PPOI_MESSAGES;
+use crate::operator::notifier::NotificationMode;
 use crate::{
     messages::poi::PublicPoiMessage,
     operator::attestation::{
@@ -251,6 +252,7 @@ impl PersistedState {
         &self,
         new_comparison_result: ComparisonResult,
         notifier: Notifier,
+        notification_mode: NotificationMode,
     ) -> ComparisonResultType {
         let (should_notify, updated_comparison_result, result_type) = {
             let mut results = self.comparison_results.lock().unwrap();
@@ -295,7 +297,7 @@ impl PersistedState {
             (should_notify, new_comparison_result.clone(), result_type)
         };
 
-        if should_notify {
+        if notification_mode == NotificationMode::Live && should_notify {
             notifier.notify(updated_comparison_result.to_string()).await;
         }
 
@@ -596,7 +598,9 @@ mod tests {
             attestations: Vec::new(),
         };
 
-        state.handle_comparison_result(new_result, notifier).await;
+        state
+            .handle_comparison_result(new_result, notifier, NotificationMode::Live)
+            .await;
 
         let comparison_results = state.comparison_results.lock().unwrap();
         assert!(comparison_results.contains_key(&String::from("new_deployment")));
@@ -637,7 +641,9 @@ mod tests {
             .lock()
             .unwrap()
             .insert(String::from("existing_deployment"), old_result.clone());
-        state.handle_comparison_result(new_result, notifier).await;
+        state
+            .handle_comparison_result(new_result, notifier, NotificationMode::Live)
+            .await;
 
         let comparison_results = state.comparison_results.lock().unwrap();
         let result = comparison_results

@@ -17,6 +17,7 @@ use graphcast_sdk::{
     graphcast_agent::message_typing::{get_indexer_stake, BuildMessageError, GraphcastMessage},
 };
 
+use crate::operator::notifier::NotificationMode;
 use crate::{
     messages::poi::PublicPoiMessage, metrics::ACTIVE_INDEXERS, state::PersistedState,
     OperationError,
@@ -613,6 +614,7 @@ pub async fn process_comparison_results(
     result_strings: Vec<Result<ComparisonResult, OperationError>>,
     notifier: Notifier,
     persisted_state: PersistedState,
+    notification_mode: NotificationMode,
 ) {
     // Generate attestation summary
     let mut match_strings = vec![];
@@ -626,7 +628,11 @@ pub async fn process_comparison_results(
         match result {
             Ok(comparison_result) => {
                 let result_type = persisted_state
-                    .handle_comparison_result(comparison_result.clone(), notifier.clone())
+                    .handle_comparison_result(
+                        comparison_result.clone(),
+                        notifier.clone(),
+                        notification_mode.clone(),
+                    )
                     .await;
 
                 match result_type {

@@ -31,6 +31,7 @@ use crate::messages::upgrade::UpgradeIntentMessage;
 use crate::metrics::handle_serve_metrics;
 use crate::operator::attestation::log_gossip_summary;
 use crate::operator::attestation::process_comparison_results;
+use crate::operator::notifier::NotificationMode;
 use crate::server::run_server;
 use crate::state::PersistedState;
 use crate::GRAPHCAST_AGENT;
@@ -190,6 +191,12 @@ impl RadioOperator {
         let mut state_update_interval = interval(Duration::from_secs(10));
         let mut gossip_poi_interval = interval(Duration::from_secs(30));
         let mut comparison_interval = interval(Duration::from_secs(30));
+
+        let mut notification_interval = tokio::time::interval(Duration::from_secs(
+            self.config.radio_infrastructure.notification_interval * 3600,
+        ));
+
+        let mut first_tick = true;
 
         let iteration_timeout = Duration::from_secs(180);
         let update_timeout = Duration::from_secs(5);
@@ -351,7 +358,8 @@ impl RadioOperator {
                             identifiers.len(),
                             comparison_res,
                             self.notifier.clone(),
-                            self.persisted_state.clone()
+                            self.persisted_state.clone(),
+                            self.config.radio_infrastructure.notification_mode.clone()
                         )
                     }).await;
 
@@ -361,6 +369,43 @@ impl RadioOperator {
                         debug!("compare_poi completed");
                     }
                 },
+                _ = notification_interval.tick() => {
+                    if first_tick {
+                        first_tick = false;
+                        continue;
+                    }
+                    if self.config.radio_infrastructure.notification_mode == NotificationMode::Interval {
+                        let lines = {
+                            let comparison_results = self.persisted_state.comparison_results.lock().unwrap();
+                            let (mut matching, mut divergent) = (0, 0);
+                            let mut lines = Vec::new();
+                            let total = comparison_results.len();
+
+                            let divergent_lines: Vec<String> = comparison_results.iter().filter_map(|(identifier, res)| {
+                                match res.result_type {
+                                    ComparisonResultType::Match => {
+                                        matching += 1;
+                                        None
+                                    },
+                                    ComparisonResultType::Divergent => {
+                                        divergent += 1;
+                                        Some(format!("{} - {}", identifier, res.block_number))
+                                    },
+                                    _ => None,
+                                }
+                            }).collect();
+
+                            lines.push(format!(
+                                "Total subgraphs being cross-checked: {}\nMatching: {}\nDivergent: {}, identifiers and blocks:\n",
+                                total, matching, divergent
+                            ));
+                            lines.extend(divergent_lines);
+                            lines
+                        };
+                        self.notifier.notify(lines.join("\n")).await;
+                    }
+                },
+
                 else => break,
             }
 
