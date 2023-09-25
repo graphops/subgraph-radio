@@ -4,6 +4,7 @@ use graphcast_sdk::{
 };
 use serde::{Deserialize, Serialize};
 use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioInfrastructure, Waku};
+use subgraph_radio::operator::notifier::NotificationMode;
 
 #[derive(Clone, Debug, Parser, Serialize, Deserialize)]
 #[clap(name = "test-sender", about = "Mock message sender")]
@@ -78,6 +79,8 @@ pub fn test_config() -> Config {
                 id_validation: IdentityValidation::ValidAddress,
                 topic_update_interval: 600,
                 auto_upgrade: CoverageLevel::OnChain,
+                notification_mode: NotificationMode::Live,
+                notification_interval: 1440,
             }
         },
         config_file: None,
