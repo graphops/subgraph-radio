@@ -16,6 +16,13 @@ pub struct Notifier {
     telegram_chat_id: Option<i64>,
 }
 
+#[derive(clap::ValueEnum, Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
+pub enum NotificationMode {
+    Interval,
+    #[default]
+    Live,
+}
+
 impl Notifier {
     pub fn new(
         radio_name: String,
