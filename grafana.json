@@ -147,9 +147,7 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -181,15 +179,11 @@
           "options": {
             "fields": {
               "Count": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "aggregate"
               },
               "DIVERGENT_deployment": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "aggregate"
               },
               "DIVERGENT_resultType": {
@@ -201,15 +195,11 @@
                 "operation": "groupby"
               },
               "MATCH_deployment": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "aggregate"
               },
               "MATCH_resultType": {
-                "aggregations": [
-                  "count"
-                ],
+                "aggregations": ["count"],
                 "operation": "groupby"
               },
               "deployment": {
@@ -266,9 +256,7 @@
         "justifyMode": "auto",
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -279,7 +267,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "builder",
-          "exemplar": true,
+          "exemplar": false,
           "expr": "sum(rate(graphcast_subgraph_radio_validated_messages{}[30m])) * 60",
           "hide": false,
           "instant": false,
@@ -291,13 +279,25 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "exemplar": true,
+          "exemplar": false,
           "expr": "sum(graphcast_subgraph_radio_cached_ppoi_messages{})",
           "hide": false,
           "instant": false,
           "interval": "",
           "legendFormat": "Messages In Store",
           "refId": "Cached Messages"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "exemplar": false,
+          "expr": "sum(graphcast_subgraph_radio_received_messages)",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Received Messages",
+          "refId": "A"
         }
       ],
       "title": "Message stats",
@@ -357,7 +357,32 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "graphcast_subgraph_radio_connected_peers{instance=\"subgraph-radio:2384\", job=\"subgraph-radio\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -368,11 +393,7 @@
       "id": 123125,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "min",
-            "max"
-          ],
+          "calcs": ["last", "min", "max"],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
@@ -389,11 +410,23 @@
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
           "exemplar": false,
-          "expr": "graphcast_subgraph_radio_ACTIVE_INDEXERS",
+          "expr": "graphcast_subgraph_radio_connected_peers",
           "interval": "",
-          "legendFormat": "{{deployment}}",
+          "legendFormat": "",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "exemplar": true,
+          "expr": "graphcast_subgraph_radio_gossip_peers",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
         }
       ],
       "title": "Number of Gossiping Indexers per Subgraph",
@@ -438,9 +471,7 @@
         "footer": {
           "countRows": false,
           "fields": "",
-          "reducer": [
-            "sum"
-          ],
+          "reducer": ["sum"],
           "show": false
         },
         "showHeader": true,
@@ -591,7 +622,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": "${DS_PROMETHEUS}",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -740,12 +774,7 @@
       "id": 123135,
       "options": {
         "legend": {
-          "calcs": [
-            "last",
-            "min",
-            "max",
-            "sum"
-          ],
+          "calcs": ["last", "min", "max", "sum"],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
@@ -799,22 +828,12 @@
       "2h",
       "1d"
     ],
-    "time_options": [
-      "5m",
-      "15m",
-      "1h",
-      "6h",
-      "12h",
-      "24h",
-      "2d",
-      "7d",
-      "30d"
-    ],
+    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"],
     "type": "timepicker"
   },
   "timezone": "browser",
   "title": "Graphcast Subgraph Radio",
   "uid": "graphcast-subgraph-radio",
-  "version": 10,
+  "version": 17,
   "weekStart": ""
 }
