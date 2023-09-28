@@ -22,7 +22,6 @@ use crate::{
     operator::attestation::{
         clear_local_attestation, Attestation, ComparisonResult, ComparisonResultType,
     },
-    operator::notifier::Notifier,
     RADIO_OPERATOR,
 };
 
@@ -31,12 +30,15 @@ type Remote = Arc<SyncMutex<Vec<GraphcastMessage<PublicPoiMessage>>>>;
 type UpgradeMessages = Arc<SyncMutex<HashMap<String, GraphcastMessage<UpgradeIntentMessage>>>>;
 type ComparisonResults = Arc<SyncMutex<HashMap<String, ComparisonResult>>>;
 
+type Notifications = Arc<SyncMutex<HashMap<String, String>>>;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PersistedState {
     pub local_attestations: Local,
     pub remote_ppoi_messages: Remote,
     pub upgrade_intent_messages: UpgradeMessages,
     pub comparison_results: ComparisonResults,
+    pub notifications: Notifications,
 }
 
 impl PersistedState {
@@ -45,6 +47,7 @@ impl PersistedState {
         remote: Option<Remote>,
         upgrade_intent_messages: Option<UpgradeMessages>,
         comparison_results: Option<ComparisonResults>,
+        notifications: Option<Notifications>,
     ) -> PersistedState {
         let local_attestations = local.unwrap_or(Arc::new(SyncMutex::new(HashMap::new())));
         let remote_ppoi_messages = remote.unwrap_or(Arc::new(SyncMutex::new(vec![])));
@@ -52,12 +55,13 @@ impl PersistedState {
             upgrade_intent_messages.unwrap_or(Arc::new(SyncMutex::new(HashMap::new())));
         let comparison_results =
             comparison_results.unwrap_or(Arc::new(SyncMutex::new(HashMap::new())));
-
+        let notifications = notifications.unwrap_or(Arc::new(SyncMutex::new(HashMap::new())));
         PersistedState {
             local_attestations,
             remote_ppoi_messages,
             upgrade_intent_messages,
             comparison_results,
+            notifications,
         }
     }
 
@@ -68,6 +72,7 @@ impl PersistedState {
         remote_ppoi_messages: Option<Remote>,
         upgrade_intent_messages: Option<UpgradeMessages>,
         comparison_results: Option<ComparisonResults>,
+        notifications: Option<Notifications>,
     ) -> PersistedState {
         let local_attestations = match local_attestations {
             None => self.local_attestations.clone(),
@@ -85,11 +90,16 @@ impl PersistedState {
             None => self.comparison_results.clone(),
             Some(r) => r,
         };
+        let notifications = match notifications {
+            None => self.notifications.clone(),
+            Some(n) => n,
+        };
         PersistedState {
             local_attestations,
             remote_ppoi_messages,
             upgrade_intent_messages,
             comparison_results,
+            notifications,
         }
     }
 
@@ -156,6 +166,20 @@ impl PersistedState {
             }
         }
         matched_type
+    }
+
+    /// Getter for notifications, return only the values
+    pub fn notifications(&self) -> Vec<String> {
+        self.notifications
+            .lock()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect()
+    }
+
+    pub fn clear_notifications(&self) {
+        self.notifications.lock().unwrap().clear();
     }
 
     /// Update local_attestations
@@ -226,6 +250,13 @@ impl PersistedState {
             .insert(deployment, comparison_result);
     }
 
+    pub fn add_notification(&self, deployment: String, notification: String) {
+        self.notifications
+            .lock()
+            .unwrap()
+            .insert(deployment, notification);
+    }
+
     pub async fn valid_ppoi_messages(
         &mut self,
         graph_node_endpoint: &str,
@@ -250,7 +281,6 @@ impl PersistedState {
     pub async fn handle_comparison_result(
         &self,
         new_comparison_result: ComparisonResult,
-        notifier: Notifier,
     ) -> ComparisonResultType {
         let (should_notify, updated_comparison_result, result_type) = {
             let mut results = self.comparison_results.lock().unwrap();
@@ -296,7 +326,10 @@ impl PersistedState {
         };
 
         if should_notify {
-            notifier.notify(updated_comparison_result.to_string()).await;
+            self.add_notification(
+                updated_comparison_result.deployment.clone(),
+                updated_comparison_result.to_string(),
+            );
         }
 
         result_type
@@ -359,7 +392,7 @@ impl PersistedState {
                     "No persisted state file provided, create an empty state"
                 );
                 // No state persisted, create new
-                let state = PersistedState::new(None, None, None, None);
+                let state = PersistedState::new(None, None, None, None, None);
                 state.update_cache(path);
                 return state;
             }
@@ -374,7 +407,7 @@ impl PersistedState {
                     err = e.to_string(),
                     "Could not parse persisted state file, created an empty state",
                 );
-                PersistedState::new(None, None, None, None)
+                PersistedState::new(None, None, None, None, None)
             }
         };
         state
@@ -406,9 +439,8 @@ pub fn panic_cache(panic_info: &PanicInfo<'_>, file_path: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use graphcast_sdk::networks::NetworkName;
-
     use crate::operator::attestation::{save_local_attestation, ComparisonResultType};
+    use graphcast_sdk::networks::NetworkName;
 
     /// Tests for load, update, and store cache
     #[tokio::test]
@@ -490,6 +522,7 @@ mod tests {
                 Some(ppoi_messages.clone()),
                 None,
                 Some(comparison_results.clone()),
+                None,
             )
             .await;
 
@@ -515,28 +548,28 @@ mod tests {
         assert_eq!(state.remote_ppoi_messages.lock().unwrap().len(), 1);
         assert_eq!(state.upgrade_intent_messages.lock().unwrap().len(), 1);
         assert!(!state.local_attestations.lock().unwrap().is_empty());
-        assert!(state.local_attestations.lock().unwrap().len() == 2);
-        assert!(
+        assert_eq!(state.local_attestations.lock().unwrap().len(), 2);
+        assert_eq!(
             state
                 .local_attestations
                 .lock()
                 .unwrap()
                 .get("0xa1")
                 .unwrap()
-                .len()
-                == 2
+                .len(),
+            2
         );
-        assert!(
+        assert_eq!(
             state
                 .local_attestations
                 .lock()
                 .unwrap()
                 .get("0xa2")
                 .unwrap()
-                .len()
-                == 1
+                .len(),
+            1
         );
-        assert!(
+        assert_eq!(
             state
                 .local_attestations
                 .lock()
@@ -545,8 +578,8 @@ mod tests {
                 .unwrap()
                 .get(&0)
                 .unwrap()
-                .ppoi
-                == *"ppoi-x"
+                .ppoi,
+            *"ppoi-x"
         );
 
         assert_eq!(state.comparison_results.lock().unwrap().len(), 1);
@@ -576,16 +609,18 @@ mod tests {
 
     #[tokio::test]
     async fn handle_comparison_result_new_deployment() {
-        let notifier = Notifier::new("not-a-real-radio".to_string(), None, None, None, None, None);
         let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
         let remote_ppoi_messages = Arc::new(SyncMutex::new(Vec::new()));
         let upgrade_intent_messages = Arc::new(SyncMutex::new(HashMap::new()));
         let comparison_results = Arc::new(SyncMutex::new(HashMap::new()));
+        let notifications = Arc::new(SyncMutex::new(HashMap::new()));
+
         let state = PersistedState {
             local_attestations,
             remote_ppoi_messages,
             upgrade_intent_messages,
             comparison_results,
+            notifications,
         };
 
         let new_result = ComparisonResult {
@@ -596,7 +631,7 @@ mod tests {
             attestations: Vec::new(),
         };
 
-        state.handle_comparison_result(new_result, notifier).await;
+        state.handle_comparison_result(new_result).await;
 
         let comparison_results = state.comparison_results.lock().unwrap();
         assert!(comparison_results.contains_key(&String::from("new_deployment")));
@@ -604,16 +639,18 @@ mod tests {
 
     #[tokio::test]
     async fn handle_comparison_result_change_result_type() {
-        let notifier = Notifier::new("not-a-real-radio".to_string(), None, None, None, None, None);
         let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
         let remote_ppoi_messages = Arc::new(SyncMutex::new(Vec::new()));
         let upgrade_intent_messages = Arc::new(SyncMutex::new(HashMap::new()));
         let comparison_results = Arc::new(SyncMutex::new(HashMap::new()));
+        let notifications = Arc::new(SyncMutex::new(HashMap::new()));
+
         let state = PersistedState {
             local_attestations,
             remote_ppoi_messages,
             upgrade_intent_messages,
             comparison_results,
+            notifications,
         };
 
         let old_result = ComparisonResult {
@@ -637,7 +674,7 @@ mod tests {
             .lock()
             .unwrap()
             .insert(String::from("existing_deployment"), old_result.clone());
-        state.handle_comparison_result(new_result, notifier).await;
+        state.handle_comparison_result(new_result).await;
 
         let comparison_results = state.comparison_results.lock().unwrap();
         let result = comparison_results
@@ -653,12 +690,15 @@ mod tests {
         let remote_ppoi_messages = Arc::new(SyncMutex::new(Vec::new()));
         let upgrade_intent_messages = Arc::new(SyncMutex::new(HashMap::new()));
         let comparison_results = Arc::new(SyncMutex::new(HashMap::new()));
+        let notifications = Arc::new(SyncMutex::new(HashMap::new()));
+
         let test_id = "AAAMdCkW3pr619gsJVtUPAWxspALPdCMw6o7obzYBNp3".to_string();
         let state = PersistedState {
             local_attestations,
             remote_ppoi_messages,
             upgrade_intent_messages,
             comparison_results,
+            notifications,
         };
 
         // Make 2 msgs
@@ -805,6 +845,7 @@ mod tests {
             local_attestations: Arc::new(SyncMutex::new(HashMap::new())),
             remote_ppoi_messages: Arc::new(SyncMutex::new(Vec::new())),
             upgrade_intent_messages: Arc::new(SyncMutex::new(HashMap::new())),
+            notifications: Arc::new(SyncMutex::new(HashMap::new())),
         };
 
         let results = state.comparison_result_typed(ComparisonResultType::Match);
