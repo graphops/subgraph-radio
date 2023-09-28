@@ -14,9 +14,20 @@ pub struct Notifier {
     discord_webhook: Option<String>,
     telegram_token: Option<String>,
     telegram_chat_id: Option<i64>,
+    pub notification_mode: NotificationMode,
+    pub notification_interval: u64,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
+pub enum NotificationMode {
+    PeriodicReport,
+    PeriodicUpdate,
+    #[default]
+    Live,
 }
 
 impl Notifier {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         radio_name: String,
         slack_token: Option<String>,
@@ -24,6 +35,8 @@ impl Notifier {
         discord_webhook: Option<String>,
         telegram_token: Option<String>,
         telegram_chat_id: Option<i64>,
+        notification_mode: NotificationMode,
+        notification_interval: u64,
     ) -> Notifier {
         Notifier {
             radio_name,
@@ -32,6 +45,8 @@ impl Notifier {
             discord_webhook,
             telegram_token,
             telegram_chat_id,
+            notification_mode,
+            notification_interval,
         }
     }
 
@@ -42,6 +57,8 @@ impl Notifier {
         let discord_webhook = config.radio_infrastructure().discord_webhook.clone();
         let telegram_token = config.radio_infrastructure().telegram_token.clone();
         let telegram_chat_id = config.radio_infrastructure().telegram_chat_id;
+        let notification_mode = config.radio_infrastructure().notification_mode.clone();
+        let notification_interval = config.radio_infrastructure().notification_interval;
 
         Notifier::new(
             radio_name,
@@ -50,6 +67,8 @@ impl Notifier {
             discord_webhook,
             telegram_token,
             telegram_chat_id,
+            notification_mode,
+            notification_interval,
         )
     }
 

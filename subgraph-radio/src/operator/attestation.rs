@@ -17,6 +17,7 @@ use graphcast_sdk::{
     graphcast_agent::message_typing::{get_indexer_stake, BuildMessageError, GraphcastMessage},
 };
 
+use crate::operator::notifier::NotificationMode;
 use crate::{
     messages::poi::PublicPoiMessage, metrics::ACTIVE_INDEXERS, state::PersistedState,
     OperationError,
@@ -626,7 +627,7 @@ pub async fn process_comparison_results(
         match result {
             Ok(comparison_result) => {
                 let result_type = persisted_state
-                    .handle_comparison_result(comparison_result.clone(), notifier.clone())
+                    .handle_comparison_result(comparison_result.clone())
                     .await;
 
                 match result_type {
@@ -646,6 +647,12 @@ pub async fn process_comparison_results(
             Err(OperationError::Attestation(e)) => attestation_failed.push(e.to_string()),
             Err(e) => cmp_errors.push(e.to_string()),
         }
+    }
+
+    let notifications = persisted_state.notifications();
+    if notifier.notification_mode == NotificationMode::Live && !notifications.is_empty() {
+        notifier.notify(notifications.join("\n")).await;
+        persisted_state.clear_notifications();
     }
 
     info!(
@@ -1080,26 +1087,26 @@ mod tests {
         );
 
         assert!(!local_attestations.lock().unwrap().is_empty());
-        assert!(local_attestations.lock().unwrap().len() == 2);
-        assert!(
+        assert_eq!(local_attestations.lock().unwrap().len(), 2);
+        assert_eq!(
             local_attestations
                 .lock()
                 .unwrap()
                 .get("0xa1")
                 .unwrap()
-                .len()
-                == 2
+                .len(),
+            2
         );
-        assert!(
+        assert_eq!(
             local_attestations
                 .lock()
                 .unwrap()
                 .get("0xa2")
                 .unwrap()
-                .len()
-                == 1
+                .len(),
+            1
         );
-        assert!(
+        assert_eq!(
             local_attestations
                 .lock()
                 .unwrap()
@@ -1107,8 +1114,8 @@ mod tests {
                 .unwrap()
                 .get(&0)
                 .unwrap()
-                .ppoi
-                == *"ppoi-x"
+                .ppoi,
+            *"ppoi-x"
         );
     }
 }

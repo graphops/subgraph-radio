@@ -1,21 +1,11 @@
-use derive_getters::Getters;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc::Receiver,
     Arc,
 };
 use std::time::Duration;
-use tokio::time::{interval, sleep, timeout};
-use tracing::{debug, error, info, trace, warn};
 
-use crate::{
-    chainhead_block_str,
-    messages::poi::{process_valid_message, PublicPoiMessage},
-    metrics::{
-        CONNECTED_PEERS, DIVERGING_SUBGRAPHS, GOSSIP_PEERS, RECEIVED_MESSAGES, VALIDATED_MESSAGES,
-    },
-    operator::{attestation::ComparisonResultType, indexer_management::health_query},
-};
+use derive_getters::Getters;
 use graphcast_sdk::{
     graphcast_agent::{
         message_typing::check_message_validity,
@@ -26,14 +16,26 @@ use graphcast_sdk::{
     WakuMessage,
 };
 
+use tokio::time::{interval, sleep, timeout};
+use tracing::{debug, error, info, trace, warn};
+
 use crate::config::Config;
 use crate::messages::upgrade::UpgradeIntentMessage;
 use crate::metrics::handle_serve_metrics;
 use crate::operator::attestation::log_gossip_summary;
 use crate::operator::attestation::process_comparison_results;
+use crate::operator::notifier::NotificationMode;
 use crate::server::run_server;
 use crate::state::PersistedState;
 use crate::GRAPHCAST_AGENT;
+use crate::{
+    chainhead_block_str,
+    messages::poi::{process_valid_message, PublicPoiMessage},
+    metrics::{
+        CONNECTED_PEERS, DIVERGING_SUBGRAPHS, GOSSIP_PEERS, RECEIVED_MESSAGES, VALIDATED_MESSAGES,
+    },
+    operator::{attestation::ComparisonResultType, indexer_management::health_query},
+};
 
 use self::notifier::Notifier;
 
@@ -189,7 +191,11 @@ impl RadioOperator {
 
         let mut state_update_interval = interval(Duration::from_secs(10));
         let mut gossip_poi_interval = interval(Duration::from_secs(30));
-        let mut comparison_interval = interval(Duration::from_secs(30));
+        let mut comparison_interval = interval(Duration::from_secs(300));
+
+        let mut notification_interval = tokio::time::interval(Duration::from_secs(
+            self.config.radio_infrastructure.notification_interval * 3600,
+        ));
 
         let iteration_timeout = Duration::from_secs(180);
         let update_timeout = Duration::from_secs(5);
@@ -351,7 +357,7 @@ impl RadioOperator {
                             identifiers.len(),
                             comparison_res,
                             self.notifier.clone(),
-                            self.persisted_state.clone()
+                            self.persisted_state.clone(),
                         )
                     }).await;
 
@@ -361,6 +367,52 @@ impl RadioOperator {
                         debug!("compare_poi completed");
                     }
                 },
+                _ = notification_interval.tick() => {
+                    match self.config.radio_infrastructure.notification_mode {
+                        NotificationMode::PeriodicReport => {
+                        let comparison_results = self.persisted_state.comparison_results();
+                            if !comparison_results.is_empty() {
+                                let lines = {
+                                    let (mut matching, mut divergent) = (0, 0);
+                                    let mut lines = Vec::new();
+                                    let total = comparison_results.len();
+
+                                    let divergent_lines: Vec<String> = comparison_results.iter().filter_map(|(identifier, res)| {
+                                        match res.result_type {
+                                            ComparisonResultType::Match => {
+                                                matching += 1;
+                                                None
+                                            },
+                                            ComparisonResultType::Divergent => {
+                                                divergent += 1;
+                                                Some(format!("{} - {}", identifier, res.block_number))
+                                            },
+                                            _ => None,
+                                        }
+                                    }).collect();
+
+                                    lines.push(format!(
+                                        "Total subgraphs being cross-checked: {}\nMatching: {}\nDivergent: {}, identifiers and blocks:",
+                                        total, matching, divergent
+                                    ));
+                                    lines.extend(divergent_lines);
+                                    lines
+                                };
+
+                                self.notifier.notify(lines.join("\n")).await;
+                            }
+                        },
+                        NotificationMode::PeriodicUpdate=> {
+                            let notifications = self.persisted_state.notifications();
+                            if !notifications.is_empty() {
+                                self.notifier.notify(notifications.join("\n")).await;
+                                self.persisted_state.clear_notifications();
+                            }
+                        },
+                        _ => {}
+                    }
+                },
+
                 else => break,
             }
 

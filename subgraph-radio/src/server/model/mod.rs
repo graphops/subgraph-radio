@@ -241,8 +241,8 @@ impl SubgraphRadioContext {
         let msgs = self.remote_ppoi_messages();
         let filtered = msgs
             .iter()
+            .filter(|&message| filter_remote_ppoi_messages(message, identifier, block))
             .cloned()
-            .filter(|message| filter_remote_ppoi_messages(message, identifier, block))
             .collect::<Vec<_>>();
         filtered
     }
