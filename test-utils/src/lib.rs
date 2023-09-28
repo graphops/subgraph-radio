@@ -198,7 +198,7 @@ pub fn start_radio(config: &Config) -> Child {
                 .to_string(),
         )
         .arg("--waku-log-level")
-        .arg(config.waku().waku_log_level.as_deref().unwrap_or("None"))
+        .arg(config.waku().waku_log_level.clone())
         .arg("--waku-port")
         .arg(config.waku().waku_port.as_deref().unwrap_or("None"))
         .arg("--log-level")
