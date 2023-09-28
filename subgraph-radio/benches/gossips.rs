@@ -41,7 +41,7 @@ fn gossip_poi_bench(c: &mut Criterion) {
             waku_port: None,
             waku_node_key: None,
             boot_node_addresses: vec![],
-            waku_log_level: None,
+            waku_log_level: "fatal".to_string(),
             waku_addr: None,
             discv5_enrs: None,
             discv5_port: None,

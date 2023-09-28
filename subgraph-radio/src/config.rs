@@ -99,6 +99,9 @@ impl Config {
     ) -> Result<GraphcastAgentConfig, GraphcastAgentError> {
         let wallet_key = self.wallet_input().unwrap().to_string();
         let topics = self.radio_infrastructure().topics.clone();
+        let mut discv5_enrs = self.waku().discv5_enrs.clone().unwrap_or(vec![]);
+        // Discovery network
+        discv5_enrs.push("enr:-P-4QJI8tS1WTdIQxq_yIrD05oIIW1Xg-tm_qfP0CHfJGnp9dfr6ttQJmHwTNxGEl4Le8Q7YHcmi-kXTtphxFysS11oBgmlkgnY0gmlwhLymh5GKbXVsdGlhZGRyc7hgAC02KG5vZGUtMDEuZG8tYW1zMy53YWt1djIucHJvZC5zdGF0dXNpbS5uZXQGdl8ALzYobm9kZS0wMS5kby1hbXMzLndha3V2Mi5wcm9kLnN0YXR1c2ltLm5ldAYfQN4DiXNlY3AyNTZrMaEDbl1X_zJIw3EAJGtmHMVn4Z2xhpSoUaP5ElsHKCv7hlWDdGNwgnZfg3VkcIIjKIV3YWt1Mg8".to_string());
 
         GraphcastAgentConfig::new(
             wallet_key,
@@ -116,7 +119,7 @@ impl Config {
             self.waku().waku_port.clone(),
             self.waku().waku_addr.clone(),
             self.waku().filter_protocol,
-            self.waku().discv5_enrs.clone(),
+            Some(discv5_enrs),
             self.waku().discv5_port,
         )
         .await
@@ -521,9 +524,10 @@ pub struct Waku {
         long,
         value_name = "WAKU_LOG_LEVEL",
         help = "Waku node logging configuration",
+        default_value = "fatal",
         env = "WAKU_LOG_LEVEL"
     )]
-    pub waku_log_level: Option<String>,
+    pub waku_log_level: String,
     #[clap(
         long,
         value_name = "DISCV5_ENRS",
@@ -583,7 +587,7 @@ mod tests {
                 waku_port: None,
                 waku_node_key: None,
                 boot_node_addresses: vec![],
-                waku_log_level: None,
+                waku_log_level: "fatal".to_string(),
                 waku_addr: None,
                 discv5_enrs: None,
                 discv5_port: None,

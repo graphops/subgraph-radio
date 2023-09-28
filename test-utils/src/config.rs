@@ -47,7 +47,7 @@ pub fn test_config() -> Config {
                 waku_node_key: None,
                 waku_addr: None,
                 boot_node_addresses: vec![],
-                waku_log_level: None,
+                waku_log_level: "fatal".to_string(),
                 discv5_enrs: None,
                 discv5_port: None,
                 filter_protocol: None,

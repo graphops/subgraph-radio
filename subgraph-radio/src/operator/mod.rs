@@ -119,12 +119,6 @@ impl RadioOperator {
         };
         let notifier = Notifier::from_config(config);
 
-        GRAPHCAST_AGENT
-            .get()
-            .unwrap()
-            .register_handler()
-            .expect("Could not register handler");
-
         RadioOperator {
             config: config.clone(),
             persisted_state,

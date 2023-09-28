@@ -60,6 +60,8 @@ async fn start_sender(config: TestSenderConfig) {
         store_retention_max_messages: None,
         store_retention_max_seconds: None,
         gossipsub_params: Some(gossipsub_params),
+        dns4_domain_name: None,
+        websocket_params: None,
     };
 
     let node_handle = waku_new(Some(node_config)).unwrap().start().unwrap();
