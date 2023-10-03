@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qos Dashboard</title>
+    <script>
+      // This function loads and instantiates the Wasm module
+      async function initWasm() {
+        try {
+          // Fetch the Wasm file
+          const response = await fetch("/qos-dashboard.wasm");
+
+          // Convert the fetched data to an ArrayBuffer
+          const bytes = await response.arrayBuffer();
+
+          // Instantiate the Wasm module
+          const results = await WebAssembly.instantiate(bytes);
+
+          // Here, you can call exported functions from your Wasm module
+          // For example: results.instance.exports.your_exported_function();
+        } catch (error) {
+          console.error("Error loading Wasm:", error);
+        }
+      }
+
+      // Call the initWasm function when the window loads
+      window.onload = initWasm;
+    </script>
+  </head>
+  <body>
+    <!-- Your HTML content here -->
+  </body>
+</html>
