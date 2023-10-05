@@ -1,7 +1,8 @@
-use axum::{extract::Extension, routing::get, Router, Server};
+use axum::{extract::Extension, routing::get, Router};
+use axum_server::Handle;
 use std::net::SocketAddr;
 use std::str::FromStr;
-use std::sync::atomic::AtomicBool;
+
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -21,11 +22,7 @@ pub mod routes;
 /// Set up the routes for a radio health endpoint at `/health`
 /// and a versioned GraphQL endpoint at `api/v1/graphql`
 /// This function starts a API server at the configured server_host and server_port
-pub async fn run_server(
-    config: Config,
-    persisted_state: &'static PersistedState,
-    _running_program: Arc<AtomicBool>,
-) {
+pub async fn run_server(config: Config, persisted_state: &'static PersistedState, handle: Handle) {
     if config.radio_infrastructure().server_port.is_none() {
         return;
     }
@@ -55,9 +52,10 @@ pub async fn run_server(
         host = tracing::field::debug(&config.radio_infrastructure().server_host),
         port, "Bind port to service"
     );
-    Server::bind(&addr)
+
+    axum_server::bind(addr)
+        .handle(handle)
         .serve(app.into_make_service())
-        // .with_graceful_shutdown(shutdown_signal(running_program))
         .await
         .expect("Error starting API service");
 }

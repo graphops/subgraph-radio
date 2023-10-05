@@ -23,8 +23,8 @@ async fn main() {
     // Initialization and pass in for static lifetime throughout the program
     let radio_operator = RadioOperator::new(&radio_config, agent).await;
 
-    // Start separate processes
-    radio_operator.prepare(receiver).await;
+    // Start message processes
+    radio_operator.message_processor(receiver).await;
 
     _ = RADIO_OPERATOR.set(radio_operator);
 

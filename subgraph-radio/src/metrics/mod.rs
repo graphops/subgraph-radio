@@ -2,11 +2,11 @@ use autometrics::{encode_global_metrics, global_metrics_exporter};
 use axum::http::StatusCode;
 use axum::routing::get;
 use axum::Router;
+use axum_server::Handle;
 use once_cell::sync::Lazy;
 use prometheus::{core::Collector, Registry};
 use prometheus::{IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts};
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+
 use std::{net::SocketAddr, str::FromStr};
 use tracing::{debug, info};
 
@@ -151,22 +151,22 @@ pub async fn get_metrics() -> (StatusCode, String) {
 
 /// Run the API server as well as Prometheus and a traffic generator
 #[allow(dead_code)]
-pub async fn handle_serve_metrics(host: String, port: u16, _running_program: Arc<AtomicBool>) {
+pub async fn handle_serve_metrics(host: String, port: u16, handle: Handle) {
     // Set up the exporter to collect metrics
     let _exporter = global_metrics_exporter();
 
     let app = Router::new().route("/metrics", get(get_metrics));
     let addr =
         SocketAddr::from_str(&format!("{}:{}", host, port)).expect("Start Prometheus metrics");
-    let server = axum::Server::bind(&addr);
+    // let server = axum::Server::bind(&addr);
     info!(
         address = addr.to_string(),
         "Prometheus Metrics port exposed"
     );
 
-    server
+    axum_server::bind(addr)
+        .handle(handle)
         .serve(app.into_make_service())
-        // .with_graceful_shutdown(shutdown_signal(running_program))
         .await
-        .expect("Error starting Prometheus metrics service");
+        .expect("Error starting Prometheus metrics service")
 }

@@ -1,16 +1,21 @@
 use async_graphql::{Error, ErrorExtensions};
 use autometrics::autometrics;
 
+use axum_server::Handle;
+use derive_getters::Getters;
 use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,
+    process,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    thread::sleep,
+    time::Duration,
 };
 use tokio::signal;
-use tracing::error;
+use tracing::{debug, error, info};
 
 use graphcast_sdk::{
     graphcast_agent::GraphcastAgent, graphql::client_network::query_network_subgraph,
@@ -96,7 +101,7 @@ pub fn chainhead_block_str(
 }
 
 /// Graceful shutdown when receive signal
-pub async fn shutdown_signal(running_program: Arc<AtomicBool>) {
+pub async fn shutdown(control: ControlFlow) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -115,12 +120,27 @@ pub async fn shutdown_signal(running_program: Arc<AtomicBool>) {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {println!("Shutting down server...");},
-        _ = terminate => {},
+        _ = ctrl_c => {
+            info!("Ctrl+C received! Shutting down...");
+        }
+        _ = terminate => {
+            info!("SIGTERM received! Shutting down...");
+        }
     }
+    // Set running boolean to false
+    debug!("Finish the current running processes...");
+    control.running.store(false, Ordering::SeqCst);
+    // Signal the server to shutdown using Handle.
+    control
+        .metrics_handle
+        .graceful_shutdown(Some(Duration::from_secs(1)));
+    control
+        .server_handle
+        .graceful_shutdown(Some(Duration::from_secs(3)));
 
-    running_program.store(false, Ordering::SeqCst);
-    opentelemetry::global::shutdown_tracer_provider();
+    sleep(Duration::from_secs(5));
+    debug!("Allowed 5 seconds for graceful shutdown, force exit");
+    process::exit(1);
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -157,6 +177,38 @@ impl OperationError {
 impl ErrorExtensions for OperationError {
     fn extend(&self) -> Error {
         Error::new(format!("{}", self))
+    }
+}
+
+/// Aggregated control flow configurations
+#[derive(Getters, Debug, Clone)]
+pub struct ControlFlow {
+    running: Arc<AtomicBool>,
+    skip_iteration: Arc<AtomicBool>,
+    metrics_handle: Handle,
+    server_handle: Handle,
+}
+
+impl ControlFlow {
+    /// Create basic control flow settings
+    fn new() -> Self {
+        let running = Arc::new(AtomicBool::new(true));
+        let skip_iteration = Arc::new(AtomicBool::new(false));
+
+        let metrics_handle = Handle::new();
+        let server_handle = Handle::new();
+
+        //TODO: Test for effectiveness
+        // let iteration_timeout = Duration::from_micros(1);
+        // let update_timeout = Duration::from_secs(5);
+        // let gossip_timeout = Duration::from_nanos(1);
+
+        ControlFlow {
+            running,
+            skip_iteration,
+            metrics_handle,
+            server_handle,
+        }
     }
 }
 
