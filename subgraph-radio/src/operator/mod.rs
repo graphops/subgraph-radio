@@ -1,11 +1,6 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    mpsc::Receiver,
-    Arc,
-};
+use std::sync::{atomic::Ordering, mpsc::Receiver, Arc};
 use std::time::Duration;
 
-use derive_getters::Getters;
 use graphcast_sdk::{
     graphcast_agent::{
         message_typing::check_message_validity,
@@ -19,7 +14,6 @@ use graphcast_sdk::{
 use tokio::time::{interval, sleep, timeout};
 use tracing::{debug, error, info, trace, warn};
 
-use crate::config::Config;
 use crate::messages::upgrade::UpgradeIntentMessage;
 use crate::metrics::handle_serve_metrics;
 use crate::operator::attestation::log_gossip_summary;
@@ -36,6 +30,7 @@ use crate::{
     },
     operator::{attestation::ComparisonResultType, indexer_management::health_query},
 };
+use crate::{config::Config, shutdown, ControlFlow};
 
 use self::notifier::Notifier;
 
@@ -44,50 +39,6 @@ pub mod callbook;
 pub mod indexer_management;
 pub mod notifier;
 pub mod operation;
-
-/// Aggregated control flow configurations
-/// Not used currently
-#[derive(Getters)]
-#[allow(unused)]
-struct ControlFlow {
-    running: Arc<AtomicBool>,
-    skip_iteration: Arc<AtomicBool>,
-    iteration_timeout: Duration,
-    update_timeout: Duration,
-    gossip_timeout: Duration,
-    topic_update_duration: Duration,
-    state_update_duration: Duration,
-    gossip_poi_duration: Duration,
-    comparison_duration: Duration,
-}
-
-impl ControlFlow {
-    fn new() -> Self {
-        let running = Arc::new(AtomicBool::new(true));
-        let skip_iteration = Arc::new(AtomicBool::new(false));
-
-        let topic_update_duration = Duration::from_secs(600);
-        let state_update_duration = Duration::from_secs(15);
-        let gossip_poi_duration = Duration::from_secs(30);
-        let comparison_duration = Duration::from_secs(60);
-
-        let iteration_timeout = Duration::from_secs(180);
-        let update_timeout = Duration::from_secs(10);
-        let gossip_timeout = Duration::from_secs(150);
-
-        ControlFlow {
-            running,
-            skip_iteration,
-            iteration_timeout,
-            update_timeout,
-            gossip_timeout,
-            topic_update_duration,
-            state_update_duration,
-            gossip_poi_duration,
-            comparison_duration,
-        }
-    }
-}
 
 /// Radio operator contains all states needed for radio operations
 #[allow(unused)]
@@ -120,46 +71,41 @@ impl RadioOperator {
                 .expect("Failed to validate the provided indexer management server endpoint");
         };
         let notifier = Notifier::from_config(config);
+        let control_flow = ControlFlow::new();
 
-        RadioOperator {
-            config: config.clone(),
-            persisted_state,
-            graphcast_agent,
-            notifier,
-            control_flow: ControlFlow::new(),
-        }
-    }
+        // Spawn a task to gracefully shutdown
+        tokio::spawn(shutdown(control_flow.clone()));
 
-    /// Preparation for running the radio applications
-    /// Expose metrics and subscribe to graphcast topics
-    pub async fn prepare(&self, receiver: Receiver<WakuMessage>) {
         // Set up Prometheus metrics url if configured
-        if let Some(port) = self.config.radio_infrastructure().metrics_port {
+        if let Some(port) = config.radio_infrastructure().metrics_port {
             debug!("Initializing metrics port");
             tokio::spawn(handle_serve_metrics(
-                self.config.radio_infrastructure().metrics_host.clone(),
+                config.radio_infrastructure().metrics_host.clone(),
                 port,
-                self.control_flow.running.clone(),
+                control_flow.metrics_handle.clone(),
             ));
         }
 
         // Provide generated topics to Graphcast agent
-        let topics = self
-            .config
+        let topics = config
             .generate_topics(
-                &self.config.radio_infrastructure().coverage,
-                &self.config.graph_stack.indexer_address,
+                &config.radio_infrastructure().coverage,
+                &config.graph_stack.indexer_address,
             )
             .await;
         debug!(
             topics = tracing::field::debug(&topics),
             "Found content topics for subscription",
         );
-        self.graphcast_agent
-            .update_content_topics(topics.clone())
-            .await;
+        graphcast_agent.update_content_topics(topics.clone()).await;
 
-        self.message_processor(receiver).await;
+        RadioOperator {
+            config: config.clone(),
+            persisted_state,
+            graphcast_agent,
+            notifier,
+            control_flow,
+        }
     }
 
     pub fn graphcast_agent(&self) -> &GraphcastAgent {
@@ -174,11 +120,6 @@ impl RadioOperator {
     /// Radio operations
     pub async fn run(&'static self) {
         // Control flow
-        // TODO: expose to radio config for the users
-        let running = Arc::new(AtomicBool::new(true));
-        let skip_iteration = Arc::new(AtomicBool::new(false));
-        let skip_iteration_clone = skip_iteration.clone();
-
         let mut topic_update_interval = interval(Duration::from_secs(
             self.config.radio_infrastructure.topic_update_interval,
         ));
@@ -198,24 +139,30 @@ impl RadioOperator {
         // Separate thread to skip a main loop iteration when hit timeout
         tokio::spawn(async move {
             tokio::time::sleep(iteration_timeout).await;
-            skip_iteration_clone.store(true, Ordering::SeqCst);
+            self.control_flow
+                .skip_iteration
+                .store(true, Ordering::SeqCst);
         });
 
         // Initialize Http server with graceful shutdown if configured
         if self.config.radio_infrastructure().server_port.is_some() {
             let state_ref = &self.persisted_state;
             let config_cloned = self.config.clone();
-            tokio::spawn(run_server(config_cloned, state_ref, running.clone()));
+            tokio::spawn(run_server(
+                config_cloned,
+                state_ref,
+                self.control_flow.server_handle.clone(),
+            ));
         }
 
         // Main loop for sending messages, can factor out
         // and take radio specific query and parsing for radioPayload
-        while running.load(Ordering::SeqCst) {
+        while self.control_flow.running.load(Ordering::SeqCst) {
             // Run event intervals sequentially by satisfication of other intervals and corresponding tick
             tokio::select! {
                 _ = topic_update_interval.tick() => {
-                    if skip_iteration.load(Ordering::SeqCst) {
-                        skip_iteration.store(false, Ordering::SeqCst);
+                    if self.control_flow.skip_iteration.load(Ordering::SeqCst) {
+                        self.control_flow.skip_iteration.store(false, Ordering::SeqCst);
                         continue;
                     }
                     // Update topic subscription
@@ -233,8 +180,8 @@ impl RadioOperator {
                     }
                 },
                 _ = state_update_interval.tick() => {
-                    if skip_iteration.load(Ordering::SeqCst) {
-                        skip_iteration.store(false, Ordering::SeqCst);
+                    if self.control_flow.skip_iteration.load(Ordering::SeqCst) {
+                        self.control_flow.skip_iteration.store(false, Ordering::SeqCst);
                         continue;
                     }
                     // Update the number of peers connected
@@ -253,8 +200,8 @@ impl RadioOperator {
                     });
                 },
                 _ = gossip_poi_interval.tick() => {
-                    if skip_iteration.load(Ordering::SeqCst) {
-                        skip_iteration.store(false, Ordering::SeqCst);
+                    if self.control_flow.skip_iteration.load(Ordering::SeqCst) {
+                        self.control_flow.skip_iteration.store(false, Ordering::SeqCst);
                         continue;
                     }
 
@@ -319,8 +266,8 @@ impl RadioOperator {
                     }
                 },
                 _ = comparison_interval.tick() => {
-                    if skip_iteration.load(Ordering::SeqCst) {
-                        skip_iteration.store(false, Ordering::SeqCst);
+                    if self.control_flow.skip_iteration.load(Ordering::SeqCst) {
+                        self.control_flow.skip_iteration.store(false, Ordering::SeqCst);
                         continue;
                     }
 
