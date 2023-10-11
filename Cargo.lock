@@ -2374,7 +2374,7 @@ dependencies = [
  "once_cell",
  "partial_application",
  "prometheus-http-query",
- "prost",
+ "prost 0.11.9",
  "reqwest",
  "rsb_derive",
  "secp256k1 0.27.0",
@@ -4010,7 +4010,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b82eaa1d779e9a4bc1c3217db8ffbeabaae1dca241bf70183242128d48681cd"
 dependencies = [
  "bytes",
- "prost-derive",
+ "prost-derive 0.11.9",
+]
+
+[[package]]
+name = "prost"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4fdd22f3b9c31b53c060df4a0613a1c7f062d4115a2b984dd15b1858f7e340d"
+dependencies = [
+ "bytes",
+ "prost-derive 0.12.1",
 ]
 
 [[package]]
@@ -4024,6 +4034,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "prost-derive"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "265baba7fabd416cf5078179f7d2cbeca4ce7a9041111900675ea7c4cb8a4c32"
+dependencies = [
+ "anyhow",
+ "itertools 0.11.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.37",
 ]
 
 [[package]]
@@ -5120,7 +5143,7 @@ dependencies = [
  "opentelemetry 0.19.0",
  "partial_application",
  "prometheus",
- "prost",
+ "prost 0.12.1",
  "rand",
  "reqwest",
  "secp256k1 0.27.0",
@@ -5358,7 +5381,7 @@ dependencies = [
  "clap 3.2.25",
  "ethers",
  "graphcast-sdk",
- "prost",
+ "prost 0.12.1",
  "serde",
  "serde_derive",
  "serde_json",
@@ -5385,7 +5408,7 @@ dependencies = [
  "ethers-core 2.0.10",
  "ethers-derive-eip712",
  "graphcast-sdk",
- "prost",
+ "prost 0.12.1",
  "rand",
  "serde",
  "serde_derive",
