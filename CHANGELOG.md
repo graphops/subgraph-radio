@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8] - 2023-10-11
+
+### Bug Fixes
+
+- Remove local_ppois_to_compare, refactor diverged_subgraph
+
+### Features
+
+- Add divergence summary notification on a given interval
+- Add waku discovery network enr to bootstrapping nodes by default
+
+### Miscellaneous Tasks
+
+- Remove labels workflow (#82)
+- Update grafana.json
+- Release 0.1.8
+
+### Refactor
+
+- Add network peer logs
+- Shutdown handlers and control flow struct
+
 ## [0.1.7] - 2023-09-15
 
 ### Bug Fixes
