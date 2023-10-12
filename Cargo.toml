@@ -1,6 +1,12 @@
 [workspace]
 
-members = ["subgraph-radio", "test-sender", "test-utils", "test-runner"]
+members = [
+    "subgraph-radio",
+    "frontend",
+    "test-sender",
+    "test-utils",
+    "test-runner",
+]
 resolver = "2"
 
 [profile.dev]

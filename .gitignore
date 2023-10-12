@@ -12,3 +12,4 @@ data
 *.json
 .DS_Store
 configs
+node_modules
