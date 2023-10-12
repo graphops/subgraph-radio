@@ -1,9 +1,11 @@
+use axum::http::Method;
 use axum::{extract::Extension, routing::get, Router};
 use axum_server::Handle;
+use http::header::HeaderName;
 use std::net::SocketAddr;
 use std::str::FromStr;
-
 use std::sync::Arc;
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{debug, info};
 
 use crate::{
@@ -33,6 +35,11 @@ pub async fn run_server(config: Config, persisted_state: &'static PersistedState
 
     debug!("Setting up HTTP service");
 
+    let cors = CorsLayer::new()
+        .allow_methods(vec![Method::GET, Method::POST])
+        .allow_origin(Any)
+        .allow_headers(vec![HeaderName::from_static("content-type")]);
+
     let app = Router::new()
         .route("/health", get(health))
         .route(
@@ -40,7 +47,9 @@ pub async fn run_server(config: Config, persisted_state: &'static PersistedState
             get(graphql_playground).post(graphql_handler),
         )
         .layer(Extension(schema))
-        .layer(Extension(context));
+        .layer(Extension(context))
+        .layer(cors);
+
     let addr = SocketAddr::from_str(&format!(
         "{}:{}",
         config.radio_infrastructure().server_host,

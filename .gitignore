@@ -14,3 +14,4 @@ configs
 node_modules
 *.json
 !schema.json
+dist
