@@ -14,13 +14,13 @@ fn main() {
     );
 
     let js_path = workspace_root
-        .join("../frontend/dist/frontend-d6e92d55b4e09ed6.js")
+        .join("../frontend/dist/frontend-55769dbc205a49f5.js")
         .canonicalize()
         .unwrap();
     println!("cargo:rustc-env=JS_PATH={}", js_path.display());
 
     let wasm_path = workspace_root
-        .join("../frontend/dist/frontend-d6e92d55b4e09ed6_bg.wasm")
+        .join("../frontend/dist/frontend-55769dbc205a49f5_bg.wasm")
         .canonicalize()
         .unwrap();
     println!("cargo:rustc-env=WASM_PATH={}", wasm_path.display());

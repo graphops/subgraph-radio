@@ -24,7 +24,7 @@ pub fn table(props: &Props) -> Html {
         })
         .collect::<Html>();
     html! {
-    <>
+    <table class={classes!("table","is-striped","is-bordered", "has-background-danger-light")}>
         <thead>
             <tr>
                 <th>{"Deployment"}</th>
@@ -36,6 +36,6 @@ pub fn table(props: &Props) -> Html {
         <tbody>
         {subgraphs}
         </tbody>
-        </>
+        </table>
     }
 }
