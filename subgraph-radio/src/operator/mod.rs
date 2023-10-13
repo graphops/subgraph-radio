@@ -56,13 +56,13 @@ pub async fn serve_frontend() {
             .body(Bytes::from_static(INDEX))
     });
 
-    let js = warp::path("frontend-d6e92d55b4e09ed6.js").map(|| {
+    let js = warp::path("frontend-55769dbc205a49f5.js").map(|| {
         Response::builder()
             .header("Content-Type", "application/javascript")
             .body(Bytes::from_static(JS))
     });
 
-    let wasm = warp::path("frontend-d6e92d55b4e09ed6_bg.wasm").map(|| {
+    let wasm = warp::path("frontend-55769dbc205a49f5_bg.wasm").map(|| {
         Response::builder()
             .header("Content-Type", "application/wasm")
             .body(Bytes::from_static(WASM))
