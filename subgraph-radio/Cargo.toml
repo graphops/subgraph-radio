@@ -57,6 +57,7 @@ clap = { version = "4.3.1", features = ["derive", "env"] }
 confy = "0.5.1"
 tower-http = { version = "0.4.3", features = ["cors"] }
 http = "0.2.6"
+warp = "0.3"
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["async", "async_futures"] }
