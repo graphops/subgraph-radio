@@ -39,6 +39,41 @@ pub mod callbook;
 pub mod indexer_management;
 pub mod notifier;
 pub mod operation;
+use std::net::SocketAddr;
+use warp::hyper::body::Bytes;
+use warp::{http::Response, Filter};
+
+const INDEX: &[u8] = include_bytes!(env!("INDEX_HTML_PATH"));
+const JS: &[u8] = include_bytes!(env!("JS_PATH"));
+const WASM: &[u8] = include_bytes!(env!("WASM_PATH"));
+
+pub async fn serve_frontend() {
+    info!("Starting frontend");
+
+    let index = warp::path::end().map(|| {
+        Response::builder()
+            .header("Content-Type", "text/html")
+            .body(Bytes::from_static(INDEX))
+    });
+
+    let js = warp::path("frontend-d6e92d55b4e09ed6.js").map(|| {
+        Response::builder()
+            .header("Content-Type", "application/javascript")
+            .body(Bytes::from_static(JS))
+    });
+
+    let wasm = warp::path("frontend-d6e92d55b4e09ed6_bg.wasm").map(|| {
+        Response::builder()
+            .header("Content-Type", "application/wasm")
+            .body(Bytes::from_static(WASM))
+    });
+
+    let routes = warp::get().and(index.or(js).or(wasm));
+    //let routes = warp::get().and(index);
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
+    warp::serve(routes).run(addr).await;
+}
 
 /// Radio operator contains all states needed for radio operations
 #[allow(unused)]
@@ -154,6 +189,8 @@ impl RadioOperator {
                 self.control_flow.server_handle.clone(),
             ));
         }
+
+        tokio::spawn(serve_frontend());
 
         // Main loop for sending messages, can factor out
         // and take radio specific query and parsing for radioPayload
