@@ -1,0 +1,8 @@
+query ComparisonQuery {
+  comparisonRatio {
+    deployment
+    blockNumber
+    senderRatio
+    stakeRatio
+  }
+}

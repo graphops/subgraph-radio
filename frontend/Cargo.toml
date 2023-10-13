@@ -1,0 +1,35 @@
+[package]
+name = "frontend"
+version = "0.1.0"
+authors = ["GraphOps"]
+edition = "2021"
+
+[dependencies]
+pulldown-cmark = { version = "0.9", default-features = false }
+wasm-bindgen = "0.2.87"
+wasm-bindgen-futures = "0.4"
+yew = { version = "0.21.0", features = ["csr"] }
+gloo = "0.10.0"
+reqwest = "0.11.18"
+graphql_client = { version = "0.13.0", features = ["reqwest"] }
+serde = { version = "1.0.163", features = ["derive"] }
+num-bigint = { version = "0.4.3", features = ["serde"] }
+num-traits = "0.2.15"
+ybc = "0.4.0"
+tokio = { version = "1.28.1", features = ["mio", "sync", "time"] }
+futures = "0.3.28"
+thiserror = "1.0"
+web-sys = { version = "0.3.64", features = [
+    "HtmlInputElement",
+    "Headers",
+    "Request",
+    "RequestInit",
+    "RequestMode",
+    "Response",
+    "Window",
+] }
+yew-router = "0.18.0"
+yewdux = "0.9.3"
+yew-plotly = "0.2.0"
+plotly = { version = "0.8.4", features = ["wasm"] }
+yew-hooks = "0.3.0"
