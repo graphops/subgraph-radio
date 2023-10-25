@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tracing::{debug, trace, warn};
 
 use graphcast_sdk::{
-    determine_message_block, graphcast_agent::message_typing::BuildMessageError,
+    determine_message_block, graphcast_agent::message_typing::MessageError,
     networks::NetworkName, BlockPointer, NetworkBlockError, NetworkPointer,
 };
 
@@ -23,7 +23,7 @@ pub async fn gossip_set_up(
     id: String,
     network_chainhead_blocks: &HashMap<NetworkName, BlockPointer>,
     subgraph_network_latest_blocks: &HashMap<String, NetworkPointer>,
-) -> Result<(NetworkName, BlockPointer, u64), BuildMessageError> {
+) -> Result<(NetworkName, BlockPointer, u64), MessageError> {
     // Get the indexing network of the deployment
     // and update the NETWORK message block
     let (network_name, latest_block) = match subgraph_network_latest_blocks.get(&id.clone()) {
@@ -37,7 +37,7 @@ pub async fn gossip_set_up(
                 err = tracing::field::debug(&err_msg),
                 "Failed to build message"
             );
-            return Err(BuildMessageError::Network(NetworkBlockError::FailedStatus(
+            return Err(MessageError::Network(NetworkBlockError::FailedStatus(
                 err_msg,
             )));
         }
@@ -45,7 +45,7 @@ pub async fn gossip_set_up(
 
     let message_block = match determine_message_block(network_chainhead_blocks, network_name) {
         Ok(block) => block,
-        Err(e) => return Err(BuildMessageError::Network(e)),
+        Err(e) => return Err(MessageError::Network(e)),
     };
 
     debug!(

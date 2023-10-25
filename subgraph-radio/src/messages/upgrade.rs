@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 use graphcast_sdk::{
-    graphcast_agent::message_typing::{BuildMessageError, GraphcastMessage},
+    graphcast_agent::message_typing::{MessageError, GraphcastMessage, RadioPayload},
     graphql::client_graph_account::{owned_subgraphs, subgraph_hash_by_id},
 };
 
@@ -41,27 +41,30 @@ pub struct UpgradeIntentMessage {
     pub graph_account: String,
 }
 
-impl UpgradeIntentMessage {
+impl RadioPayload for UpgradeIntentMessage {
     /// Check duplicated fields: payload message has duplicated fields with GraphcastMessage, the values must be the same
-    pub fn valid_outer(&self, outer: &GraphcastMessage<Self>) -> Result<&Self, BuildMessageError> {
+    fn valid_outer(&self, outer: &GraphcastMessage<Self>) -> Result<&Self, MessageError> {
         if self.nonce == outer.nonce && self.graph_account == outer.graph_account {
             Ok(self)
         } else {
-            Err(BuildMessageError::InvalidFields(anyhow::anyhow!(
+            Err(MessageError::InvalidFields(anyhow::anyhow!(
                 "Radio message wrapped by inconsistent GraphcastMessage: {:#?} <- {:#?}",
                 &self,
                 &outer,
             )))
         }
     }
+}
+
+impl UpgradeIntentMessage {
 
     /// Check message from valid sender: check for ownership for subgraph-owner messages
-    pub async fn valid_owner(&self, network_subgraph: &str) -> Result<&Self, BuildMessageError> {
+    pub async fn valid_owner(&self, network_subgraph: &str) -> Result<&Self, MessageError> {
         let subgraphs = owned_subgraphs(network_subgraph, &self.graph_account)
             .await
-            .map_err(BuildMessageError::FieldDerivations)?;
+            .map_err(MessageError::FieldDerivations)?;
         if !subgraphs.contains(&self.subgraph_id) {
-            return Err(BuildMessageError::InvalidFields(anyhow::anyhow!(format!(
+            return Err(MessageError::InvalidFields(anyhow::anyhow!(format!(
                 "Verified account failed to be subgraph owner. Verified account: {:#?}",
                 self.graph_account
             ))));
@@ -74,7 +77,7 @@ impl UpgradeIntentMessage {
         &self,
         gc_msg: &GraphcastMessage<Self>,
         graph_network: &str,
-    ) -> Result<&Self, BuildMessageError> {
+    ) -> Result<&Self, MessageError> {
         let _ = self
             .valid_owner(graph_network)
             .await

@@ -14,7 +14,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use graphcast_sdk::{
     callbook::CallBook,
-    graphcast_agent::message_typing::{get_indexer_stake, BuildMessageError, GraphcastMessage},
+    graphcast_agent::message_typing::{get_indexer_stake, MessageError, GraphcastMessage},
 };
 
 use crate::operator::notifier::NotificationMode;
@@ -127,7 +127,7 @@ pub async fn process_ppoi_message(
             get_indexer_stake(&radio_msg.graph_account.clone(), callbook.graph_network())
                 .await
                 .map_err(|e| {
-                    AttestationError::BuildError(BuildMessageError::FieldDerivations(e))
+                    AttestationError::BuildError(MessageError::FieldDerivations(e))
                 })?;
 
         //TODO: update this to utilize update_blocks?
@@ -672,7 +672,7 @@ pub async fn process_comparison_results(
 #[derive(Debug, thiserror::Error)]
 pub enum AttestationError {
     #[error("Failed to build attestation: {0}")]
-    BuildError(BuildMessageError),
+    BuildError(MessageError),
     #[error("Failed to update attestation: {0}")]
     UpdateError(String),
 }

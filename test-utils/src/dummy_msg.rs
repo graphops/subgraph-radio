@@ -4,6 +4,7 @@ use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
 use prost::Message;
 use serde::{Deserialize, Serialize};
+use graphcast_sdk::graphcast_agent::message_typing::{RadioPayload, GraphcastMessage, MessageError};
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize, SimpleObject)]
 #[eip712(
@@ -17,6 +18,16 @@ pub struct DummyMsg {
     pub identifier: String,
     #[prost(int32, tag = "2")]
     pub dummy_value: i32,
+}
+
+impl RadioPayload for DummyMsg {
+    fn valid_outer(&self, outer: &GraphcastMessage<Self>) -> Result<&Self, MessageError> {
+        if self.identifier == outer.identifier{
+            Ok(self)
+        } else {
+            Err(MessageError::Payload)
+        }
+    }
 }
 
 impl DummyMsg {

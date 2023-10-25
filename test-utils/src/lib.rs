@@ -9,10 +9,9 @@ use std::{
 };
 
 use config::TestSenderConfig;
-use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
-use graphcast_sdk::graphcast_agent::message_typing::IdentityValidation;
+use graphcast_sdk::graphcast_agent::message_typing::{GraphcastMessage, RadioPayload, IdentityValidation};
 use mock_server::{start_mock_server, ServerState};
-use prost::Message;
+
 use rand::Rng;
 use subgraph_radio::{
     config::{Config, CoverageLevel},
@@ -285,12 +284,7 @@ pub fn find_random_udp_port() -> u16 {
 
 pub fn messages_are_equal<T>(msg1: &GraphcastMessage<T>, msg2: &GraphcastMessage<T>) -> bool
 where
-    T: Message
-        + ethers::types::transaction::eip712::Eip712
-        + Default
-        + Clone
-        + 'static
-        + async_graphql::OutputType,
+    T: RadioPayload,
 {
     msg1.identifier == msg2.identifier
         && msg1.nonce == msg2.nonce
