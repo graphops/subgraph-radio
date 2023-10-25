@@ -6,7 +6,7 @@ use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
 use graphcast_sdk::callbook::CallBook;
 use graphcast_sdk::{
-    graphcast_agent::message_typing::{BuildMessageError, GraphcastMessage},
+    graphcast_agent::message_typing::{MessageError, GraphcastMessage, RadioPayload},
     graphql::client_graph_node::query_graph_node_network_block_hash,
     networks::NetworkName,
 };
@@ -66,6 +66,27 @@ pub struct PublicPoiMessage {
     pub graph_account: String,
 }
 
+impl RadioPayload for PublicPoiMessage {
+    /// Check duplicated fields: payload message has duplicated fields with GraphcastMessage, the values must be the same
+    fn valid_outer(&self, outer: &GraphcastMessage<Self>) -> Result<&Self, MessageError> {
+        if self.nonce == outer.nonce
+            && self.graph_account == outer.graph_account
+            && self.identifier == outer.identifier
+        {
+            Ok(self)
+        } else {
+            Err(MessageError::InvalidFields(anyhow::anyhow!(
+                "Radio message wrapped by inconsistent GraphcastMessage: {:#?} <- {:#?}\nnonce check: {:#?}\naccount check: {:#?}\nidentifier check: {:#?}",
+                &self,
+                &outer,
+                self.nonce == outer.nonce,
+                self.graph_account == outer.graph_account,
+                self.identifier == outer.identifier,
+            )))
+        }
+    }
+}
+
 impl PublicPoiMessage {
     pub fn new(
         identifier: String,
@@ -112,14 +133,14 @@ impl PublicPoiMessage {
     }
 
     // Check for the valid hash between local graph node and gossip
-    pub async fn valid_hash(&self, graph_node_endpoint: &str) -> Result<&Self, BuildMessageError> {
+    pub async fn valid_hash(&self, graph_node_endpoint: &str) -> Result<&Self, MessageError> {
         let block_hash: String = query_graph_node_network_block_hash(
             graph_node_endpoint,
             &self.network,
             self.block_number,
         )
         .await
-        .map_err(BuildMessageError::FieldDerivations)?;
+        .map_err(MessageError::FieldDerivations)?;
 
         trace!(
             network = tracing::field::debug(self.network.clone()),
@@ -131,29 +152,10 @@ impl PublicPoiMessage {
         if self.block_hash == block_hash {
             Ok(self)
         } else {
-            Err(BuildMessageError::InvalidFields(anyhow::anyhow!(
+            Err(MessageError::InvalidFields(anyhow::anyhow!(
                 "Message hash ({}) differ from trusted provider response ({}), drop message",
                 self.block_hash,
                 block_hash
-            )))
-        }
-    }
-
-    /// Check duplicated fields: payload message has duplicated fields with GraphcastMessage, the values must be the same
-    pub fn valid_outer(&self, outer: &GraphcastMessage<Self>) -> Result<&Self, BuildMessageError> {
-        if self.nonce == outer.nonce
-            && self.graph_account == outer.graph_account
-            && self.identifier == outer.identifier
-        {
-            Ok(self)
-        } else {
-            Err(BuildMessageError::InvalidFields(anyhow::anyhow!(
-                "Radio message wrapped by inconsistent GraphcastMessage: {:#?} <- {:#?}\nnonce check: {:#?}\naccount check: {:#?}\nidentifier check: {:#?}",
-                &self,
-                &outer,
-                self.nonce == outer.nonce,
-                self.graph_account == outer.graph_account,
-                self.identifier == outer.identifier,
             )))
         }
     }
@@ -163,7 +165,7 @@ impl PublicPoiMessage {
         &self,
         gc_msg: &GraphcastMessage<Self>,
         graph_node_endpoint: &str,
-    ) -> Result<&Self, BuildMessageError> {
+    ) -> Result<&Self, MessageError> {
         let _ = self
             .valid_hash(graph_node_endpoint)
             .await

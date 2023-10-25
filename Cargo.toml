@@ -12,4 +12,5 @@ panic = 'unwind'
 opt-level = 3
 
 [workspace.dependencies]
-graphcast-sdk = "0.5.1"
+# graphcast-sdk = "0.5.1"
+graphcast-sdk = { path = "../graphcast-rs" }

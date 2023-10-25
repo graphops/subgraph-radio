@@ -215,7 +215,7 @@ impl ControlFlow {
 #[cfg(test)]
 mod tests {
     use crate::messages::poi::PublicPoiMessage;
-    use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
+    use graphcast_sdk::graphcast_agent::message_typing::{GraphcastMessage, RadioPayload};
 
     fn simple_message() -> PublicPoiMessage {
         PublicPoiMessage::new(

@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use graphcast_sdk::{
     graphcast_agent::{
-        message_typing::check_message_validity, waku_handling::WakuHandlingError, GraphcastAgent,
+        message_typing::{GraphcastMessage, check_message_validity},
+        waku_handling::WakuHandlingError, GraphcastAgent,
     },
     graphql::client_graph_node::{subgraph_network_blocks, update_network_chainheads},
     WakuMessage,
@@ -400,7 +401,9 @@ pub async fn process_message(
     let callbook = agent.callbook.clone();
     let nonces = agent.nonces.clone();
     let local_sender = agent.graphcast_identity.graphcast_id.clone();
-    let parsed = if let Ok(msg) = agent.decode::<PublicPoiMessage>(msg.payload()).await {
+
+    // Try to handle as Public Poi message
+    let handled = if let Ok(msg) = GraphcastMessage::<PublicPoiMessage>::decode(msg.payload()) {
         trace!(
             message = tracing::field::debug(&msg),
             "Parseable as Public PoI message, now validate",
@@ -442,7 +445,8 @@ pub async fn process_message(
         false
     };
 
-    if !parsed {
+    // Failed to handle as a public POI message, now try as UpgradeIntentMessage
+    if !handled {
         if let Ok(msg) = agent.decode::<UpgradeIntentMessage>(msg.payload()).await {
             trace!(
                 message = tracing::field::debug(&msg),
