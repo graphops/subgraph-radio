@@ -14,7 +14,10 @@ use crate::{
     },
     state::PersistedState,
 };
-use graphcast_sdk::{graphcast_agent::message_typing::GraphcastMessage, graphql::QueryError};
+use graphcast_sdk::{
+    graphcast_agent::{message_typing::GraphcastMessage, GraphcastAgent, PeerData},
+    graphql::QueryError,
+};
 
 pub(crate) type SubgraphRadioSchema = Schema<QueryRoot, EmptyMutation, EmptySubscription>;
 
@@ -139,6 +142,25 @@ impl QueryRoot {
             stake: basic_info.1,
         })
     }
+
+    /// Return Waku Peer data excluding local waku node
+    async fn gossip_peers(&self, ctx: &Context<'_>) -> Result<Vec<PeerData>, HttpServiceError> {
+        let peers = ctx
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
+            .gossip_peers();
+        Ok(peers)
+    }
+
+    /// Return Waku Peer data for the local waku node
+    async fn local_gossip_peer(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<PeerData>, HttpServiceError> {
+        let peer = ctx
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
+            .local_gossip_node();
+        Ok(peer)
+    }
 }
 
 /// Helper function to order attestations by stake weight and then calculate stake and sender ratios
@@ -186,13 +208,19 @@ pub async fn build_schema(ctx: Arc<SubgraphRadioContext>) -> SubgraphRadioSchema
 pub struct SubgraphRadioContext {
     pub radio_config: Config,
     pub persisted_state: &'static PersistedState,
+    pub graphcast_agent: &'static GraphcastAgent,
 }
 
 impl SubgraphRadioContext {
-    pub fn init(radio_config: Config, persisted_state: &'static PersistedState) -> Self {
+    pub fn init(
+        radio_config: Config,
+        persisted_state: &'static PersistedState,
+        graphcast_agent: &'static GraphcastAgent,
+    ) -> Self {
         Self {
             radio_config,
             persisted_state,
+            graphcast_agent,
         }
     }
 
@@ -319,6 +347,29 @@ impl SubgraphRadioContext {
 
     pub fn radio_config(&self) -> Config {
         self.radio_config.clone()
+    }
+
+    pub fn gossip_peers(&self) -> Vec<PeerData> {
+        self.graphcast_agent
+            .peers_data()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| PeerData {
+                peer_id: p.peer_id().to_string(),
+                protocols: p.protocols().iter().map(|p| p.to_string()).collect(),
+                addresses: p.addresses().iter().map(|a| a.to_string()).collect(),
+                connected: p.connected(),
+            })
+            .collect()
+    }
+
+    pub fn local_gossip_node(&self) -> Option<PeerData> {
+        self.graphcast_agent.local_peer().map(|p| PeerData {
+            peer_id: p.peer_id().to_string(),
+            protocols: p.protocols().iter().map(|p| p.to_string()).collect(),
+            addresses: p.addresses().iter().map(|a| a.to_string()).collect(),
+            connected: p.connected(),
+        })
     }
 }
 
