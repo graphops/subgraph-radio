@@ -29,7 +29,6 @@ type Local = Arc<SyncMutex<HashMap<String, HashMap<u64, Attestation>>>>;
 type Remote = Arc<SyncMutex<Vec<GraphcastMessage<PublicPoiMessage>>>>;
 type UpgradeMessages = Arc<SyncMutex<HashMap<String, GraphcastMessage<UpgradeIntentMessage>>>>;
 type ComparisonResults = Arc<SyncMutex<HashMap<String, ComparisonResult>>>;
-
 type Notifications = Arc<SyncMutex<HashMap<String, String>>>;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

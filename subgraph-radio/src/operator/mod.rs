@@ -3,9 +3,7 @@ use std::time::Duration;
 
 use graphcast_sdk::{
     graphcast_agent::{
-        message_typing::check_message_validity,
-        waku_handling::{connected_peer_count, WakuHandlingError},
-        GraphcastAgent,
+        message_typing::check_message_validity, waku_handling::WakuHandlingError, GraphcastAgent,
     },
     graphql::client_graph_node::{subgraph_network_blocks, update_network_chainheads},
     WakuMessage,
@@ -151,6 +149,7 @@ impl RadioOperator {
             tokio::spawn(run_server(
                 config_cloned,
                 state_ref,
+                self.graphcast_agent(),
                 self.control_flow.server_handle.clone(),
             ));
         }
@@ -185,10 +184,10 @@ impl RadioOperator {
                         continue;
                     }
                     // Update the number of peers connected
-                    let connected_peers = connected_peer_count(&self.graphcast_agent().node_handle).unwrap_or_default();
-                    let gossip_peers = self.graphcast_agent.number_of_peers();
-                    CONNECTED_PEERS.set(connected_peers.try_into().unwrap_or_default());
-                    GOSSIP_PEERS.set(gossip_peers.try_into().unwrap_or_default());
+                    let connected_peers = self.graphcast_agent.connected_peer_count().unwrap_or_default() as i64;
+                    let gossip_peers = self.graphcast_agent.number_of_peers() as i64;
+                    CONNECTED_PEERS.set(connected_peers);
+                    GOSSIP_PEERS.set(gossip_peers);
 
                     let diverged_num = self.persisted_state.comparison_result_typed(ComparisonResultType::Divergent).len();
                     DIVERGING_SUBGRAPHS.set(diverged_num.try_into().unwrap());
@@ -235,13 +234,13 @@ impl RadioOperator {
                         // Function takes in an identifier string and make specific queries regarding the identifier
                         // The example here combines a single function provided query endpoint, current block info based on the subgraph's indexing network
                         // Then the function gets sent to agent for making identifier independent queries
-                        let identifiers = self.graphcast_agent.content_identifiers().await;
+                        let identifiers = self.graphcast_agent.content_identifiers();
                         let num_topics = identifiers.len();
                         let blocks_str = chainhead_block_str(&network_chainhead_blocks);
                         info!(
                             chainhead = blocks_str.clone(),
                             num_gossip_peers = self.graphcast_agent.number_of_peers(),
-                            num_connected_peers = connected_peer_count(&self.graphcast_agent.node_handle).unwrap_or_default(),
+                            num_connected_peers = self.graphcast_agent.connected_peer_count().unwrap_or_default(),
                             num_topics,
                             "Network statuses",
                         );
@@ -284,7 +283,7 @@ impl RadioOperator {
                         let network_chainhead_blocks = update_network_chainheads(
                                 indexing_status,
                             );
-                        let identifiers = self.graphcast_agent().content_identifiers().await;
+                        let identifiers = self.graphcast_agent().content_identifiers();
                         let blocks_str = chainhead_block_str(&network_chainhead_blocks);
 
                         trace!(

@@ -2342,8 +2342,7 @@ dependencies = [
 [[package]]
 name = "graphcast-sdk"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1c78f4696a06aec5dcb8d9aafa15e2f55482629540c7b8c70ff423ec279ca67"
+source = "git+https://github.com/graphops/graphcast-sdk?branch=hope/peer-helpers#de519bd80914397ab984fb6b6c0ee7058d5c0da0"
 dependencies = [
  "anyhow",
  "async-graphql",

@@ -1,5 +1,6 @@
 use axum::{extract::Extension, routing::get, Router};
 use axum_server::Handle;
+use graphcast_sdk::graphcast_agent::GraphcastAgent;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
@@ -22,12 +23,21 @@ pub mod routes;
 /// Set up the routes for a radio health endpoint at `/health`
 /// and a versioned GraphQL endpoint at `api/v1/graphql`
 /// This function starts a API server at the configured server_host and server_port
-pub async fn run_server(config: Config, persisted_state: &'static PersistedState, handle: Handle) {
+pub async fn run_server(
+    config: Config,
+    persisted_state: &'static PersistedState,
+    graphcast_agent: &'static GraphcastAgent,
+    handle: Handle,
+) {
     if config.radio_infrastructure().server_port.is_none() {
         return;
     }
     let port = config.radio_infrastructure().server_port.unwrap();
-    let context = Arc::new(SubgraphRadioContext::init(config.clone(), persisted_state));
+    let context = Arc::new(SubgraphRadioContext::init(
+        config.clone(),
+        persisted_state,
+        graphcast_agent,
+    ));
 
     let schema = build_schema(Arc::clone(&context)).await;
 
