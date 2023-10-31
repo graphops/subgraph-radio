@@ -8,15 +8,13 @@ use graphcast_sdk::{
     },
     init_tracing,
     networks::NetworkName,
-    wallet_address,
+    wallet_address, WakuPubSubTopic,
 };
 use std::{net::IpAddr, str::FromStr, thread::sleep, time::Duration};
 use subgraph_radio::messages::poi::PublicPoiMessage;
 use test_utils::{config::TestSenderConfig, dummy_msg::DummyMsg, find_random_udp_port};
 use tracing::{error, info};
-use waku::{
-    waku_new, GossipSubParams, ProtocolId, WakuContentTopic, WakuNodeConfig, WakuPubSubTopic,
-};
+use waku::{waku_new, GossipSubParams, ProtocolId, WakuContentTopic, WakuNodeConfig};
 
 async fn start_sender(config: TestSenderConfig) {
     std::env::set_var(
