@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.9] - 2023-10-31
+
+### Features
+
+- PeerData, localPeerData GraphQL APIs
+
+### Miscellaneous Tasks
+
+- Update changelog
+- Update test packages waku dep
+- Release 0.1.9
+
 ## [0.1.8] - 2023-10-11
 
 ### Bug Fixes
