@@ -9,7 +9,7 @@ indexer_management_server_endpoint = 'http://127.0.0.1:18000'
 [waku]
 boot_node_addresses = []
 
-[radio_infrastructure]
+[radio_setup]
 graphcast_network = 'Testnet'
 topics = ['QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB']
 coverage = 'Comprehensive'

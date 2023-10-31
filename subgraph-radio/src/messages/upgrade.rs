@@ -101,7 +101,7 @@ impl UpgradeIntentMessage {
         state: &PersistedState,
     ) -> Result<&Self, OperationError> {
         // ratelimit upgrades: return early if there was a recent upgrade
-        if state.recent_upgrade(self, config.radio_infrastructure.ratelimit_threshold) {
+        if state.recent_upgrade(self, config.radio_setup.ratelimit_threshold) {
             info!(subgraph = &self.subgraph_id, "Received an Upgrade Intent Message for a recently upgraded subgraph, skiping notification and auto deployment");
             return Ok(self);
         }
@@ -114,7 +114,7 @@ impl UpgradeIntentMessage {
             // If the identifier satisfy the config coverage level
             let covered_topics = config
                 .generate_topics(
-                    &config.radio_infrastructure().auto_upgrade,
+                    &config.radio_setup().auto_upgrade,
                     &config.graph_stack().indexer_address,
                 )
                 .await;

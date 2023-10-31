@@ -11,7 +11,7 @@ use std::sync::mpsc;
 
 use graphcast_sdk::networks::NetworkName;
 use graphcast_sdk::{BlockPointer, GraphcastNetworkName, LogFormat, NetworkPointer, WakuMessage};
-use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioInfrastructure, Waku};
+use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioSetup, Waku};
 use subgraph_radio::operator::notifier::NotificationMode;
 
 fn gossip_poi_bench(c: &mut Criterion) {
@@ -48,7 +48,7 @@ fn gossip_poi_bench(c: &mut Criterion) {
             discv5_port: None,
             filter_protocol: None,
         },
-        radio_infrastructure: RadioInfrastructure {
+        radio_setup: RadioSetup {
             radio_name: String::from("test"),
             topics: vec![String::from(
                 "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",

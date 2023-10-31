@@ -3,7 +3,7 @@ use graphcast_sdk::{
     graphcast_agent::message_typing::IdentityValidation, GraphcastNetworkName, LogFormat,
 };
 use serde::{Deserialize, Serialize};
-use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioInfrastructure, Waku};
+use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioSetup, Waku};
 use subgraph_radio::operator::notifier::NotificationMode;
 
 #[derive(Clone, Debug, Parser, Serialize, Deserialize)]
@@ -54,8 +54,8 @@ pub fn test_config() -> Config {
                 filter_protocol: None,
             }
         },
-        radio_infrastructure: {
-            RadioInfrastructure {
+        radio_setup: {
+            RadioSetup {
                 graphcast_network: GraphcastNetworkName::Testnet,
                 topics: vec![],
                 coverage: CoverageLevel::OnChain,

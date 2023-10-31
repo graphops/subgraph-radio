@@ -69,7 +69,7 @@ pub async fn setup(
     test_file_name: &str,
     test_sender_config: &mut TestSenderConfig,
 ) -> ProcessManager {
-    if let Some(file_path) = &config.radio_infrastructure().persistence_file_path {
+    if let Some(file_path) = &config.radio_setup().persistence_file_path {
         let path = Path::new(file_path);
         if path.exists() {
             fs::remove_file(path).expect("Failed to remove file");
@@ -121,7 +121,7 @@ pub async fn setup(
     let host = format!("127.0.0.1:{}", port);
     let server_state = start_mock_server(
         host.clone(),
-        config.radio_infrastructure().topics.clone(),
+        config.radio_setup().topics.clone(),
         test_sender_config.staked_tokens.clone(),
     )
     .await;
@@ -129,7 +129,7 @@ pub async fn setup(
     config.graph_stack.graph_node_status_endpoint = format!("http://{}/graphql", host);
     config.graph_stack.registry_subgraph = format!("http://{}/registry-subgraph", host);
     config.graph_stack.network_subgraph = format!("http://{}/network-subgraph", host);
-    config.radio_infrastructure.radio_name = radio_name;
+    config.radio_setup.radio_name = radio_name;
     config.waku.waku_port = Some(waku_port.to_string());
     config.waku.discv5_port = Some(discv5_port);
 
@@ -180,33 +180,28 @@ pub fn start_radio(config: &Config) -> Child {
         .arg("--network-subgraph")
         .arg(&config.graph_stack().network_subgraph)
         .arg("--graphcast-network")
-        .arg(config.radio_infrastructure().graphcast_network.to_string())
+        .arg(config.radio_setup().graphcast_network.to_string())
         .arg("--topics")
-        .arg(config.radio_infrastructure().topics.join(","))
+        .arg(config.radio_setup().topics.join(","))
         .arg("--coverage")
-        .arg(match config.radio_infrastructure().coverage {
+        .arg(match config.radio_setup().coverage {
             CoverageLevel::None => "none",
             CoverageLevel::Minimal => "minimal",
             CoverageLevel::OnChain => "on-chain",
             CoverageLevel::Comprehensive => "comprehensive",
         })
         .arg("--collect-message-duration")
-        .arg(
-            config
-                .radio_infrastructure()
-                .collect_message_duration
-                .to_string(),
-        )
+        .arg(config.radio_setup().collect_message_duration.to_string())
         .arg("--waku-log-level")
         .arg(config.waku().waku_log_level.clone())
         .arg("--waku-port")
         .arg(config.waku().waku_port.as_deref().unwrap_or("None"))
         .arg("--log-level")
-        .arg(&config.radio_infrastructure().log_level)
+        .arg(&config.radio_setup().log_level)
         .arg("--slack-token")
         .arg(
             config
-                .radio_infrastructure()
+                .radio_setup()
                 .slack_token
                 .as_deref()
                 .unwrap_or("None"),
@@ -214,7 +209,7 @@ pub fn start_radio(config: &Config) -> Child {
         .arg("--slack-channel")
         .arg(
             config
-                .radio_infrastructure()
+                .radio_setup()
                 .slack_channel
                 .as_deref()
                 .unwrap_or("None"),
@@ -222,7 +217,7 @@ pub fn start_radio(config: &Config) -> Child {
         .arg("--discord-webhook")
         .arg(
             config
-                .radio_infrastructure()
+                .radio_setup()
                 .discord_webhook
                 .as_deref()
                 .unwrap_or("None"),
@@ -230,22 +225,17 @@ pub fn start_radio(config: &Config) -> Child {
         .arg("--persistence-file-path")
         .arg(
             config
-                .radio_infrastructure()
+                .radio_setup()
                 .persistence_file_path
                 .as_deref()
                 .unwrap_or("None"),
         )
         .arg("--log-format")
-        .arg(&config.radio_infrastructure().log_format.to_string())
+        .arg(&config.radio_setup().log_format.to_string())
         .arg("--radio-name")
-        .arg(&config.radio_infrastructure().radio_name)
+        .arg(&config.radio_setup().radio_name)
         .arg("--topic-update-interval")
-        .arg(
-            config
-                .radio_infrastructure()
-                .topic_update_interval
-                .to_string(),
-        )
+        .arg(config.radio_setup().topic_update_interval.to_string())
         .arg("--discv5-port")
         .arg(
             config
@@ -257,7 +247,7 @@ pub fn start_radio(config: &Config) -> Child {
         .arg("--indexer-address")
         .arg(&config.graph_stack().indexer_address)
         .arg("--id-validation")
-        .arg(match config.radio_infrastructure().id_validation {
+        .arg(match config.radio_setup().id_validation {
             IdentityValidation::NoCheck => "no-check",
             IdentityValidation::ValidAddress => "valid-address",
             IdentityValidation::GraphcastRegistered => "graphcast-registered",
