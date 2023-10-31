@@ -21,7 +21,7 @@ categories = [
 ]
 
 [dependencies]
-waku = { version = "0.3.0", package = "waku-bindings" }
+waku = { version = "0.4.0", package = "waku-bindings" }
 test-utils = { path = "../test-utils" }
 graphcast-sdk = { workspace = true }
 subgraph-radio = { path = "../subgraph-radio" }
