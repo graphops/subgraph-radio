@@ -41,7 +41,7 @@ pub struct Config {
     #[command(flatten)]
     pub waku: Waku,
     #[command(flatten)]
-    pub radio_infrastructure: RadioInfrastructure,
+    pub radio_setup: RadioSetup,
     #[arg(
         short,
         value_name = "config_file",
@@ -66,9 +66,9 @@ impl Config {
             Config::parse()
         };
 
-        std::env::set_var("RUST_LOG", config.radio_infrastructure().log_level.clone());
+        std::env::set_var("RUST_LOG", config.radio_setup().log_level.clone());
         // Enables tracing under RUST_LOG variable
-        init_tracing(config.radio_infrastructure().log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level`");
+        init_tracing(config.radio_setup().log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level`");
         config
     }
 
@@ -99,7 +99,7 @@ impl Config {
         &self,
     ) -> Result<GraphcastAgentConfig, GraphcastAgentError> {
         let wallet_key = self.wallet_input().unwrap().to_string();
-        let topics = self.radio_infrastructure().topics.clone();
+        let topics = self.radio_setup().topics.clone();
         let mut discv5_enrs = self.waku().discv5_enrs.clone().unwrap_or_default();
         // Discovery network
         discv5_enrs.push("enr:-P-4QJI8tS1WTdIQxq_yIrD05oIIW1Xg-tm_qfP0CHfJGnp9dfr6ttQJmHwTNxGEl4Le8Q7YHcmi-kXTtphxFysS11oBgmlkgnY0gmlwhLymh5GKbXVsdGlhZGRyc7hgAC02KG5vZGUtMDEuZG8tYW1zMy53YWt1djIucHJvZC5zdGF0dXNpbS5uZXQGdl8ALzYobm9kZS0wMS5kby1hbXMzLndha3V2Mi5wcm9kLnN0YXR1c2ltLm5ldAYfQN4DiXNlY3AyNTZrMaEDbl1X_zJIw3EAJGtmHMVn4Z2xhpSoUaP5ElsHKCv7hlWDdGNwgnZfg3VkcIIjKIV3YWt1Mg8".to_string());
@@ -107,13 +107,13 @@ impl Config {
         GraphcastAgentConfig::new(
             wallet_key,
             self.graph_stack().indexer_address.clone(),
-            self.radio_infrastructure().radio_name.clone(),
+            self.radio_setup().radio_name.clone(),
             self.graph_stack().registry_subgraph.clone(),
             self.graph_stack().network_subgraph.clone(),
-            self.radio_infrastructure().id_validation.clone(),
+            self.radio_setup().id_validation.clone(),
             Some(self.graph_stack().graph_node_status_endpoint.clone()),
             Some(self.waku().boot_node_addresses.clone()),
-            Some(self.radio_infrastructure().graphcast_network.to_string()),
+            Some(self.radio_setup().graphcast_network.to_string()),
             Some(topics),
             self.waku().waku_node_key.clone(),
             self.waku().waku_host.clone(),
@@ -140,7 +140,7 @@ impl Config {
     }
 
     pub async fn init_radio_state(&self) -> PersistedState {
-        let file_path = &self.radio_infrastructure().persistence_file_path.clone();
+        let file_path = &self.radio_setup().persistence_file_path.clone();
 
         if let Some(path) = file_path {
             //TODO: set up synchronous panic hook as part of PersistedState functions
@@ -176,7 +176,7 @@ impl Config {
         coverage: &CoverageLevel,
         indexer_address: &str,
     ) -> Vec<String> {
-        let static_topics = HashSet::from_iter(self.radio_infrastructure().topics.to_vec());
+        let static_topics = HashSet::from_iter(self.radio_setup().topics.to_vec());
         let topics = match coverage {
             CoverageLevel::None => HashSet::new(),
             CoverageLevel::Minimal => static_topics,
@@ -301,7 +301,7 @@ pub struct GraphStack {
 
 #[derive(Clone, Debug, Args, Serialize, Deserialize, Default)]
 #[group(required = true, multiple = true)]
-pub struct RadioInfrastructure {
+pub struct RadioSetup {
     #[clap(
         long,
         value_name = "GRAPHCAST_NETWORK",
@@ -611,7 +611,7 @@ mod tests {
                 discv5_port: None,
                 filter_protocol: None,
             },
-            radio_infrastructure: RadioInfrastructure {
+            radio_setup: RadioSetup {
                 radio_name: String::from("test"),
                 topics: vec![String::from(
                     "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",

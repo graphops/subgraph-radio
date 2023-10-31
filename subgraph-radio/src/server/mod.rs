@@ -29,10 +29,10 @@ pub async fn run_server(
     graphcast_agent: &'static GraphcastAgent,
     handle: Handle,
 ) {
-    if config.radio_infrastructure().server_port.is_none() {
+    if config.radio_setup().server_port.is_none() {
         return;
     }
-    let port = config.radio_infrastructure().server_port.unwrap();
+    let port = config.radio_setup().server_port.unwrap();
     let context = Arc::new(SubgraphRadioContext::init(
         config.clone(),
         persisted_state,
@@ -51,15 +51,11 @@ pub async fn run_server(
         )
         .layer(Extension(schema))
         .layer(Extension(context));
-    let addr = SocketAddr::from_str(&format!(
-        "{}:{}",
-        config.radio_infrastructure().server_host,
-        port
-    ))
-    .expect("Create address");
+    let addr = SocketAddr::from_str(&format!("{}:{}", config.radio_setup().server_host, port))
+        .expect("Create address");
 
     info!(
-        host = tracing::field::debug(&config.radio_infrastructure().server_host),
+        host = tracing::field::debug(&config.radio_setup().server_host),
         port, "Bind port to service"
     );
 

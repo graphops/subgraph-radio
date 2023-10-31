@@ -123,11 +123,7 @@ impl RadioOperator {
 
         for id in identifiers.clone() {
             /* Set up */
-            let collect_duration: i64 = self
-                .config
-                .radio_infrastructure
-                .collect_message_duration
-                .to_owned();
+            let collect_duration: i64 = self.config.radio_setup.collect_message_duration.to_owned();
             let id_cloned = id.clone();
             let callbook = self.config.callbook();
             let local_attestations = self.state().local_attestations();
