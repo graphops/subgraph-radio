@@ -44,6 +44,7 @@ pub struct Config {
     pub radio_setup: RadioSetup,
     #[arg(
         short,
+        long,
         value_name = "config_file",
         env = "CONFIG_FILE",
         help = "Configuration file (toml or yaml format)"
@@ -171,30 +172,30 @@ impl Config {
 
     /// Generate a set of unique topics along with given static topics
     #[autometrics]
-    pub async fn generate_topics(
-        &self,
-        coverage: &CoverageLevel,
-        indexer_address: &str,
-    ) -> Vec<String> {
+    pub async fn generate_topics(&self, coverage: &CoverageLevel) -> Vec<String> {
         let static_topics = HashSet::from_iter(self.radio_setup().topics.to_vec());
         let topics = match coverage {
             CoverageLevel::None => HashSet::new(),
             CoverageLevel::Minimal => static_topics,
             CoverageLevel::OnChain => {
-                let mut topics: HashSet<String> =
-                    active_allocation_hashes(self.callbook().graph_network(), indexer_address)
-                        .await
-                        .into_iter()
-                        .collect();
+                let mut topics: HashSet<String> = active_allocation_hashes(
+                    self.callbook().graph_network(),
+                    &self.graph_stack().indexer_address,
+                )
+                .await
+                .into_iter()
+                .collect();
                 topics.extend(static_topics);
                 topics
             }
             CoverageLevel::Comprehensive => {
-                let active_topics: HashSet<String> =
-                    active_allocation_hashes(self.callbook().graph_network(), indexer_address)
-                        .await
-                        .into_iter()
-                        .collect();
+                let active_topics: HashSet<String> = active_allocation_hashes(
+                    self.callbook().graph_network(),
+                    &self.graph_stack().indexer_address,
+                )
+                .await
+                .into_iter()
+                .collect();
                 let mut additional_topics: HashSet<String> =
                     syncing_deployment_hashes(self.graph_stack().graph_node_status_endpoint())
                         .await
@@ -221,8 +222,8 @@ impl Config {
                 .last()
                 .and_then(|suf| suf.strip_prefix("graph-network-"))
                 .ok_or(ConfigError::ValidateInput(
-                    "Not a conventionally parseable API, need a protocol network specification"
-                        .to_string(),
+                    format!("Not a conventionally parseable graph-network subgraph API: {:#?}, please provide a protocol network specification",
+                    self.graph_stack().network_subgraph())
                 ))?
                 .to_string()
         };
@@ -320,28 +321,28 @@ pub struct RadioSetup {
     pub topics: Vec<String>,
     #[clap(
         long,
-        value_name = "COVERAGE",
+        value_name = "GOSSIP_TOPIC_COVERAGE",
         value_enum,
         default_value = "comprehensive",
-        env = "COVERAGE",
-        help = "Toggle for topic coverage level",
-        long_help = "Topic coverage level\ncomprehensive: Subscribe to on-chain topics, user defined static topics, and additional topics\n
+        env = "GOSSIP_TOPIC_COVERAGE",
+        help = "Toggle for gossip topic coverage level",
+        long_help = "Topic gossip coverage level\ncomprehensive: Subscribe to on-chain topics, user defined static topics, and additional topics\n
             on-chain: Subscribe to on-chain topics and user defined static topics\nminimal: Only subscribe to user defined static topics.\n
             Default: comprehensive"
     )]
-    pub coverage: CoverageLevel,
+    pub gossip_topic_coverage: CoverageLevel,
     #[clap(
         long,
-        value_name = "COVERAGE",
+        value_name = "AUTO_UPGRADE_COVERAGE",
         value_enum,
         default_value = "comprehensive",
-        env = "AUTO_UPGRADE",
+        env = "AUTO_UPGRADE_COVERAGE",
         help = "Toggle for the types of subgraph the radio send offchain syncing commands to indexer management server. Default to upgrade all syncing deployments",
-        long_help = "Topic upgrade  coverage level\ncomprehensive: on-chain allocations, user defined static topics, and additional topics\n
+        long_help = "Topic upgrade coverage level\ncomprehensive: on-chain allocations, user defined static topics, and additional topics\n
             on-chain: Subscribe to on-chain topics and user defined static topics\nminimal: Only subscribe to user defined static topics.\n
             none: no automatic upgrade, only notifications.\nDefault: comprehensive"
     )]
-    pub auto_upgrade: CoverageLevel,
+    pub auto_upgrade_coverage: CoverageLevel,
     #[clap(
         long,
         value_parser = value_parser!(i64).range(1..),
@@ -350,7 +351,7 @@ pub struct RadioSetup {
         env = "RATELIMIT_THRESHOLD",
         help = "Set upgrade intent ratelimit in seconds: only one upgrade per subgraph within the threshold (default: 86400 seconds = 1 day)"
     )]
-    pub ratelimit_threshold: i64,
+    pub auto_upgrade_ratelimit: i64,
     #[clap(
         long,
         value_parser = value_parser!(i64).range(1..),
@@ -612,31 +613,7 @@ mod tests {
                 filter_protocol: None,
             },
             radio_setup: RadioSetup {
-                radio_name: String::from("test"),
-                topics: vec![String::from(
-                    "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",
-                )],
-                coverage: CoverageLevel::Comprehensive,
-                collect_message_duration: 10,
-                ratelimit_threshold: 60000,
-                log_level: String::from("info"),
-                slack_token: None,
-                slack_channel: None,
-                discord_webhook: None,
-                telegram_token: None,
-                telegram_chat_id: None,
-                metrics_host: String::from("0.0.0.0"),
-                metrics_port: None,
-                server_host: String::from("0.0.0.0"),
-                server_port: None,
-                persistence_file_path: None,
-                id_validation: IdentityValidation::NoCheck,
-                topic_update_interval: 600,
-                log_format: LogFormat::Pretty,
-                graphcast_network: GraphcastNetworkName::Testnet,
-                auto_upgrade: CoverageLevel::Comprehensive,
-                notification_mode: NotificationMode::Live,
-                notification_interval: 24,
+                ..Default::default()
             },
             config_file: None,
         }
@@ -645,7 +622,6 @@ mod tests {
     #[test]
     fn protocol_network() {
         let mut config = test_config();
-
         assert_eq!(&config.protocol_network().unwrap(), "goerli");
 
         config.graph_stack.protocol_network = Some("arbitrum-one".to_string());

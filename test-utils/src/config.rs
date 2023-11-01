@@ -58,8 +58,8 @@ pub fn test_config() -> Config {
             RadioSetup {
                 graphcast_network: GraphcastNetworkName::Testnet,
                 topics: vec![],
-                coverage: CoverageLevel::OnChain,
-                ratelimit_threshold: 60000,
+                gossip_topic_coverage: CoverageLevel::OnChain,
+                auto_upgrade_ratelimit: 60000,
                 collect_message_duration: 60,
                 log_level:
                     "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_runner=trace"
@@ -78,7 +78,7 @@ pub fn test_config() -> Config {
                 telegram_token: None,
                 id_validation: IdentityValidation::ValidAddress,
                 topic_update_interval: 600,
-                auto_upgrade: CoverageLevel::OnChain,
+                auto_upgrade_coverage: CoverageLevel::OnChain,
                 notification_mode: NotificationMode::Live,
                 notification_interval: 24,
             }
