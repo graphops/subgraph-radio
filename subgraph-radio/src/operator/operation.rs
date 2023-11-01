@@ -6,8 +6,8 @@ use std::sync::Arc;
 use tracing::{debug, trace, warn};
 
 use graphcast_sdk::{
-    determine_message_block, graphcast_agent::message_typing::MessageError,
-    networks::NetworkName, BlockPointer, NetworkBlockError, NetworkPointer,
+    determine_message_block, graphcast_agent::message_typing::MessageError, networks::NetworkName,
+    BlockPointer, NetworkBlockError, NetworkPointer,
 };
 
 use crate::messages::poi::{poi_message_comparison, send_poi_message};

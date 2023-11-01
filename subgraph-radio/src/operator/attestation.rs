@@ -14,7 +14,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use graphcast_sdk::{
     callbook::CallBook,
-    graphcast_agent::message_typing::{get_indexer_stake, MessageError, GraphcastMessage},
+    graphcast_agent::message_typing::{get_indexer_stake, GraphcastMessage, MessageError},
 };
 
 use crate::operator::notifier::NotificationMode;
@@ -126,9 +126,7 @@ pub async fn process_ppoi_message(
         let sender_stake =
             get_indexer_stake(&radio_msg.graph_account.clone(), callbook.graph_network())
                 .await
-                .map_err(|e| {
-                    AttestationError::BuildError(MessageError::FieldDerivations(e))
-                })?;
+                .map_err(|e| AttestationError::BuildError(MessageError::FieldDerivations(e)))?;
 
         //TODO: update this to utilize update_blocks?
         let blocks = remote_attestations

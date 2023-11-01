@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 use graphcast_sdk::{
-    graphcast_agent::message_typing::{MessageError, GraphcastMessage, RadioPayload},
+    graphcast_agent::message_typing::{GraphcastMessage, MessageError, RadioPayload},
     graphql::client_graph_account::{owned_subgraphs, subgraph_hash_by_id},
 };
 
@@ -57,7 +57,6 @@ impl RadioPayload for UpgradeIntentMessage {
 }
 
 impl UpgradeIntentMessage {
-
     /// Check message from valid sender: check for ownership for subgraph-owner messages
     pub async fn valid_owner(&self, network_subgraph: &str) -> Result<&Self, MessageError> {
         let subgraphs = owned_subgraphs(network_subgraph, &self.graph_account)

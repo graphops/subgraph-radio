@@ -6,7 +6,7 @@ use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
 use graphcast_sdk::callbook::CallBook;
 use graphcast_sdk::{
-    graphcast_agent::message_typing::{MessageError, GraphcastMessage, RadioPayload},
+    graphcast_agent::message_typing::{GraphcastMessage, MessageError, RadioPayload},
     graphql::client_graph_node::query_graph_node_network_block_hash,
     networks::NetworkName,
 };

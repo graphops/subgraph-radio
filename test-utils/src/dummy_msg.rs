@@ -2,9 +2,11 @@ use async_graphql::SimpleObject;
 use ethers_contract::EthAbiType;
 use ethers_core::types::transaction::eip712::Eip712;
 use ethers_derive_eip712::*;
+use graphcast_sdk::graphcast_agent::message_typing::{
+    GraphcastMessage, MessageError, RadioPayload,
+};
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use graphcast_sdk::graphcast_agent::message_typing::{RadioPayload, GraphcastMessage, MessageError};
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize, SimpleObject)]
 #[eip712(
@@ -22,7 +24,7 @@ pub struct DummyMsg {
 
 impl RadioPayload for DummyMsg {
     fn valid_outer(&self, outer: &GraphcastMessage<Self>) -> Result<&Self, MessageError> {
-        if self.identifier == outer.identifier{
+        if self.identifier == outer.identifier {
             Ok(self)
         } else {
             Err(MessageError::Payload)
