@@ -183,8 +183,8 @@ pub fn start_radio(config: &Config) -> Child {
         .arg(config.radio_setup().graphcast_network.to_string())
         .arg("--topics")
         .arg(config.radio_setup().topics.join(","))
-        .arg("--coverage")
-        .arg(match config.radio_setup().coverage {
+        .arg("--gossip-topic-coverage")
+        .arg(match config.radio_setup().gossip_topic_coverage {
             CoverageLevel::None => "none",
             CoverageLevel::Minimal => "minimal",
             CoverageLevel::OnChain => "on-chain",
