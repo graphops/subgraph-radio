@@ -1,10 +1,12 @@
 use std::sync::{atomic::Ordering, mpsc::Receiver, Arc};
 use std::time::Duration;
 
+use ethers_core::types::transaction::eip712::Eip712;
 use graphcast_sdk::{
     graphcast_agent::{
-        message_typing::{GraphcastMessage, check_message_validity},
-        waku_handling::WakuHandlingError, GraphcastAgent,
+        message_typing::{check_message_validity, GraphcastMessage},
+        waku_handling::WakuHandlingError,
+        GraphcastAgent,
     },
     graphql::client_graph_node::{subgraph_network_blocks, update_network_chainheads},
     WakuMessage,
@@ -93,7 +95,7 @@ impl RadioOperator {
             topics = tracing::field::debug(&topics),
             "Found content topics for subscription",
         );
-        graphcast_agent.update_content_topics(topics.clone()).await;
+        graphcast_agent.update_content_topics(topics.clone());
 
         RadioOperator {
             config: config.clone(),
@@ -164,14 +166,15 @@ impl RadioOperator {
                     }
                     // Update topic subscription
                     let result = timeout(update_timeout,
-                        self.graphcast_agent()
-                        .update_content_topics(self.config.generate_topics(
-                            &self.config.radio_setup().gossip_topic_coverage,).await)
+                        self.config.generate_topics(
+                            &self.config.radio_setup().gossip_topic_coverage)
                     ).await;
 
                     if result.is_err() {
                         warn!("update_content_topics timed out");
                     } else {
+                        self.graphcast_agent()
+                        .update_content_topics(result.unwrap());
                         debug!("update_content_topics completed");
                     }
                 },
@@ -402,55 +405,48 @@ pub async fn process_message(
     let nonces = agent.nonces.clone();
     let local_sender = agent.graphcast_identity.graphcast_id.clone();
 
-    // Try to handle as Public Poi message
-    let handled = if let Ok(msg) = GraphcastMessage::<PublicPoiMessage>::decode(msg.payload()) {
-        trace!(
-            message = tracing::field::debug(&msg),
-            "Parseable as Public PoI message, now validate",
-        );
-        match check_message_validity(
-            msg,
-            &nonces,
-            callbook.clone(),
-            local_sender.clone(),
-            &id_validation,
-        )
-        .await
-        .map_err(|e| WakuHandlingError::InvalidMessage(e.to_string()))
-        {
-            Ok(msg) => {
-                let is_valid = msg
-                    .payload
-                    .validity_check(&msg, &config.graph_stack.graph_node_status_endpoint)
-                    .await
-                    .is_ok();
-
-                if is_valid {
-                    VALIDATED_MESSAGES
-                        .with_label_values(&[&msg.identifier, "public_poi_message"])
-                        .inc();
-                    process_valid_message(msg.clone(), &state).await;
-                };
-                is_valid
-            }
-            Err(e) => {
-                debug!(
-                    err = tracing::field::debug(e),
-                    "Failed to validate incoming message"
-                );
-                false
-            }
-        }
-    } else {
-        false
-    };
-
-    // Failed to handle as a public POI message, now try as UpgradeIntentMessage
-    if !handled {
-        if let Ok(msg) = agent.decode::<UpgradeIntentMessage>(msg.payload()).await {
+    // handle each message based on their type
+    match determine_message_type(msg) {
+        TypedMessage::PublicPoi(msg) => {
             trace!(
                 message = tracing::field::debug(&msg),
-                "Parseable as Upgrade Intent message, now validate",
+                "Handling a Public PoI message",
+            );
+            match check_message_validity(
+                msg,
+                &nonces,
+                callbook.clone(),
+                local_sender.clone(),
+                &id_validation,
+            )
+            .await
+            .map_err(|e| WakuHandlingError::InvalidMessage(e.to_string()))
+            {
+                Ok(msg) => {
+                    if msg
+                        .payload
+                        .validity_check(&msg, &config.graph_stack.graph_node_status_endpoint)
+                        .await
+                        .is_ok()
+                    {
+                        VALIDATED_MESSAGES
+                            .with_label_values(&[&msg.identifier, "public_poi_message"])
+                            .inc();
+                        process_valid_message(msg.clone(), &state).await;
+                    }
+                }
+                Err(e) => {
+                    debug!(
+                        err = tracing::field::debug(e),
+                        "Failed to validate incoming message"
+                    );
+                }
+            }
+        }
+        TypedMessage::UpgradeIntent(msg) => {
+            trace!(
+                message = tracing::field::debug(&msg),
+                "Handling a Upgrade Intent message",
             );
             // Skip general first time sender nonce check and timestamp check
             let msg = match msg
@@ -472,12 +468,12 @@ pub async fn process_message(
                     return;
                 }
             };
-            let is_valid = msg
+
+            if let Ok(radio_msg) = msg
                 .payload
                 .validity_check(msg, &config.graph_stack.network_subgraph.clone())
-                .await;
-
-            if let Ok(radio_msg) = is_valid {
+                .await
+            {
                 VALIDATED_MESSAGES
                     .with_label_values(&[&msg.identifier, "upgrade_intent_message"])
                     .inc();
@@ -489,8 +485,47 @@ pub async fn process_message(
                     state.add_upgrade_intent_message(msg.clone());
                 };
             };
+        }
+        TypedMessage::Unsupported => {
+            trace!("Waku message not decoded or validated, skipped message with unsupported type",)
+        }
+    }
+}
+
+/// Message types supported by the radio operator
+pub enum TypedMessage {
+    PublicPoi(GraphcastMessage<PublicPoiMessage>),
+    UpgradeIntent(GraphcastMessage<UpgradeIntentMessage>),
+    Unsupported,
+}
+
+/// Determine message type
+pub fn determine_message_type(msg: WakuMessage) -> TypedMessage {
+    if let Ok(ppoi_msg) = GraphcastMessage::<PublicPoiMessage>::decode(msg.payload()) {
+        if ppoi_msg.payload.domain().is_ok()
+            && ppoi_msg.payload.domain().unwrap().name == Some(String::from("PublicPoiMessage"))
+        {
+            TypedMessage::PublicPoi(ppoi_msg)
+        } else if let Ok(msg) = GraphcastMessage::<UpgradeIntentMessage>::decode(msg.payload()) {
+            if msg.payload.domain().is_ok()
+                && msg.payload.domain().unwrap().name == Some(String::from("UpgradeIntentMessage"))
+            {
+                TypedMessage::UpgradeIntent(msg)
+            } else {
+                TypedMessage::Unsupported
+            }
         } else {
-            trace!("Waku message not decoded or validated, skipped message",);
-        };
+            TypedMessage::Unsupported
+        }
+    } else if let Ok(msg) = GraphcastMessage::<UpgradeIntentMessage>::decode(msg.payload()) {
+        if msg.payload.domain().is_ok()
+            && msg.payload.domain().unwrap().name == Some(String::from("UpgradeIntentMessage"))
+        {
+            TypedMessage::UpgradeIntent(msg)
+        } else {
+            TypedMessage::Unsupported
+        }
+    } else {
+        TypedMessage::Unsupported
     }
 }

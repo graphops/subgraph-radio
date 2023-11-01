@@ -9,7 +9,9 @@ use std::{
 };
 
 use config::TestSenderConfig;
-use graphcast_sdk::graphcast_agent::message_typing::{GraphcastMessage, RadioPayload, IdentityValidation};
+use graphcast_sdk::graphcast_agent::message_typing::{
+    GraphcastMessage, IdentityValidation, RadioPayload,
+};
 use mock_server::{start_mock_server, ServerState};
 
 use rand::Rng;
