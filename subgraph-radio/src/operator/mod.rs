@@ -122,17 +122,17 @@ impl RadioOperator {
             self.config.radio_setup.topic_update_interval,
         ));
 
-        let mut state_update_interval = interval(Duration::from_secs(10));
-        let mut gossip_poi_interval = interval(Duration::from_secs(30));
-        let mut comparison_interval = interval(Duration::from_secs(300));
+        let mut state_update_interval = interval(self.control_flow.update_event);
+        let mut gossip_poi_interval = interval(self.control_flow.gossip_event);
+        let mut comparison_interval = interval(self.control_flow.compare_event);
 
         let mut notification_interval = tokio::time::interval(Duration::from_secs(
             self.config.radio_setup.notification_interval * 3600,
         ));
 
-        let iteration_timeout = Duration::from_secs(180);
-        let update_timeout = Duration::from_secs(5);
-        let gossip_timeout = Duration::from_secs(120);
+        let iteration_timeout = self.control_flow.iteration_timeout;
+        let update_timeout = self.control_flow.update_timeout;
+        let gossip_timeout = self.control_flow.gossip_timeout;
 
         // Separate thread to skip a main loop iteration when hit timeout
         tokio::spawn(async move {

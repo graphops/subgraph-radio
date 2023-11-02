@@ -6,27 +6,25 @@ use derive_getters::Getters;
 use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,
-    process,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    thread::sleep,
     time::Duration,
 };
 use tokio::signal;
 use tracing::{debug, error, info};
 
-use graphcast_sdk::{
-    graphcast_agent::GraphcastAgent, graphql::client_network::query_network_subgraph,
-    networks::NetworkName, BlockPointer,
-};
-use graphcast_sdk::{
-    graphcast_agent::GraphcastAgentError,
-    graphql::{client_graph_node::get_indexing_statuses, QueryError},
-};
-
 use crate::operator::{attestation::AttestationError, RadioOperator};
+use graphcast_sdk::{
+    graphcast_agent::{GraphcastAgent, GraphcastAgentError},
+    graphql::{
+        client_graph_node::get_indexing_statuses, client_network::query_network_subgraph,
+        QueryError,
+    },
+    networks::NetworkName,
+    waku_set_event_callback, BlockPointer,
+};
 
 pub mod config;
 pub mod graphql;
@@ -72,11 +70,10 @@ pub async fn syncing_deployment_hashes(
 ) -> Vec<String> {
     get_indexing_statuses(graph_node_endpoint)
         .await
-        .map_err(|e| -> Vec<String> {
+        .map_err(|e| {
             error!(err = tracing::field::debug(&e), "Topic generation error");
-            [].to_vec()
         })
-        .unwrap()
+        .unwrap_or_default()
         .iter()
         .filter(|&status| status.node.is_some() && status.node != Some(String::from("removed")))
         .map(|s| s.subgraph.clone())
@@ -130,6 +127,8 @@ pub async fn shutdown(control: ControlFlow) {
     // Set running boolean to false
     debug!("Finish the current running processes...");
     control.running.store(false, Ordering::SeqCst);
+
+    waku_set_event_callback(|_| {});
     // Signal the server to shutdown using Handle.
     control
         .metrics_handle
@@ -137,10 +136,6 @@ pub async fn shutdown(control: ControlFlow) {
     control
         .server_handle
         .graceful_shutdown(Some(Duration::from_secs(3)));
-
-    sleep(Duration::from_secs(5));
-    debug!("Allowed 5 seconds for graceful shutdown, force exit");
-    process::exit(1);
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -187,6 +182,12 @@ pub struct ControlFlow {
     skip_iteration: Arc<AtomicBool>,
     metrics_handle: Handle,
     server_handle: Handle,
+    update_event: Duration,
+    gossip_event: Duration,
+    compare_event: Duration,
+    iteration_timeout: Duration,
+    update_timeout: Duration,
+    gossip_timeout: Duration,
 }
 
 impl ControlFlow {
@@ -198,16 +199,25 @@ impl ControlFlow {
         let metrics_handle = Handle::new();
         let server_handle = Handle::new();
 
-        //TODO: Test for effectiveness
-        // let iteration_timeout = Duration::from_micros(1);
-        // let update_timeout = Duration::from_secs(5);
-        // let gossip_timeout = Duration::from_nanos(1);
+        let update_event = Duration::from_secs(10);
+        let gossip_event = Duration::from_nanos(60);
+        let compare_event = Duration::from_secs(300);
+
+        let iteration_timeout = Duration::from_secs(120);
+        let update_timeout = Duration::from_secs(5);
+        let gossip_timeout = Duration::from_nanos(120);
 
         ControlFlow {
             running,
             skip_iteration,
             metrics_handle,
             server_handle,
+            update_event,
+            gossip_event,
+            compare_event,
+            iteration_timeout,
+            update_timeout,
+            gossip_timeout,
         }
     }
 }
