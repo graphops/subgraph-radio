@@ -41,7 +41,7 @@ pub async fn main() {
             "RUST_LOG",
             "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_runner=trace,test_sender=trace,test_utils=trace",
         );
-    init_tracing(config.radio_setup.log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level");
+    init_tracing(config.radio_infrastructure.log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level");
 
     let start_time = Instant::now();
 

@@ -1,0 +1,2250 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index bfe3986..8b91552 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -64,9 +64,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "ahash"
+-version = "0.7.6"
++version = "0.7.7"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
++checksum = "5a824f2aa7e75a0c98c5a504fceb80649e9c35265d44525b5f94de4771a395cd"
+ dependencies = [
+  "getrandom",
+  "once_cell",
+@@ -75,13 +75,14 @@ dependencies = [
+ 
+ [[package]]
+ name = "ahash"
+-version = "0.8.3"
++version = "0.8.6"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "2c99f64d1e06488f620f932677e24bc6e2897582980441ae90a671415bd7ec2f"
++checksum = "91429305e9f0a25f6205c5b8e0d2db09e0708a7a6df0f42212bb56c32c8ac97a"
+ dependencies = [
+  "cfg-if",
+  "once_cell",
+  "version_check",
++ "zerocopy",
+ ]
+ 
+ [[package]]
+@@ -272,7 +273,7 @@ dependencies = [
+  "Inflector",
+  "async-graphql-parser",
+  "darling 0.14.4",
+- "proc-macro-crate",
++ "proc-macro-crate 1.1.3",
+  "proc-macro2",
+  "quote",
+  "syn 1.0.109",
+@@ -338,9 +339,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "async-trait"
+-version = "0.1.73"
++version = "0.1.74"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "bc00ceb34980c03614e35a3a4e218276a0a824e911d07651cd0d858a51e8c0f0"
++checksum = "a66537f1bb974b254c98ed142ff995236e81b9d0fe4db0575f46612cb15eb0f9"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+@@ -571,9 +572,9 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
+ 
+ [[package]]
+ name = "base64"
+-version = "0.21.4"
++version = "0.21.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "9ba43ea6f343b788c8764558649e08df62f86c6ef251fdaeb1ffd010a9ae50a2"
++checksum = "35636a1494ede3b646cc98f74f8e62c773a38a659ebc777a2cf26b9b74171df9"
+ 
+ [[package]]
+ name = "base64ct"
+@@ -632,9 +633,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
+ 
+ [[package]]
+ name = "bitflags"
+-version = "2.4.0"
++version = "2.4.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "b4682ae6287fcf752ecaabbfcc7b6f9b72aa33933dc23a554d853aea8eea8635"
++checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
+ 
+ [[package]]
+ name = "bitvec"
+@@ -886,24 +887,27 @@ dependencies = [
+ 
+ [[package]]
+ name = "clap"
+-version = "4.4.6"
++version = "4.4.7"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "d04704f56c2cde07f43e8e2c154b43f216dc5c92fc98ada720177362f953b956"
++checksum = "ac495e00dcec98c83465d5ad66c5c4fabd652fd6686e7c6269b117e729a6f17b"
+ dependencies = [
+  "clap_builder",
+- "clap_derive 4.4.2",
++ "clap_derive 4.4.7",
+ ]
+ 
+ [[package]]
+ name = "clap_builder"
+-version = "4.4.6"
++version = "4.4.7"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "0e231faeaca65ebd1ea3c737966bf858971cd38c3849107aa3ea7de90a804e45"
++checksum = "c77ed9a32a62e6ca27175d00d29d05ca32e396ea1eb5fb01d8256b669cec7663"
+ dependencies = [
+  "anstream",
+  "anstyle",
+- "clap_lex 0.5.1",
++ "clap_lex 0.6.0",
+  "strsim",
++ "terminal_size",
++ "unicase",
++ "unicode-width",
+ ]
+ 
+ [[package]]
+@@ -921,9 +925,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "clap_derive"
+-version = "4.4.2"
++version = "4.4.7"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "0862016ff20d69b84ef8247369fabf5c008a7417002411897d40ee1f4532b873"
++checksum = "cf9804afaaf59a91e75b022a30fb7229a7901f60c755489cc61c9b423b836442"
+ dependencies = [
+  "heck",
+  "proc-macro2",
+@@ -942,9 +946,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "clap_lex"
+-version = "0.5.1"
++version = "0.6.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "cd7cc57abe963c6d3b9d8be5b06ba7c8957a930305ca90304f24ef040aa6f961"
++checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
+ 
+ [[package]]
+ name = "coins-bip32"
+@@ -984,7 +988,7 @@ version = "0.8.7"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "5286a0843c21f8367f7be734f89df9b822e0321d8bcce8d6e735aadff7d74979"
+ dependencies = [
+- "base64 0.21.4",
++ "base64 0.21.5",
+  "bech32",
+  "bs58 0.5.0",
+  "digest",
+@@ -1031,13 +1035,14 @@ dependencies = [
+ 
+ [[package]]
+ name = "const-hex"
+-version = "1.9.1"
++version = "1.10.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c37be52ef5e3b394db27a2341010685ad5103c72ac15ce2e9420a7e8f93f342c"
++checksum = "a5104de16b218eddf8e34ffe2f86f74bfa4e61e95a1b89732fccf6325efd0557"
+ dependencies = [
+  "cfg-if",
+  "cpufeatures",
+  "hex",
++ "proptest",
+  "serde",
+ ]
+ 
+@@ -1049,18 +1054,18 @@ checksum = "28c122c3980598d243d63d9a704629a2d748d101f278052ff068be5a4423ab6f"
+ 
+ [[package]]
+ name = "const_format"
+-version = "0.2.31"
++version = "0.2.32"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c990efc7a285731f9a4378d81aff2f0e85a2c8781a05ef0f8baa8dac54d0ff48"
++checksum = "e3a214c7af3d04997541b18d432afaff4c455e79e2029079647e72fc2bd27673"
+ dependencies = [
+  "const_format_proc_macros",
+ ]
+ 
+ [[package]]
+ name = "const_format_proc_macros"
+-version = "0.2.31"
++version = "0.2.32"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "e026b6ce194a874cb9cf32cd5772d1ef9767cc8fcb5765948d74f37a9d8b2bf6"
++checksum = "c7f6ff08fd20f4f299298a28e2dfa8a8ba1036e6cd2460ac1de7b425d76f2500"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+@@ -1115,9 +1120,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "cpufeatures"
+-version = "0.2.9"
++version = "0.2.11"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "a17b76ff3a4162b0b27f354a0c87015ddad39d35f9c0c36607a3bdd175dde1f1"
++checksum = "ce420fe07aecd3e67c5f910618fe65e94158f6dcc0adf44e00d69ce2bdfe0fd0"
+ dependencies = [
+  "libc",
+ ]
+@@ -1348,7 +1353,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
+ dependencies = [
+  "cfg-if",
+- "hashbrown 0.14.1",
++ "hashbrown 0.14.2",
+  "lock_api",
+  "once_cell",
+  "parking_lot_core",
+@@ -1402,9 +1407,12 @@ dependencies = [
+ 
+ [[package]]
+ name = "deranged"
+-version = "0.3.8"
++version = "0.3.9"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "f2696e8a945f658fd14dc3b87242e6b80cd0f36ff04ea560fa39082368847946"
++checksum = "0f32d04922c60427da6f9fef14d042d9edddef64cb9d4ce0d64d0685fbeb1fd3"
++dependencies = [
++ "powerfmt",
++]
+ 
+ [[package]]
+ name = "derive-getters"
+@@ -1646,7 +1654,7 @@ version = "0.9.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "fe81b5c06ecfdbc71dd845216f225f53b62a10cb8a16c946836a3467f701d05b"
+ dependencies = [
+- "base64 0.21.4",
++ "base64 0.21.5",
+  "bytes",
+  "hex",
+  "k256 0.13.1",
+@@ -1965,7 +1973,7 @@ checksum = "6838fa110e57d572336178b7c79e94ff88ef976306852d8cb87d9e5b1fc7c0b5"
+ dependencies = [
+  "async-trait",
+  "auto_impl",
+- "base64 0.21.4",
++ "base64 0.21.5",
+  "bytes",
+  "const-hex",
+  "enr 0.9.1",
+@@ -2110,9 +2118,9 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+ 
+ [[package]]
+ name = "flate2"
+-version = "1.0.27"
++version = "1.0.28"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c6c98ee8095e9d1dcbf2fcc6d95acccb90d1c81db1e44725c6a984b1dbdfb010"
++checksum = "46303f565772937ffe1d394a4fac6f411c6013172fadde9dcdb1e147a086940e"
+ dependencies = [
+  "crc32fast",
+  "miniz_oxide",
+@@ -2166,9 +2174,9 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
+ 
+ [[package]]
+ name = "futures"
+-version = "0.3.28"
++version = "0.3.29"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "23342abe12aba583913b2e62f22225ff9c950774065e4bfb61a19cd9770fec40"
++checksum = "da0290714b38af9b4a7b094b8a37086d1b4e61f2df9122c3cad2577669145335"
+ dependencies = [
+  "futures-channel",
+  "futures-core",
+@@ -2181,9 +2189,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "futures-channel"
+-version = "0.3.28"
++version = "0.3.29"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "955518d47e09b25bbebc7a18df10b81f0c766eaf4c4f1cccef2fca5f2a4fb5f2"
++checksum = "ff4dd66668b557604244583e3e1e1eada8c5c2e96a6d0d6653ede395b78bbacb"
+ dependencies = [
+  "futures-core",
+  "futures-sink",
+@@ -2191,15 +2199,15 @@ dependencies = [
+ 
+ [[package]]
+ name = "futures-core"
+-version = "0.3.28"
++version = "0.3.29"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "4bca583b7e26f571124fe5b7561d49cb2868d79116cfa0eefce955557c6fee8c"
++checksum = "eb1d22c66e66d9d72e1758f0bd7d4fd0bee04cad842ee34587d68c07e45d088c"
+ 
+ [[package]]
+ name = "futures-executor"
+-version = "0.3.28"
++version = "0.3.29"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "ccecee823288125bd88b4d7f565c9e58e41858e47ab72e8ea2d64e93624386e0"
++checksum = "0f4fb8693db0cf099eadcca0efe2a5a22e4550f98ed16aba6c48700da29597bc"
+ dependencies = [
+  "futures-core",
+  "futures-task",
+@@ -2208,9 +2216,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "futures-io"
+-version = "0.3.28"
++version = "0.3.29"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "4fff74096e71ed47f8e023204cfd0aa1289cd54ae5430a9523be060cdb849964"
++checksum = "8bf34a163b5c4c52d0478a4d757da8fb65cabef42ba90515efee0f6f9fa45aaa"
+ 
+ [[package]]
+ name = "futures-locks"
+@@ -2225,9 +2233,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "futures-macro"
+-version = "0.3.28"
++version = "0.3.29"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "89ca545a94061b6365f2c7355b4b32bd20df3ff95f02da9329b34ccc3bd6ee72"
++checksum = "53b153fd91e4b0147f4aced87be237c98248656bb01050b96bf3ee89220a8ddb"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+@@ -2236,15 +2244,15 @@ dependencies = [
+ 
+ [[package]]
+ name = "futures-sink"
+-version = "0.3.28"
++version = "0.3.29"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "f43be4fe21a13b9781a69afa4985b0f6ee0e1afab2c6f454a8cf30e2b2237b6e"
++checksum = "e36d3378ee38c2a36ad710c5d30c2911d752cb941c00c72dbabfb786a7970817"
+ 
+ [[package]]
+ name = "futures-task"
+-version = "0.3.28"
++version = "0.3.29"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "76d3d132be6c0e6aa1534069c705a74a5997a356c0dc2f86a47765e5617c5b65"
++checksum = "efd193069b0ddadc69c46389b740bbccdd97203899b48d09c5f7969591d6bae2"
+ 
+ [[package]]
+ name = "futures-timer"
+@@ -2258,9 +2266,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "futures-util"
+-version = "0.3.28"
++version = "0.3.29"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "26b01e40b772d54cf6c6d721c1d1abd0647a0106a12ecaa1c186273392a69533"
++checksum = "a19526d624e703a3179b3d322efec918b6246ea0fa51d41124525f00f1cc8104"
+ dependencies = [
+  "futures-channel",
+  "futures-core",
+@@ -2349,7 +2357,7 @@ dependencies = [
+  "async-graphql",
+  "async-graphql-axum",
+  "chrono",
+- "clap 4.4.6",
++ "clap 4.4.7",
+  "data-encoding",
+  "derive-getters",
+  "dotenv",
+@@ -2493,14 +2501,14 @@ version = "0.12.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
+ dependencies = [
+- "ahash 0.7.6",
++ "ahash 0.7.7",
+ ]
+ 
+ [[package]]
+ name = "hashbrown"
+-version = "0.14.1"
++version = "0.14.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "7dfda62a12f55daeae5015f81b0baea145391cb4520f86c248fc615d72640d12"
++checksum = "f93e7192158dbcda357bdec5fb5788eebf8bbac027f3f33e719d29135ae84156"
+ 
+ [[package]]
+ name = "hashers"
+@@ -2517,7 +2525,7 @@ version = "0.3.9"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "06683b93020a07e3dbcf5f8c0f6d40080d725bea7936fc01ad345c01b97dc270"
+ dependencies = [
+- "base64 0.21.4",
++ "base64 0.21.5",
+  "bytes",
+  "headers-core",
+  "http",
+@@ -2637,7 +2645,7 @@ dependencies = [
+  "httpdate",
+  "itoa",
+  "pin-project-lite",
+- "socket2 0.4.9",
++ "socket2 0.4.10",
+  "tokio",
+  "tower-service",
+  "tracing",
+@@ -2646,9 +2654,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "hyper-rustls"
+-version = "0.24.1"
++version = "0.24.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "8d78e1e73ec14cf7375674f74d7dde185c8206fd9dea6fb6295e8a98098aaa97"
++checksum = "ec3efd23720e2049821a693cbc7e65ea87c72f1c58ff2f9522ff332b1491e590"
+ dependencies = [
+  "futures-util",
+  "http",
+@@ -2675,16 +2683,16 @@ dependencies = [
+ 
+ [[package]]
+ name = "iana-time-zone"
+-version = "0.1.57"
++version = "0.1.58"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "2fad5b825842d2b38bd206f3e81d6957625fd7f0a361e345c30e01a0ae2dd613"
++checksum = "8326b86b6cff230b97d0d312a6c40a60726df3332e721f72a1b035f451663b20"
+ dependencies = [
+  "android_system_properties",
+  "core-foundation-sys",
+  "iana-time-zone-haiku",
+  "js-sys",
+  "wasm-bindgen",
+- "windows",
++ "windows-core",
+ ]
+ 
+ [[package]]
+@@ -2769,12 +2777,12 @@ dependencies = [
+ 
+ [[package]]
+ name = "indexmap"
+-version = "2.0.2"
++version = "2.1.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "8adf3ddd720272c6ea8bf59463c04e0f93d0bbf7c5439b691bca2987e0270897"
++checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
+ dependencies = [
+  "equivalent",
+- "hashbrown 0.14.1",
++ "hashbrown 0.14.2",
+ ]
+ 
+ [[package]]
+@@ -2797,9 +2805,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "ipnet"
+-version = "2.8.0"
++version = "2.9.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "28b29a3cd74f0f4598934efe3aeba42bae0eb4680554128851ebbecb02af14e6"
++checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
+ 
+ [[package]]
+ name = "is-terminal"
+@@ -2869,9 +2877,9 @@ version = "8.3.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "6971da4d9c3aa03c3d8f3ff0f4155b534aad021292003895a469716b2a230378"
+ dependencies = [
+- "base64 0.21.4",
++ "base64 0.21.5",
+  "pem",
+- "ring",
++ "ring 0.16.20",
+  "serde",
+  "serde_json",
+  "simple_asn1",
+@@ -2969,6 +2977,12 @@ dependencies = [
+  "winapi",
+ ]
+ 
++[[package]]
++name = "libm"
++version = "0.2.8"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
++
+ [[package]]
+ name = "linux-raw-sys"
+ version = "0.4.10"
+@@ -2977,9 +2991,9 @@ checksum = "da2479e8c062e40bf0066ffa0bc823de0a9368974af99c9f6df941d2c231e03f"
+ 
+ [[package]]
+ name = "lock_api"
+-version = "0.4.10"
++version = "0.4.11"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c1cc9717a20b1bb222f333e6a92fd32f7d8a18ddc5a3191a11af45dcbf4dcd16"
++checksum = "3c168f8615b12bc01f9c17e2eb0cc07dcae1940121185446edc3744920e8ef45"
+ dependencies = [
+  "autocfg",
+  "scopeguard",
+@@ -3052,7 +3066,7 @@ version = "0.20.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "7b9b8653cec6897f73b519a43fba5ee3d50f62fe9af80b428accdcc093b4a849"
+ dependencies = [
+- "ahash 0.7.6",
++ "ahash 0.7.7",
+  "metrics-macros 0.6.0",
+  "portable-atomic 0.3.20",
+ ]
+@@ -3063,9 +3077,9 @@ version = "0.21.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "fde3af1a009ed76a778cb84fdef9e7dbbdf5775ae3e4cc1f434a6a307f6f76c5"
+ dependencies = [
+- "ahash 0.8.3",
++ "ahash 0.8.6",
+  "metrics-macros 0.7.0",
+- "portable-atomic 1.4.3",
++ "portable-atomic 1.5.1",
+ ]
+ 
+ [[package]]
+@@ -3155,9 +3169,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "mio"
+-version = "0.8.8"
++version = "0.8.9"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "927a765cd3fc26206e66b296465fa9d3e5ab003e651c1b3c060e7956d96b19d2"
++checksum = "3dce281c5e46beae905d4de1870d8b1509a9142b62eedf18b443b011ca8343d0"
+ dependencies = [
+  "libc",
+  "wasi 0.11.0+wasi-snapshot-preview1",
+@@ -3229,7 +3243,7 @@ version = "0.8.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "1d6d4752e6230d8ef7adf7bd5d8c4b1f6561c1014c5ba9a37445ccefe18aa1db"
+ dependencies = [
+- "proc-macro-crate",
++ "proc-macro-crate 1.1.3",
+  "proc-macro-error",
+  "proc-macro2",
+  "quote",
+@@ -3273,7 +3287,7 @@ version = "0.27.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
+ dependencies = [
+- "bitflags 2.4.0",
++ "bitflags 2.4.1",
+  "cfg-if",
+  "libc",
+ ]
+@@ -3326,6 +3340,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "39e3200413f237f41ab11ad6d161bc7239c84dcb631773ccd7de3dfe4b5c267c"
+ dependencies = [
+  "autocfg",
++ "libm",
+ ]
+ 
+ [[package]]
+@@ -3340,20 +3355,20 @@ dependencies = [
+ 
+ [[package]]
+ name = "num_enum"
+-version = "0.7.0"
++version = "0.7.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "70bf6736f74634d299d00086f02986875b3c2d924781a6a2cb6c201e73da0ceb"
++checksum = "683751d591e6d81200c39fb0d1032608b77724f34114db54f571ff1317b337c0"
+ dependencies = [
+  "num_enum_derive",
+ ]
+ 
+ [[package]]
+ name = "num_enum_derive"
+-version = "0.7.0"
++version = "0.7.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "56ea360eafe1022f7cc56cd7b869ed57330fb2453d0c7831d99b74c65d2f5597"
++checksum = "6c11e44798ad209ccdd91fc192f0526a369a01234f7373e1b141c96d7cee4f0e"
+ dependencies = [
+- "proc-macro-crate",
++ "proc-macro-crate 2.0.0",
+  "proc-macro2",
+  "quote",
+  "syn 2.0.38",
+@@ -3417,7 +3432,7 @@ version = "0.10.57"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "bac25ee399abb46215765b1cb35bc0212377e58a061560d8b29b024fd0430e7c"
+ dependencies = [
+- "bitflags 2.4.0",
++ "bitflags 2.4.1",
+  "cfg-if",
+  "foreign-types",
+  "libc",
+@@ -3565,9 +3580,9 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+ 
+ [[package]]
+ name = "os_str_bytes"
+-version = "6.5.1"
++version = "6.6.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "4d5d9eb14b174ee9aa2ef96dc2b94637a2d4b6e7cb873c7e171f0c20c6cf3eac"
++checksum = "e2355d85b9a3786f481747ced0e0ff2ba35213a1f9bd406ed906554d7af805a1"
+ 
+ [[package]]
+ name = "overload"
+@@ -3595,7 +3610,7 @@ version = "3.6.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "312270ee71e1cd70289dacf597cab7b207aa107d2f28191c2ae45b2ece18a260"
+ dependencies = [
+- "proc-macro-crate",
++ "proc-macro-crate 1.1.3",
+  "proc-macro2",
+  "quote",
+  "syn 1.0.109",
+@@ -3613,13 +3628,13 @@ dependencies = [
+ 
+ [[package]]
+ name = "parking_lot_core"
+-version = "0.9.8"
++version = "0.9.9"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "93f00c865fe7cabf650081affecd3871070f26767e7b2070a3ffae14c654b447"
++checksum = "4c42a9226546d68acdd9c0a280d17ce19bfe27a46bf68784e4066115788d008e"
+ dependencies = [
+  "cfg-if",
+  "libc",
+- "redox_syscall 0.3.5",
++ "redox_syscall 0.4.1",
+  "smallvec",
+  "windows-targets",
+ ]
+@@ -3692,9 +3707,9 @@ checksum = "9b2a4787296e9989611394c33f193f676704af1686e70b8f8033ab5ba9a35a94"
+ 
+ [[package]]
+ name = "pest"
+-version = "2.7.4"
++version = "2.7.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c022f1e7b65d6a24c0dbbd5fb344c66881bc01f3e5ae74a1c8100f2f985d98a4"
++checksum = "ae9cee2a55a544be8b89dc6848072af97a20f2422603c10865be2a42b580fff5"
+ dependencies = [
+  "memchr",
+  "thiserror",
+@@ -3708,7 +3723,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "e1d3afd2628e69da2be385eb6f2fd57c8ac7977ceeff6dc166ff1657b0e386a9"
+ dependencies = [
+  "fixedbitset",
+- "indexmap 2.0.2",
++ "indexmap 2.1.0",
+ ]
+ 
+ [[package]]
+@@ -3876,14 +3891,20 @@ version = "0.3.20"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "e30165d31df606f5726b090ec7592c308a0eaf61721ff64c9a3018e344a8753e"
+ dependencies = [
+- "portable-atomic 1.4.3",
++ "portable-atomic 1.5.1",
+ ]
+ 
+ [[package]]
+ name = "portable-atomic"
+-version = "1.4.3"
++version = "1.5.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "3bccab0e7fd7cc19f820a1c8c91720af652d0c88dc9664dd72aef2614f04af3b"
++
++[[package]]
++name = "powerfmt"
++version = "0.2.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "31114a898e107c51bb1609ffaf55a0e011cf6a4d7f1170d0015a165082c0338b"
++checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+ 
+ [[package]]
+ name = "ppv-lite86"
+@@ -3931,6 +3952,15 @@ dependencies = [
+  "toml 0.5.11",
+ ]
+ 
++[[package]]
++name = "proc-macro-crate"
++version = "2.0.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "7e8366a6159044a37876a2b9817124296703c586a5c92e2c53751fa06d8d43e8"
++dependencies = [
++ "toml_edit 0.20.7",
++]
++
+ [[package]]
+ name = "proc-macro-error"
+ version = "1.0.4"
+@@ -3993,6 +4023,22 @@ dependencies = [
+  "url",
+ ]
+ 
++[[package]]
++name = "proptest"
++version = "1.3.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "7c003ac8c77cb07bb74f5f198bce836a689bcd5a42574612bf14d17bfd08c20e"
++dependencies = [
++ "bitflags 2.4.1",
++ "lazy_static",
++ "num-traits",
++ "rand",
++ "rand_chacha",
++ "rand_xorshift",
++ "regex-syntax 0.7.5",
++ "unarray",
++]
++
+ [[package]]
+ name = "prost"
+ version = "0.11.9"
+@@ -4083,6 +4129,15 @@ dependencies = [
+  "getrandom",
+ ]
+ 
++[[package]]
++name = "rand_xorshift"
++version = "0.3.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
++dependencies = [
++ "rand_core",
++]
++
+ [[package]]
+ name = "raw-cpuid"
+ version = "10.7.0"
+@@ -4132,9 +4187,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "redox_syscall"
+-version = "0.3.5"
++version = "0.4.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "567664f262709473930a4bf9e51bf2ebf3348f2e748ccc50dea20646858f8f29"
++checksum = "4722d768eff46b75989dd134e5c353f0d6296e5aaa3132e776cbdb56be7731aa"
+ dependencies = [
+  "bitflags 1.3.2",
+ ]
+@@ -4152,14 +4207,14 @@ dependencies = [
+ 
+ [[package]]
+ name = "regex"
+-version = "1.10.0"
++version = "1.10.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "d119d7c7ca818f8a53c300863d4f87566aac09943aef5b355bb83969dae75d87"
++checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
+ dependencies = [
+  "aho-corasick",
+  "memchr",
+- "regex-automata 0.4.1",
+- "regex-syntax 0.8.0",
++ "regex-automata 0.4.3",
++ "regex-syntax 0.8.2",
+ ]
+ 
+ [[package]]
+@@ -4173,13 +4228,13 @@ dependencies = [
+ 
+ [[package]]
+ name = "regex-automata"
+-version = "0.4.1"
++version = "0.4.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "465c6fc0621e4abc4187a2bda0937bfd4f722c2730b29562e19689ea796c9a4b"
++checksum = "5f804c7828047e88b2d32e2d7fe5a105da8ee3264f01902f796c8e067dc2483f"
+ dependencies = [
+  "aho-corasick",
+  "memchr",
+- "regex-syntax 0.8.0",
++ "regex-syntax 0.8.2",
+ ]
+ 
+ [[package]]
+@@ -4196,9 +4251,9 @@ checksum = "dbb5fb1acd8a1a18b3dd5be62d25485eb770e05afb408a9627d14d451bae12da"
+ 
+ [[package]]
+ name = "regex-syntax"
+-version = "0.8.0"
++version = "0.8.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "c3cbb081b9784b07cceb8824c8583f86db4814d172ab043f3c23f7dc600bf83d"
++checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
+ 
+ [[package]]
+ name = "reqwest"
+@@ -4206,7 +4261,7 @@ version = "0.11.22"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "046cd98826c46c2ac8ddecae268eb5c2e58628688a5fc7a2643704a73faba95b"
+ dependencies = [
+- "base64 0.21.4",
++ "base64 0.21.5",
+  "bytes",
+  "encoding_rs",
+  "futures-core",
+@@ -4277,11 +4332,25 @@ dependencies = [
+  "libc",
+  "once_cell",
+  "spin 0.5.2",
+- "untrusted",
++ "untrusted 0.7.1",
+  "web-sys",
+  "winapi",
+ ]
+ 
++[[package]]
++name = "ring"
++version = "0.17.5"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "fb0205304757e5d899b9c2e448b867ffd03ae7f988002e47cd24954391394d0b"
++dependencies = [
++ "cc",
++ "getrandom",
++ "libc",
++ "spin 0.9.8",
++ "untrusted 0.9.0",
++ "windows-sys",
++]
++
+ [[package]]
+ name = "ripemd"
+ version = "0.1.3"
+@@ -4353,11 +4422,11 @@ dependencies = [
+ 
+ [[package]]
+ name = "rustix"
+-version = "0.38.18"
++version = "0.38.21"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "5a74ee2d7c2581cd139b42447d7d9389b889bdaad3a73f1ebb16f2a3237bb19c"
++checksum = "2b426b0506e5d50a7d8dafcf2e81471400deb602392c7dd110815afb4eaf02a3"
+ dependencies = [
+- "bitflags 2.4.0",
++ "bitflags 2.4.1",
+  "errno",
+  "libc",
+  "linux-raw-sys",
+@@ -4366,12 +4435,12 @@ dependencies = [
+ 
+ [[package]]
+ name = "rustls"
+-version = "0.21.7"
++version = "0.21.8"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "cd8d6c9f025a446bc4d18ad9632e69aec8f287aa84499ee335599fabd20c3fd8"
++checksum = "446e14c5cda4f3f30fe71863c34ec70f5ac79d6087097ad0bb433e1be5edf04c"
+ dependencies = [
+  "log",
+- "ring",
++ "ring 0.17.5",
+  "rustls-webpki",
+  "sct",
+ ]
+@@ -4394,17 +4463,17 @@ version = "1.0.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "2d3987094b1d07b653b7dfdc3f70ce9a1da9c51ac18c1b06b662e4f9a0e9f4b2"
+ dependencies = [
+- "base64 0.21.4",
++ "base64 0.21.5",
+ ]
+ 
+ [[package]]
+ name = "rustls-webpki"
+-version = "0.101.6"
++version = "0.101.7"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "3c7d5dece342910d9ba34d259310cae3e0154b873b35408b787b59bce53d34fe"
++checksum = "8b6275d1ee7a1cd780b64aca7726599a1dbc893b1e64144529e55c3c2f745765"
+ dependencies = [
+- "ring",
+- "untrusted",
++ "ring 0.17.5",
++ "untrusted 0.9.0",
+ ]
+ 
+ [[package]]
+@@ -4459,9 +4528,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "scale-info"
+-version = "2.9.0"
++version = "2.10.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "35c0a159d0c45c12b20c5a844feb1fe4bea86e28f17b92a5f0c42193634d3782"
++checksum = "7f7d66a1128282b7ef025a8ead62a4a9fcf017382ec53b8ffbf4d7bf77bd3c60"
+ dependencies = [
+  "cfg-if",
+  "derive_more",
+@@ -4471,11 +4540,11 @@ dependencies = [
+ 
+ [[package]]
+ name = "scale-info-derive"
+-version = "2.9.0"
++version = "2.10.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "912e55f6d20e0e80d63733872b40e1227c0bce1e1ab81ba67d696339bfd7fd29"
++checksum = "abf2c68b89cafb3b8d918dd07b42be0da66ff202cf1155c5739a4e0c1ea0dc19"
+ dependencies = [
+- "proc-macro-crate",
++ "proc-macro-crate 1.1.3",
+  "proc-macro2",
+  "quote",
+  "syn 1.0.109",
+@@ -4510,12 +4579,12 @@ dependencies = [
+ 
+ [[package]]
+ name = "sct"
+-version = "0.7.0"
++version = "0.7.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "d53dcdb7c9f8158937a7981b48accfd39a43af418591a5d008c7b22b5e1b7ca4"
++checksum = "da046153aa2352493d6cb7da4b6e5c0c057d8a1d0a9aa8560baffdd945acd414"
+ dependencies = [
+- "ring",
+- "untrusted",
++ "ring 0.17.5",
++ "untrusted 0.9.0",
+ ]
+ 
+ [[package]]
+@@ -4639,18 +4708,18 @@ checksum = "cd0b0ec5f1c1ca621c432a25813d8d60c88abe6d3e08a3eb9cf37d97a0fe3d73"
+ 
+ [[package]]
+ name = "serde"
+-version = "1.0.188"
++version = "1.0.190"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "cf9e0fcba69a370eed61bcf2b728575f726b50b55cba78064753d708ddc7549e"
++checksum = "91d3c334ca1ee894a2c6f6ad698fe8c435b76d504b13d436f0685d648d6d96f7"
+ dependencies = [
+  "serde_derive",
+ ]
+ 
+ [[package]]
+ name = "serde_derive"
+-version = "1.0.188"
++version = "1.0.190"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "4eca7ac642d82aa35b60049a6eccb4be6be75e599bd2e9adb5f875a737654af2"
++checksum = "67c5609f394e5c2bd7fc51efda478004ea80ef42fee983d5c67a65e34f32c0e3"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+@@ -4659,9 +4728,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "serde_json"
+-version = "1.0.107"
++version = "1.0.108"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "6b420ce6e3d8bd882e9b243c6eed35dbc9a6110c9769e74b584e0d68d1f20c65"
++checksum = "3d1c7e3eac408d115102c4c24ad393e0821bb3a5df4d506a80f85f7a742a526b"
+ dependencies = [
+  "itoa",
+  "ryu",
+@@ -4680,9 +4749,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "serde_spanned"
+-version = "0.6.3"
++version = "0.6.4"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "96426c9936fd7a0124915f9185ea1d20aa9445cc9821142f0a73bc9207a2e186"
++checksum = "12022b835073e5b11e90a14f86838ceb1c8fb0325b72416845c487ac0fa95e80"
+ dependencies = [
+  "serde",
+ ]
+@@ -4867,14 +4936,14 @@ dependencies = [
+ 
+ [[package]]
+ name = "slack-morphism"
+-version = "1.14.3"
++version = "1.15.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "eaf93e47c6a41913dfff6571e303418587fbd63a7a0f6c499f22eeb1ea8040b9"
++checksum = "6bae74ab9efb4260d3ac96a95f8e47bb98d6135569447e535a9b33c255d060e9"
+ dependencies = [
+  "async-recursion",
+  "async-trait",
+  "axum 0.6.20",
+- "base64 0.21.4",
++ "base64 0.21.5",
+  "bytes",
+  "chrono",
+  "ctrlc",
+@@ -4888,7 +4957,7 @@ dependencies = [
+  "lazy_static",
+  "mime",
+  "rand",
+- "ring",
++ "ring 0.17.5",
+  "rsb_derive",
+  "rvstruct",
+  "serde",
+@@ -4924,9 +4993,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "socket2"
+-version = "0.4.9"
++version = "0.4.10"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "64a4a911eed85daf18834cfaa86a79b7d266ff93ff5ba14005426219480ed662"
++checksum = "9f7916fc008ca5542385b89a3d3ce689953c143e9304a9bf8beec1de48994c0d"
+ dependencies = [
+  "libc",
+  "winapi",
+@@ -4934,9 +5003,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "socket2"
+-version = "0.5.4"
++version = "0.5.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "4031e820eb552adee9295814c0ced9e5cf38ddf1e8b7d566d6de8e2538ea989e"
++checksum = "7b5fac59a5cb5dd637972e5fca70daf0523c9067fcdc4842f053dae04a18f8e9"
+ dependencies = [
+  "libc",
+  "windows-sys",
+@@ -5055,7 +5124,7 @@ version = "0.25.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
+ dependencies = [
+- "strum_macros 0.25.2",
++ "strum_macros 0.25.3",
+ ]
+ 
+ [[package]]
+@@ -5073,9 +5142,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "strum_macros"
+-version = "0.25.2"
++version = "0.25.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "ad8d03b598d3d0fff69bf533ee3ef19b8eeb342729596df84bcc7e1f96ec4059"
++checksum = "23dc1fa9ac9c169a78ba62f0b841814b7abae11bdd047b9c58f893439e309ea0"
+ dependencies = [
+  "heck",
+  "proc-macro2",
+@@ -5097,7 +5166,7 @@ dependencies = [
+  "axum-server",
+  "cargo-husky",
+  "chrono",
+- "clap 4.4.6",
++ "clap 4.4.7",
+  "confy",
+  "criterion",
+  "derive-getters",
+@@ -5139,9 +5208,9 @@ checksum = "81cdd64d312baedb58e21336b31bc043b77e01cc99033ce76ef539f78e965ebc"
+ 
+ [[package]]
+ name = "svm-rs"
+-version = "0.3.0"
++version = "0.3.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "597e3a746727984cb7ea2487b6a40726cad0dbe86628e7d429aa6b8c4c153db4"
++checksum = "d0cc95be7cc2c384a2f57cac56548d2178650905ebe5725bc8970ccc25529060"
+ dependencies = [
+  "dirs",
+  "fs2",
+@@ -5289,18 +5358,18 @@ dependencies = [
+  "tokio",
+  "tokio-util",
+  "url",
+- "uuid 1.4.1",
++ "uuid 1.5.0",
+ ]
+ 
+ [[package]]
+ name = "tempfile"
+-version = "3.8.0"
++version = "3.8.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "cb94d2f3cc536af71caac6b6fcebf65860b347e7ce0cc9ebe8f70d3e521054ef"
++checksum = "7ef1adac450ad7f4b3c28589471ade84f25f731a7a0fe30d71dfa9f60fd808e5"
+ dependencies = [
+  "cfg-if",
+  "fastrand",
+- "redox_syscall 0.3.5",
++ "redox_syscall 0.4.1",
+  "rustix",
+  "windows-sys",
+ ]
+@@ -5325,6 +5394,16 @@ dependencies = [
+  "winapi-util",
+ ]
+ 
++[[package]]
++name = "terminal_size"
++version = "0.3.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
++dependencies = [
++ "rustix",
++ "windows-sys",
++]
++
+ [[package]]
+ name = "test-runner"
+ version = "0.0.1"
+@@ -5392,7 +5471,7 @@ dependencies = [
+  "tower-http 0.4.4",
+  "tracing",
+  "tracing-subscriber",
+- "uuid 1.4.1",
++ "uuid 1.5.0",
+  "waku-bindings",
+ ]
+ 
+@@ -5404,18 +5483,18 @@ checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
+ 
+ [[package]]
+ name = "thiserror"
+-version = "1.0.49"
++version = "1.0.50"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "1177e8c6d7ede7afde3585fd2513e611227efd6481bd78d2e82ba1ce16557ed4"
++checksum = "f9a7210f5c9a7156bb50aa36aed4c95afb51df0df00713949448cf9e97d382d2"
+ dependencies = [
+  "thiserror-impl",
+ ]
+ 
+ [[package]]
+ name = "thiserror-impl"
+-version = "1.0.49"
++version = "1.0.50"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "10712f02019e9288794769fba95cd6847df9874d49d871d062172f9dd41bc4cc"
++checksum = "266b2e40bc00e5a6c09c3584011e08b06f123c00362c92b975ba9843aaaa14b8"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+@@ -5434,12 +5513,13 @@ dependencies = [
+ 
+ [[package]]
+ name = "time"
+-version = "0.3.29"
++version = "0.3.30"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "426f806f4089c493dcac0d24c29c01e2c38baf8e30f1b716ee37e83d200b18fe"
++checksum = "c4a34ab300f2dee6e562c10a046fc05e358b29f9bf92277f30c3c8d82275f6f5"
+ dependencies = [
+  "deranged",
+  "itoa",
++ "powerfmt",
+  "serde",
+  "time-core",
+  "time-macros",
+@@ -5508,7 +5588,7 @@ dependencies = [
+  "parking_lot",
+  "pin-project-lite",
+  "signal-hook-registry",
+- "socket2 0.5.4",
++ "socket2 0.5.5",
+  "tokio-macros",
+  "tracing",
+  "windows-sys",
+@@ -5586,9 +5666,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "tokio-util"
+-version = "0.7.9"
++version = "0.7.10"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "1d68074620f57a0b21594d9735eb2e98ab38b17f80d3fcb189fca266771ca60d"
++checksum = "5419f34732d9eb6ee4c3578b7989078579b7f039cbbb9ca2c4da015749371e15"
+ dependencies = [
+  "bytes",
+  "futures-core",
+@@ -5617,14 +5697,14 @@ dependencies = [
+  "serde",
+  "serde_spanned",
+  "toml_datetime",
+- "toml_edit",
++ "toml_edit 0.19.15",
+ ]
+ 
+ [[package]]
+ name = "toml_datetime"
+-version = "0.6.3"
++version = "0.6.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "7cda73e2f1397b1262d6dfdcef8aafae14d1de7748d66822d3bfeeb6d03e5e4b"
++checksum = "3550f4e9685620ac18a50ed434eb3aec30db8ba93b0287467bca5826ea25baf1"
+ dependencies = [
+  "serde",
+ ]
+@@ -5635,13 +5715,24 @@ version = "0.19.15"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
+ dependencies = [
+- "indexmap 2.0.2",
++ "indexmap 2.1.0",
+  "serde",
+  "serde_spanned",
+  "toml_datetime",
+  "winnow",
+ ]
+ 
++[[package]]
++name = "toml_edit"
++version = "0.20.7"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "70f427fce4d84c72b5b732388bf4a9f4531b53f74e2887e3ecb2481f68f66d81"
++dependencies = [
++ "indexmap 2.1.0",
++ "toml_datetime",
++ "winnow",
++]
++
+ [[package]]
+ name = "tower"
+ version = "0.4.13"
+@@ -5683,7 +5774,7 @@ version = "0.4.4"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "61c5bb1d698276a2443e5ecfabc1008bf15a36c12e6a7176e7bf089ea9131140"
+ dependencies = [
+- "bitflags 2.4.0",
++ "bitflags 2.4.1",
+  "bytes",
+  "futures-core",
+  "futures-util",
+@@ -5710,11 +5801,10 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
+ 
+ [[package]]
+ name = "tracing"
+-version = "0.1.37"
++version = "0.1.40"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "8ce8c33a8d48bd45d624a6e523445fd21ec13d3653cd51f681abf67418f54eb8"
++checksum = "c3523ab5a71916ccf420eebdf5521fcef02141234bbc0b8a49f2fdc4544364ef"
+ dependencies = [
+- "cfg-if",
+  "log",
+  "pin-project-lite",
+  "tracing-attributes",
+@@ -5723,9 +5813,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "tracing-attributes"
+-version = "0.1.26"
++version = "0.1.27"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "5f4f31f56159e98206da9efd823404b79b6ef3143b4a7ab76e67b1751b25a4ab"
++checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+@@ -5734,9 +5824,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "tracing-core"
+-version = "0.1.31"
++version = "0.1.32"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "0955b8137a1df6f1a2e9a37d8a6656291ff0297c1a97c24e0d8425fe2312f79a"
++checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
+ dependencies = [
+  "once_cell",
+  "valuable",
+@@ -5754,12 +5844,12 @@ dependencies = [
+ 
+ [[package]]
+ name = "tracing-log"
+-version = "0.1.3"
++version = "0.1.4"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "78ddad33d2d10b1ed7eb9d1f518a5674713876e97e5bb9b7345a7984fbb4f922"
++checksum = "f751112709b4e791d8ce53e32c4ed2d353565a795ce84da2285393f41557bdf2"
+ dependencies = [
+- "lazy_static",
+  "log",
++ "once_cell",
+  "tracing-core",
+ ]
+ 
+@@ -5877,6 +5967,12 @@ dependencies = [
+  "static_assertions",
+ ]
+ 
++[[package]]
++name = "unarray"
++version = "0.1.4"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
++
+ [[package]]
+ name = "unicase"
+ version = "2.7.0"
+@@ -5956,6 +6052,12 @@ version = "0.7.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
+ 
++[[package]]
++name = "untrusted"
++version = "0.9.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
++
+ [[package]]
+ name = "url"
+ version = "2.4.1"
+@@ -5998,9 +6100,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "uuid"
+-version = "1.4.1"
++version = "1.5.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "79daa5ed5740825c40b389c5e50312b9c86df53fccd33f281df655642b43869d"
++checksum = "88ad59a7560b41a70d191093a945f0b87bc1deeda46fb237479708a1d6b6cdfc"
+ dependencies = [
+  "getrandom",
+ ]
+@@ -6036,7 +6138,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "2db391df1457690eb489ce20fdcc7ba5d1fd6c24feee3a5942ce51273c71e514"
+ dependencies = [
+  "aes-gcm",
+- "base64 0.21.4",
++ "base64 0.21.5",
+  "enr 0.7.0",
+  "hex",
+  "multiaddr",
+@@ -6230,10 +6332,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+ 
+ [[package]]
+-name = "windows"
+-version = "0.48.0"
++name = "windows-core"
++version = "0.51.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "e686886bc078bc1b0b600cac0147aadb815089b6e4da64016cbd754b6342700f"
++checksum = "f1f8cf84f35d2db49a46868f947758c7a1138116f7fac3bc844f43ade1292e64"
+ dependencies = [
+  "windows-targets",
+ ]
+@@ -6306,9 +6408,9 @@ checksum = "ed94fce61571a4006852b7389a063ab983c02eb1bb37b47f8272ce92d06d9538"
+ 
+ [[package]]
+ name = "winnow"
+-version = "0.5.16"
++version = "0.5.18"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "037711d82167854aff2018dfd193aa0fef5370f456732f0d5a0c59b0f1b4b907"
++checksum = "176b6138793677221d420fd2f0aeeced263f197688b36484660da767bca2fa32"
+ dependencies = [
+  "memchr",
+ ]
+@@ -6357,6 +6459,26 @@ version = "0.5.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
+ 
++[[package]]
++name = "zerocopy"
++version = "0.7.21"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "686b7e407015242119c33dab17b8f61ba6843534de936d94368856528eae4dcc"
++dependencies = [
++ "zerocopy-derive",
++]
++
++[[package]]
++name = "zerocopy-derive"
++version = "0.7.21"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "020f3dfe25dfc38dfea49ce62d5d45ecdd7f0d8a724fa63eb36b6eba4ec76806"
++dependencies = [
++ "proc-macro2",
++ "quote",
++ "syn 2.0.38",
++]
++
+ [[package]]
+ name = "zeroize"
+ version = "1.6.0"
+@@ -6404,11 +6526,10 @@ dependencies = [
+ 
+ [[package]]
+ name = "zstd-sys"
+-version = "2.0.8+zstd.1.5.5"
++version = "2.0.9+zstd.1.5.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "5556e6ee25d32df2586c098bbfa278803692a20d0ab9565e049480d52707ec8c"
++checksum = "9e16efa8a874a0481a574084d34cc26fdb3b99627480f785888deb6386506656"
+ dependencies = [
+  "cc",
+- "libc",
+  "pkg-config",
+ ]
+diff --git a/README.md b/README.md
+index 641a18f..378e165 100644
+--- a/README.md
++++ b/README.md
+@@ -19,7 +19,7 @@ The key requirement for an Indexer to earn indexing rewards is to submit a valid
+ 
+ When developers publish a new version (subgraph deployment) to their subgraph, data service instability may occur while their API queries the pre-existing version. Indexers may require some time to sync a subgraph to the chainhead after they have stopped syncing the previous deployment. To decrease the upgrade friction, developers can send a message before publishing the subgraph on current deployment hash's Graphcast channel, which includes the subgraph id, corresponding new deployment hash, and the represented graph account that must be validated to be the subgraph's owner. 
+ 
+-Indexers running the subgraph radio and listening to that channel will in turn receive the message. Given valid configurations to notification, indexer management server, and `auto_upgrade` coverage level, the radio will send a notification to the indexer and/or an offchain request to their indexer management server that should automatically presync the deployment on graph node.
++Indexers running the subgraph radio and listening to that channel will in turn receive the message. Given valid configurations to notification, indexer management server, and `auto_upgrade_coverage` coverage level, the radio will send a notification to the indexer and/or an offchain request to their indexer management server that should automatically presync the deployment on graph node.
+ 
+ Note that it is still at the subgraph developers' discretion to await for the indexers to sync upto chainhead, in which point they can publish the staged version without disrupting API usage.
+ 
+diff --git a/subgraph-radio/Cargo.toml b/subgraph-radio/Cargo.toml
+index 769ef37..f897cd0 100644
+--- a/subgraph-radio/Cargo.toml
++++ b/subgraph-radio/Cargo.toml
+@@ -53,7 +53,7 @@ async-trait = "0.1.71"
+ metrics = "0.21.0"
+ opentelemetry = { version = "0.19.0", features = ["rt-tokio", "trace"] }
+ tracing-opentelemetry = "0.18.0"
+-clap = { version = "4.3.1", features = ["derive", "env"] }
++clap = { version = "4.4", features = ["cargo", "unstable-doc", "derive", "env"] }
+ confy = "0.5.1"
+ 
+ [dev-dependencies]
+diff --git a/subgraph-radio/benches/gossips.rs b/subgraph-radio/benches/gossips.rs
+index 5a1f43b..f4a0eda 100644
+--- a/subgraph-radio/benches/gossips.rs
++++ b/subgraph-radio/benches/gossips.rs
+@@ -1,6 +1,6 @@
+ use criterion::async_executor::FuturesExecutor;
+ use criterion::{black_box, criterion_group, criterion_main, Criterion};
+-use graphcast_sdk::graphcast_agent::message_typing::IdentityValidation;
++
+ use graphcast_sdk::graphcast_agent::GraphcastAgent;
+ use subgraph_radio::operator::RadioOperator;
+ 
+@@ -10,9 +10,8 @@ use std::collections::HashMap;
+ use std::sync::mpsc;
+ 
+ use graphcast_sdk::networks::NetworkName;
+-use graphcast_sdk::{BlockPointer, GraphcastNetworkName, LogFormat, NetworkPointer, WakuMessage};
+-use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioInfrastructure, Waku};
+-use subgraph_radio::operator::notifier::NotificationMode;
++use graphcast_sdk::{BlockPointer, NetworkPointer, WakuMessage};
++use subgraph_radio::config::{Config, GraphStack};
+ 
+ fn gossip_poi_bench(c: &mut Criterion) {
+     let identifiers = black_box(vec!["identifier1".to_string(), "identifier2".to_string()]);
+@@ -24,58 +23,10 @@ fn gossip_poi_bench(c: &mut Criterion) {
+ 
+     let config = black_box(Config {
+         graph_stack: GraphStack {
+-            indexer_address: String::from("indexer_address"),
+-            graph_node_status_endpoint: String::from("http://localhost:8030/graphql"),
+             private_key: Some(pk.display_secret().to_string()),
+-            mnemonic: None,
+-            registry_subgraph: String::from(
+-                "https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-goerli",
+-            ),
+-            network_subgraph: String::from(
+-                "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli",
+-            ),
+-            indexer_management_server_endpoint: None,
+-            protocol_network: None,
+-        },
+-        waku: Waku {
+-            waku_host: None,
+-            waku_port: None,
+-            waku_node_key: None,
+-            boot_node_addresses: vec![],
+-            waku_log_level: "fatal".to_string(),
+-            waku_addr: None,
+-            discv5_enrs: None,
+-            discv5_port: None,
+-            filter_protocol: None,
+-        },
+-        radio_infrastructure: RadioInfrastructure {
+-            radio_name: String::from("test"),
+-            topics: vec![String::from(
+-                "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",
+-            )],
+-            coverage: CoverageLevel::Comprehensive,
+-            collect_message_duration: 10,
+-            ratelimit_threshold: 60000,
+-            log_level: String::from("info"),
+-            slack_token: None,
+-            slack_channel: None,
+-            discord_webhook: None,
+-            telegram_token: None,
+-            telegram_chat_id: None,
+-            metrics_host: String::from("0.0.0.0"),
+-            metrics_port: None,
+-            server_host: String::from("0.0.0.0"),
+-            server_port: None,
+-            persistence_file_path: None,
+-            id_validation: IdentityValidation::NoCheck,
+-            topic_update_interval: 600,
+-            log_format: LogFormat::Pretty,
+-            graphcast_network: GraphcastNetworkName::Testnet,
+-            auto_upgrade: CoverageLevel::Comprehensive,
+-            notification_interval: 1,
+-            notification_mode: NotificationMode::PeriodicReport,
++            ..Default::default()
+         },
+-        config_file: None,
++        ..Default::default()
+     });
+ 
+     c.bench_function("gossip_poi", move |b| {
+diff --git a/subgraph-radio/src/config.rs b/subgraph-radio/src/config.rs
+index a8b9303..5aa5dbb 100644
+--- a/subgraph-radio/src/config.rs
++++ b/subgraph-radio/src/config.rs
+@@ -41,9 +41,10 @@ pub struct Config {
+     #[command(flatten)]
+     pub waku: Waku,
+     #[command(flatten)]
+-    pub radio_infrastructure: RadioInfrastructure,
++    pub radio_setup: RadioSetup,
+     #[arg(
+         short,
++        long,
+         value_name = "config_file",
+         env = "CONFIG_FILE",
+         help = "Configuration file (toml or yaml format)"
+@@ -66,9 +67,9 @@ impl Config {
+             Config::parse()
+         };
+ 
+-        std::env::set_var("RUST_LOG", config.radio_infrastructure().log_level.clone());
++        std::env::set_var("RUST_LOG", config.radio_setup().log_level.clone());
+         // Enables tracing under RUST_LOG variable
+-        init_tracing(config.radio_infrastructure().log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level`");
++        init_tracing(config.radio_setup().log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level`");
+         config
+     }
+ 
+@@ -99,7 +100,7 @@ impl Config {
+         &self,
+     ) -> Result<GraphcastAgentConfig, GraphcastAgentError> {
+         let wallet_key = self.wallet_input().unwrap().to_string();
+-        let topics = self.radio_infrastructure().topics.clone();
++        let topics = self.radio_setup().topics.clone();
+         let mut discv5_enrs = self.waku().discv5_enrs.clone().unwrap_or_default();
+         // Discovery network
+         discv5_enrs.push("enr:-P-4QJI8tS1WTdIQxq_yIrD05oIIW1Xg-tm_qfP0CHfJGnp9dfr6ttQJmHwTNxGEl4Le8Q7YHcmi-kXTtphxFysS11oBgmlkgnY0gmlwhLymh5GKbXVsdGlhZGRyc7hgAC02KG5vZGUtMDEuZG8tYW1zMy53YWt1djIucHJvZC5zdGF0dXNpbS5uZXQGdl8ALzYobm9kZS0wMS5kby1hbXMzLndha3V2Mi5wcm9kLnN0YXR1c2ltLm5ldAYfQN4DiXNlY3AyNTZrMaEDbl1X_zJIw3EAJGtmHMVn4Z2xhpSoUaP5ElsHKCv7hlWDdGNwgnZfg3VkcIIjKIV3YWt1Mg8".to_string());
+@@ -107,13 +108,13 @@ impl Config {
+         GraphcastAgentConfig::new(
+             wallet_key,
+             self.graph_stack().indexer_address.clone(),
+-            self.radio_infrastructure().radio_name.clone(),
++            self.radio_setup().radio_name.clone(),
+             self.graph_stack().registry_subgraph.clone(),
+             self.graph_stack().network_subgraph.clone(),
+-            self.radio_infrastructure().id_validation.clone(),
++            self.radio_setup().id_validation.clone(),
+             Some(self.graph_stack().graph_node_status_endpoint.clone()),
+             Some(self.waku().boot_node_addresses.clone()),
+-            Some(self.radio_infrastructure().graphcast_network.to_string()),
++            Some(self.radio_setup().graphcast_network.to_string()),
+             Some(topics),
+             self.waku().waku_node_key.clone(),
+             self.waku().waku_host.clone(),
+@@ -140,7 +141,7 @@ impl Config {
+     }
+ 
+     pub async fn init_radio_state(&self) -> PersistedState {
+-        let file_path = &self.radio_infrastructure().persistence_file_path.clone();
++        let file_path = &self.radio_setup().persistence_file_path.clone();
+ 
+         if let Some(path) = file_path {
+             //TODO: set up synchronous panic hook as part of PersistedState functions
+@@ -171,30 +172,30 @@ impl Config {
+ 
+     /// Generate a set of unique topics along with given static topics
+     #[autometrics]
+-    pub async fn generate_topics(
+-        &self,
+-        coverage: &CoverageLevel,
+-        indexer_address: &str,
+-    ) -> Vec<String> {
+-        let static_topics = HashSet::from_iter(self.radio_infrastructure().topics.to_vec());
++    pub async fn generate_topics(&self, coverage: &CoverageLevel) -> Vec<String> {
++        let static_topics = HashSet::from_iter(self.radio_setup().topics.to_vec());
+         let topics = match coverage {
+             CoverageLevel::None => HashSet::new(),
+             CoverageLevel::Minimal => static_topics,
+             CoverageLevel::OnChain => {
+-                let mut topics: HashSet<String> =
+-                    active_allocation_hashes(self.callbook().graph_network(), indexer_address)
+-                        .await
+-                        .into_iter()
+-                        .collect();
++                let mut topics: HashSet<String> = active_allocation_hashes(
++                    self.callbook().graph_network(),
++                    &self.graph_stack().indexer_address,
++                )
++                .await
++                .into_iter()
++                .collect();
+                 topics.extend(static_topics);
+                 topics
+             }
+             CoverageLevel::Comprehensive => {
+-                let active_topics: HashSet<String> =
+-                    active_allocation_hashes(self.callbook().graph_network(), indexer_address)
+-                        .await
+-                        .into_iter()
+-                        .collect();
++                let active_topics: HashSet<String> = active_allocation_hashes(
++                    self.callbook().graph_network(),
++                    &self.graph_stack().indexer_address,
++                )
++                .await
++                .into_iter()
++                .collect();
+                 let mut additional_topics: HashSet<String> =
+                     syncing_deployment_hashes(self.graph_stack().graph_node_status_endpoint())
+                         .await
+@@ -221,8 +222,8 @@ impl Config {
+                 .last()
+                 .and_then(|suf| suf.strip_prefix("graph-network-"))
+                 .ok_or(ConfigError::ValidateInput(
+-                    "Not a conventionally parseable API, need a protocol network specification"
+-                        .to_string(),
++                    format!("Not a conventionally parseable graph-network subgraph API: {:#?}, please provide a protocol network specification",
++                    self.graph_stack().network_subgraph())
+                 ))?
+                 .to_string()
+         };
+@@ -301,7 +302,7 @@ pub struct GraphStack {
+ 
+ #[derive(Clone, Debug, Args, Serialize, Deserialize, Default)]
+ #[group(required = true, multiple = true)]
+-pub struct RadioInfrastructure {
++pub struct RadioSetup {
+     #[clap(
+         long,
+         value_name = "GRAPHCAST_NETWORK",
+@@ -320,28 +321,28 @@ pub struct RadioInfrastructure {
+     pub topics: Vec<String>,
+     #[clap(
+         long,
+-        value_name = "COVERAGE",
++        value_name = "GOSSIP_TOPIC_COVERAGE",
+         value_enum,
+         default_value = "comprehensive",
+-        env = "COVERAGE",
+-        help = "Toggle for topic coverage level",
+-        long_help = "Topic coverage level\ncomprehensive: Subscribe to on-chain topics, user defined static topics, and additional topics\n
++        env = "GOSSIP_TOPIC_COVERAGE",
++        help = "Toggle for gossip topic coverage level",
++        long_help = "Topic gossip coverage level\ncomprehensive: Subscribe to on-chain topics, user defined static topics, and additional topics\n
+             on-chain: Subscribe to on-chain topics and user defined static topics\nminimal: Only subscribe to user defined static topics.\n
+             Default: comprehensive"
+     )]
+-    pub coverage: CoverageLevel,
++    pub gossip_topic_coverage: CoverageLevel,
+     #[clap(
+         long,
+-        value_name = "COVERAGE",
++        value_name = "AUTO_UPGRADE_COVERAGE",
+         value_enum,
+         default_value = "comprehensive",
+-        env = "AUTO_UPGRADE",
++        env = "AUTO_UPGRADE_COVERAGE",
+         help = "Toggle for the types of subgraph the radio send offchain syncing commands to indexer management server. Default to upgrade all syncing deployments",
+-        long_help = "Topic upgrade  coverage level\ncomprehensive: on-chain allocations, user defined static topics, and additional topics\n
++        long_help = "Topic upgrade coverage level\ncomprehensive: on-chain allocations, user defined static topics, and additional topics\n
+             on-chain: Subscribe to on-chain topics and user defined static topics\nminimal: Only subscribe to user defined static topics.\n
+             none: no automatic upgrade, only notifications.\nDefault: comprehensive"
+     )]
+-    pub auto_upgrade: CoverageLevel,
++    pub auto_upgrade_coverage: CoverageLevel,
+     #[clap(
+         long,
+         value_parser = value_parser!(i64).range(1..),
+@@ -350,7 +351,7 @@ pub struct RadioInfrastructure {
+         env = "RATELIMIT_THRESHOLD",
+         help = "Set upgrade intent ratelimit in seconds: only one upgrade per subgraph within the threshold (default: 86400 seconds = 1 day)"
+     )]
+-    pub ratelimit_threshold: i64,
++    pub auto_upgrade_ratelimit: i64,
+     #[clap(
+         long,
+         value_parser = value_parser!(i64).range(1..),
+@@ -611,32 +612,8 @@ mod tests {
+                 discv5_port: None,
+                 filter_protocol: None,
+             },
+-            radio_infrastructure: RadioInfrastructure {
+-                radio_name: String::from("test"),
+-                topics: vec![String::from(
+-                    "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",
+-                )],
+-                coverage: CoverageLevel::Comprehensive,
+-                collect_message_duration: 10,
+-                ratelimit_threshold: 60000,
+-                log_level: String::from("info"),
+-                slack_token: None,
+-                slack_channel: None,
+-                discord_webhook: None,
+-                telegram_token: None,
+-                telegram_chat_id: None,
+-                metrics_host: String::from("0.0.0.0"),
+-                metrics_port: None,
+-                server_host: String::from("0.0.0.0"),
+-                server_port: None,
+-                persistence_file_path: None,
+-                id_validation: IdentityValidation::NoCheck,
+-                topic_update_interval: 600,
+-                log_format: LogFormat::Pretty,
+-                graphcast_network: GraphcastNetworkName::Testnet,
+-                auto_upgrade: CoverageLevel::Comprehensive,
+-                notification_mode: NotificationMode::Live,
+-                notification_interval: 24,
++            radio_setup: RadioSetup {
++                ..Default::default()
+             },
+             config_file: None,
+         }
+@@ -645,7 +622,6 @@ mod tests {
+     #[test]
+     fn protocol_network() {
+         let mut config = test_config();
+-
+         assert_eq!(&config.protocol_network().unwrap(), "goerli");
+ 
+         config.graph_stack.protocol_network = Some("arbitrum-one".to_string());
+diff --git a/subgraph-radio/src/messages/upgrade.rs b/subgraph-radio/src/messages/upgrade.rs
+index bb839a9..043d315 100644
+--- a/subgraph-radio/src/messages/upgrade.rs
++++ b/subgraph-radio/src/messages/upgrade.rs
+@@ -93,7 +93,7 @@ impl UpgradeIntentMessage {
+ 
+     /// Process the validated upgrade intent messages
+     /// If notification is set up, then notify the indexer
+-    /// If indexer management server endpoint is set up, radio checks `auto_upgrade` for
++    /// If indexer management server endpoint is set up, radio checks `auto_upgrade_coverage` for
+     pub async fn process_valid_message(
+         &self,
+         config: &Config,
+@@ -101,7 +101,7 @@ impl UpgradeIntentMessage {
+         state: &PersistedState,
+     ) -> Result<&Self, OperationError> {
+         // ratelimit upgrades: return early if there was a recent upgrade
+-        if state.recent_upgrade(self, config.radio_infrastructure.ratelimit_threshold) {
++        if state.recent_upgrade(self, config.radio_setup.auto_upgrade_ratelimit) {
+             info!(subgraph = &self.subgraph_id, "Received an Upgrade Intent Message for a recently upgraded subgraph, skiping notification and auto deployment");
+             return Ok(self);
+         }
+@@ -113,10 +113,7 @@ impl UpgradeIntentMessage {
+         if let Some(url) = &config.graph_stack().indexer_management_server_endpoint {
+             // If the identifier satisfy the config coverage level
+             let covered_topics = config
+-                .generate_topics(
+-                    &config.radio_infrastructure().auto_upgrade,
+-                    &config.graph_stack().indexer_address,
+-                )
++                .generate_topics(&config.radio_setup().auto_upgrade_coverage)
+                 .await;
+             // Get the current deployment hash by querying network subgraph and take the latest hash of the subgraph id
+             // Should be able to assume valid identifier since the message is valid
+diff --git a/subgraph-radio/src/operator/mod.rs b/subgraph-radio/src/operator/mod.rs
+index 628e379..ab53bdc 100644
+--- a/subgraph-radio/src/operator/mod.rs
++++ b/subgraph-radio/src/operator/mod.rs
+@@ -75,10 +75,10 @@ impl RadioOperator {
+         tokio::spawn(shutdown(control_flow.clone()));
+ 
+         // Set up Prometheus metrics url if configured
+-        if let Some(port) = config.radio_infrastructure().metrics_port {
++        if let Some(port) = config.radio_setup().metrics_port {
+             debug!("Initializing metrics port");
+             tokio::spawn(handle_serve_metrics(
+-                config.radio_infrastructure().metrics_host.clone(),
++                config.radio_setup().metrics_host.clone(),
+                 port,
+                 control_flow.metrics_handle.clone(),
+             ));
+@@ -86,10 +86,7 @@ impl RadioOperator {
+ 
+         // Provide generated topics to Graphcast agent
+         let topics = config
+-            .generate_topics(
+-                &config.radio_infrastructure().coverage,
+-                &config.graph_stack.indexer_address,
+-            )
++            .generate_topics(&config.radio_setup().gossip_topic_coverage)
+             .await;
+         debug!(
+             topics = tracing::field::debug(&topics),
+@@ -119,7 +116,7 @@ impl RadioOperator {
+     pub async fn run(&'static self) {
+         // Control flow
+         let mut topic_update_interval = interval(Duration::from_secs(
+-            self.config.radio_infrastructure.topic_update_interval,
++            self.config.radio_setup.topic_update_interval,
+         ));
+ 
+         let mut state_update_interval = interval(Duration::from_secs(10));
+@@ -127,7 +124,7 @@ impl RadioOperator {
+         let mut comparison_interval = interval(Duration::from_secs(300));
+ 
+         let mut notification_interval = tokio::time::interval(Duration::from_secs(
+-            self.config.radio_infrastructure.notification_interval * 3600,
++            self.config.radio_setup.notification_interval * 3600,
+         ));
+ 
+         let iteration_timeout = Duration::from_secs(180);
+@@ -143,7 +140,7 @@ impl RadioOperator {
+         });
+ 
+         // Initialize Http server with graceful shutdown if configured
+-        if self.config.radio_infrastructure().server_port.is_some() {
++        if self.config.radio_setup().server_port.is_some() {
+             let state_ref = &self.persisted_state;
+             let config_cloned = self.config.clone();
+             tokio::spawn(run_server(
+@@ -168,8 +165,7 @@ impl RadioOperator {
+                     let result = timeout(update_timeout,
+                         self.graphcast_agent()
+                         .update_content_topics(self.config.generate_topics(
+-                            &self.config.radio_infrastructure().coverage,
+-                            &self.config.graph_stack().indexer_address).await)
++                            &self.config.radio_setup().gossip_topic_coverage,).await)
+                     ).await;
+ 
+                     if result.is_err() {
+@@ -194,7 +190,7 @@ impl RadioOperator {
+ 
+                     info!(connected_peers, gossip_peers, diverged_num, "State update summary");
+                     // Save cache if path provided
+-                    let _ = &self.config.radio_infrastructure().persistence_file_path.as_ref().map(|path| {
++                    let _ = &self.config.radio_setup().persistence_file_path.as_ref().map(|path| {
+                         self.persisted_state.update_cache(path);
+                     });
+                 },
+@@ -312,7 +308,7 @@ impl RadioOperator {
+                     }
+                 },
+                 _ = notification_interval.tick() => {
+-                    match self.config.radio_infrastructure.notification_mode {
++                    match self.config.radio_setup.notification_mode {
+                         NotificationMode::PeriodicReport => {
+                         let comparison_results = self.persisted_state.comparison_results();
+                             if !comparison_results.is_empty() {
+diff --git a/subgraph-radio/src/operator/notifier.rs b/subgraph-radio/src/operator/notifier.rs
+index 2f33776..3f9b0e8 100644
+--- a/subgraph-radio/src/operator/notifier.rs
++++ b/subgraph-radio/src/operator/notifier.rs
+@@ -51,14 +51,14 @@ impl Notifier {
+     }
+ 
+     pub fn from_config(config: &Config) -> Self {
+-        let radio_name = config.radio_infrastructure().radio_name.clone();
+-        let slack_token = config.radio_infrastructure().slack_token.clone();
+-        let slack_channel = config.radio_infrastructure().slack_channel.clone();
+-        let discord_webhook = config.radio_infrastructure().discord_webhook.clone();
+-        let telegram_token = config.radio_infrastructure().telegram_token.clone();
+-        let telegram_chat_id = config.radio_infrastructure().telegram_chat_id;
+-        let notification_mode = config.radio_infrastructure().notification_mode.clone();
+-        let notification_interval = config.radio_infrastructure().notification_interval;
++        let radio_name = config.radio_setup().radio_name.clone();
++        let slack_token = config.radio_setup().slack_token.clone();
++        let slack_channel = config.radio_setup().slack_channel.clone();
++        let discord_webhook = config.radio_setup().discord_webhook.clone();
++        let telegram_token = config.radio_setup().telegram_token.clone();
++        let telegram_chat_id = config.radio_setup().telegram_chat_id;
++        let notification_mode = config.radio_setup().notification_mode.clone();
++        let notification_interval = config.radio_setup().notification_interval;
+ 
+         Notifier::new(
+             radio_name,
+diff --git a/subgraph-radio/src/operator/operation.rs b/subgraph-radio/src/operator/operation.rs
+index 3999c56..b7cdd7b 100644
+--- a/subgraph-radio/src/operator/operation.rs
++++ b/subgraph-radio/src/operator/operation.rs
+@@ -123,11 +123,7 @@ impl RadioOperator {
+ 
+         for id in identifiers.clone() {
+             /* Set up */
+-            let collect_duration: i64 = self
+-                .config
+-                .radio_infrastructure
+-                .collect_message_duration
+-                .to_owned();
++            let collect_duration: i64 = self.config.radio_setup.collect_message_duration.to_owned();
+             let id_cloned = id.clone();
+             let callbook = self.config.callbook();
+             let local_attestations = self.state().local_attestations();
+diff --git a/subgraph-radio/src/server/mod.rs b/subgraph-radio/src/server/mod.rs
+index 4f2e9b8..0df9c38 100644
+--- a/subgraph-radio/src/server/mod.rs
++++ b/subgraph-radio/src/server/mod.rs
+@@ -29,10 +29,10 @@ pub async fn run_server(
+     graphcast_agent: &'static GraphcastAgent,
+     handle: Handle,
+ ) {
+-    if config.radio_infrastructure().server_port.is_none() {
++    if config.radio_setup().server_port.is_none() {
+         return;
+     }
+-    let port = config.radio_infrastructure().server_port.unwrap();
++    let port = config.radio_setup().server_port.unwrap();
+     let context = Arc::new(SubgraphRadioContext::init(
+         config.clone(),
+         persisted_state,
+@@ -51,15 +51,11 @@ pub async fn run_server(
+         )
+         .layer(Extension(schema))
+         .layer(Extension(context));
+-    let addr = SocketAddr::from_str(&format!(
+-        "{}:{}",
+-        config.radio_infrastructure().server_host,
+-        port
+-    ))
+-    .expect("Create address");
++    let addr = SocketAddr::from_str(&format!("{}:{}", config.radio_setup().server_host, port))
++        .expect("Create address");
+ 
+     info!(
+-        host = tracing::field::debug(&config.radio_infrastructure().server_host),
++        host = tracing::field::debug(&config.radio_setup().server_host),
+         port, "Bind port to service"
+     );
+ 
+diff --git a/template.toml b/template.toml
+index 1a20c46..1ec0933 100644
+--- a/template.toml
++++ b/template.toml
+@@ -9,11 +9,11 @@ indexer_management_server_endpoint = 'http://127.0.0.1:18000'
+ [waku]
+ boot_node_addresses = []
+ 
+-[radio_infrastructure]
++[radio_setup]
+ graphcast_network = 'Testnet'
+ topics = ['QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB']
+-coverage = 'Comprehensive'
+-auto_upgrade = 'Comprehensive'
++gossip_topic_coverage = 'Comprehensive'
++auto_upgrade_coverage = 'Comprehensive'
+ collect_message_duration = 10
+ slack_token = 'xoxb-1231231231231-2312312312312-3abcabcabcabacabcabcabca'
+ metrics_host = '0.0.0.0'
+diff --git a/test-runner/src/invalid_block_hash.rs b/test-runner/src/invalid_block_hash.rs
+index 8cb3a43..9624db0 100644
+--- a/test-runner/src/invalid_block_hash.rs
++++ b/test-runner/src/invalid_block_hash.rs
+@@ -16,8 +16,8 @@ pub async fn invalid_block_hash_test() {
+         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
+ 
+     let mut config = test_config();
+-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+-    config.radio_infrastructure.topics = radio_topics.clone();
++    config.radio_setup.persistence_file_path = Some(store_path.clone());
++    config.radio_setup.topics = radio_topics.clone();
+ 
+     let mut test_sender_config = TestSenderConfig {
+         topics: test_sender_topics,
+diff --git a/test-runner/src/invalid_nonce.rs b/test-runner/src/invalid_nonce.rs
+index bd12522..e1b6135 100644
+--- a/test-runner/src/invalid_nonce.rs
++++ b/test-runner/src/invalid_nonce.rs
+@@ -16,8 +16,8 @@ pub async fn invalid_nonce_test() {
+         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
+ 
+     let mut config = test_config();
+-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+-    config.radio_infrastructure.topics = radio_topics.clone();
++    config.radio_setup.persistence_file_path = Some(store_path.clone());
++    config.radio_setup.topics = radio_topics.clone();
+ 
+     let mut test_sender_config = TestSenderConfig {
+         topics: test_sender_topics,
+diff --git a/test-runner/src/invalid_payload.rs b/test-runner/src/invalid_payload.rs
+index 4b26d83..d095001 100644
+--- a/test-runner/src/invalid_payload.rs
++++ b/test-runner/src/invalid_payload.rs
+@@ -17,8 +17,8 @@ pub async fn invalid_payload_test() {
+         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
+ 
+     let mut config = test_config();
+-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+-    config.radio_infrastructure.topics = radio_topics.clone();
++    config.radio_setup.persistence_file_path = Some(store_path.clone());
++    config.radio_setup.topics = radio_topics.clone();
+ 
+     let dummy_radio_payload = DummyMsg::new("hello".to_string(), 42);
+ 
+diff --git a/test-runner/src/invalid_sender.rs b/test-runner/src/invalid_sender.rs
+index 338359e..0666238 100644
+--- a/test-runner/src/invalid_sender.rs
++++ b/test-runner/src/invalid_sender.rs
+@@ -17,9 +17,9 @@ pub async fn invalid_sender_test() {
+         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
+ 
+     let mut config = test_config();
+-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+-    config.radio_infrastructure.topics = radio_topics.clone();
+-    config.radio_infrastructure.id_validation = IdentityValidation::RegisteredIndexer;
++    config.radio_setup.persistence_file_path = Some(store_path.clone());
++    config.radio_setup.topics = radio_topics.clone();
++    config.radio_setup.id_validation = IdentityValidation::RegisteredIndexer;
+ 
+     let mut test_sender_config = TestSenderConfig {
+         topics: test_sender_topics,
+diff --git a/test-runner/src/main.rs b/test-runner/src/main.rs
+index 1ac52ce..6c60558 100644
+--- a/test-runner/src/main.rs
++++ b/test-runner/src/main.rs
+@@ -41,7 +41,7 @@ pub async fn main() {
+             "RUST_LOG",
+             "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_runner=trace,test_sender=trace,test_utils=trace",
+         );
+-    init_tracing(config.radio_infrastructure.log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level");
++    init_tracing(config.radio_setup.log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level");
+ 
+     let start_time = Instant::now();
+ 
+diff --git a/test-runner/src/message_handling.rs b/test-runner/src/message_handling.rs
+index 6545ba9..4fd2538 100644
+--- a/test-runner/src/message_handling.rs
++++ b/test-runner/src/message_handling.rs
+@@ -19,9 +19,9 @@ pub async fn send_and_receive_test() {
+         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
+ 
+     let mut config = test_config();
+-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+-    config.radio_infrastructure.topics = radio_topics.clone();
+-    config.radio_infrastructure.topic_update_interval = 10;
++    config.radio_setup.persistence_file_path = Some(store_path.clone());
++    config.radio_setup.topics = radio_topics.clone();
++    config.radio_setup.topic_update_interval = 10;
+ 
+     let mut test_sender_config = TestSenderConfig {
+         topics: test_sender_topics,
+diff --git a/test-runner/src/poi_divergent.rs b/test-runner/src/poi_divergent.rs
+index 12627ed..33f9cd1 100644
+--- a/test-runner/src/poi_divergent.rs
++++ b/test-runner/src/poi_divergent.rs
+@@ -16,8 +16,8 @@ pub async fn poi_divergent_test() {
+         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
+ 
+     let mut config = test_config();
+-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+-    config.radio_infrastructure.topics = radio_topics.clone();
++    config.radio_setup.persistence_file_path = Some(store_path.clone());
++    config.radio_setup.topics = radio_topics.clone();
+ 
+     let mut test_sender_config = TestSenderConfig {
+         topics: test_sender_topics,
+diff --git a/test-runner/src/poi_match.rs b/test-runner/src/poi_match.rs
+index adea070..a08967d 100644
+--- a/test-runner/src/poi_match.rs
++++ b/test-runner/src/poi_match.rs
+@@ -16,8 +16,8 @@ pub async fn poi_match_test() {
+         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
+ 
+     let mut config = test_config();
+-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+-    config.radio_infrastructure.topics = radio_topics.clone();
++    config.radio_setup.persistence_file_path = Some(store_path.clone());
++    config.radio_setup.topics = radio_topics.clone();
+ 
+     let mut test_sender_config = TestSenderConfig {
+         topics: test_sender_topics,
+diff --git a/test-runner/src/topics.rs b/test-runner/src/topics.rs
+index 06c51e6..2fe7fcf 100644
+--- a/test-runner/src/topics.rs
++++ b/test-runner/src/topics.rs
+@@ -23,9 +23,9 @@ pub async fn topics_test() {
+     ];
+ 
+     let mut config = test_config();
+-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
+-    config.radio_infrastructure.topics = radio_topics.clone();
+-    config.radio_infrastructure.topic_update_interval = 90;
++    config.radio_setup.persistence_file_path = Some(store_path.clone());
++    config.radio_setup.topics = radio_topics.clone();
++    config.radio_setup.topic_update_interval = 90;
+ 
+     let mut test_sender_config = TestSenderConfig {
+         topics: test_sender_topics,
+@@ -43,7 +43,7 @@ pub async fn topics_test() {
+ 
+     // can be sure that file path is set to Some (after test_config()
+     let persisted_state =
+-        PersistedState::load_cache(&config.radio_infrastructure.persistence_file_path.unwrap());
++        PersistedState::load_cache(&config.radio_setup.persistence_file_path.unwrap());
+     debug!(
+         local_attestations = tracing::field::debug(&persisted_state.local_attestations()),
+         remote_ppoi_messages = tracing::field::debug(&persisted_state.remote_ppoi_messages()),
+diff --git a/test-utils/src/config.rs b/test-utils/src/config.rs
+index c201c2f..d2fbae5 100644
+--- a/test-utils/src/config.rs
++++ b/test-utils/src/config.rs
+@@ -3,7 +3,7 @@ use graphcast_sdk::{
+     graphcast_agent::message_typing::IdentityValidation, GraphcastNetworkName, LogFormat,
+ };
+ use serde::{Deserialize, Serialize};
+-use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioInfrastructure, Waku};
++use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioSetup, Waku};
+ use subgraph_radio::operator::notifier::NotificationMode;
+ 
+ #[derive(Clone, Debug, Parser, Serialize, Deserialize)]
+@@ -54,12 +54,12 @@ pub fn test_config() -> Config {
+                 filter_protocol: None,
+             }
+         },
+-        radio_infrastructure: {
+-            RadioInfrastructure {
++        radio_setup: {
++            RadioSetup {
+                 graphcast_network: GraphcastNetworkName::Testnet,
+                 topics: vec![],
+-                coverage: CoverageLevel::OnChain,
+-                ratelimit_threshold: 60000,
++                gossip_topic_coverage: CoverageLevel::OnChain,
++                auto_upgrade_ratelimit: 60000,
+                 collect_message_duration: 60,
+                 log_level:
+                     "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_runner=trace"
+@@ -78,7 +78,7 @@ pub fn test_config() -> Config {
+                 telegram_token: None,
+                 id_validation: IdentityValidation::ValidAddress,
+                 topic_update_interval: 600,
+-                auto_upgrade: CoverageLevel::OnChain,
++                auto_upgrade_coverage: CoverageLevel::OnChain,
+                 notification_mode: NotificationMode::Live,
+                 notification_interval: 24,
+             }
+diff --git a/test-utils/src/lib.rs b/test-utils/src/lib.rs
+index 5cbb8ef..35d9d6f 100644
+--- a/test-utils/src/lib.rs
++++ b/test-utils/src/lib.rs
+@@ -69,7 +69,7 @@ pub async fn setup(
+     test_file_name: &str,
+     test_sender_config: &mut TestSenderConfig,
+ ) -> ProcessManager {
+-    if let Some(file_path) = &config.radio_infrastructure().persistence_file_path {
++    if let Some(file_path) = &config.radio_setup().persistence_file_path {
+         let path = Path::new(file_path);
+         if path.exists() {
+             fs::remove_file(path).expect("Failed to remove file");
+@@ -121,7 +121,7 @@ pub async fn setup(
+     let host = format!("127.0.0.1:{}", port);
+     let server_state = start_mock_server(
+         host.clone(),
+-        config.radio_infrastructure().topics.clone(),
++        config.radio_setup().topics.clone(),
+         test_sender_config.staked_tokens.clone(),
+     )
+     .await;
+@@ -129,7 +129,7 @@ pub async fn setup(
+     config.graph_stack.graph_node_status_endpoint = format!("http://{}/graphql", host);
+     config.graph_stack.registry_subgraph = format!("http://{}/registry-subgraph", host);
+     config.graph_stack.network_subgraph = format!("http://{}/network-subgraph", host);
+-    config.radio_infrastructure.radio_name = radio_name;
++    config.radio_setup.radio_name = radio_name;
+     config.waku.waku_port = Some(waku_port.to_string());
+     config.waku.discv5_port = Some(discv5_port);
+ 
+@@ -180,33 +180,28 @@ pub fn start_radio(config: &Config) -> Child {
+         .arg("--network-subgraph")
+         .arg(&config.graph_stack().network_subgraph)
+         .arg("--graphcast-network")
+-        .arg(config.radio_infrastructure().graphcast_network.to_string())
++        .arg(config.radio_setup().graphcast_network.to_string())
+         .arg("--topics")
+-        .arg(config.radio_infrastructure().topics.join(","))
+-        .arg("--coverage")
+-        .arg(match config.radio_infrastructure().coverage {
++        .arg(config.radio_setup().topics.join(","))
++        .arg("--gossip-topic-coverage")
++        .arg(match config.radio_setup().gossip_topic_coverage {
+             CoverageLevel::None => "none",
+             CoverageLevel::Minimal => "minimal",
+             CoverageLevel::OnChain => "on-chain",
+             CoverageLevel::Comprehensive => "comprehensive",
+         })
+         .arg("--collect-message-duration")
+-        .arg(
+-            config
+-                .radio_infrastructure()
+-                .collect_message_duration
+-                .to_string(),
+-        )
++        .arg(config.radio_setup().collect_message_duration.to_string())
+         .arg("--waku-log-level")
+         .arg(config.waku().waku_log_level.clone())
+         .arg("--waku-port")
+         .arg(config.waku().waku_port.as_deref().unwrap_or("None"))
+         .arg("--log-level")
+-        .arg(&config.radio_infrastructure().log_level)
++        .arg(&config.radio_setup().log_level)
+         .arg("--slack-token")
+         .arg(
+             config
+-                .radio_infrastructure()
++                .radio_setup()
+                 .slack_token
+                 .as_deref()
+                 .unwrap_or("None"),
+@@ -214,7 +209,7 @@ pub fn start_radio(config: &Config) -> Child {
+         .arg("--slack-channel")
+         .arg(
+             config
+-                .radio_infrastructure()
++                .radio_setup()
+                 .slack_channel
+                 .as_deref()
+                 .unwrap_or("None"),
+@@ -222,7 +217,7 @@ pub fn start_radio(config: &Config) -> Child {
+         .arg("--discord-webhook")
+         .arg(
+             config
+-                .radio_infrastructure()
++                .radio_setup()
+                 .discord_webhook
+                 .as_deref()
+                 .unwrap_or("None"),
+@@ -230,22 +225,17 @@ pub fn start_radio(config: &Config) -> Child {
+         .arg("--persistence-file-path")
+         .arg(
+             config
+-                .radio_infrastructure()
++                .radio_setup()
+                 .persistence_file_path
+                 .as_deref()
+                 .unwrap_or("None"),
+         )
+         .arg("--log-format")
+-        .arg(&config.radio_infrastructure().log_format.to_string())
++        .arg(&config.radio_setup().log_format.to_string())
+         .arg("--radio-name")
+-        .arg(&config.radio_infrastructure().radio_name)
++        .arg(&config.radio_setup().radio_name)
+         .arg("--topic-update-interval")
+-        .arg(
+-            config
+-                .radio_infrastructure()
+-                .topic_update_interval
+-                .to_string(),
+-        )
++        .arg(config.radio_setup().topic_update_interval.to_string())
+         .arg("--discv5-port")
+         .arg(
+             config
+@@ -257,7 +247,7 @@ pub fn start_radio(config: &Config) -> Child {
+         .arg("--indexer-address")
+         .arg(&config.graph_stack().indexer_address)
+         .arg("--id-validation")
+-        .arg(match config.radio_infrastructure().id_validation {
++        .arg(match config.radio_setup().id_validation {
+             IdentityValidation::NoCheck => "no-check",
+             IdentityValidation::ValidAddress => "valid-address",
+             IdentityValidation::GraphcastRegistered => "graphcast-registered",

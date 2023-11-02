@@ -51,14 +51,14 @@ impl Notifier {
     }
 
     pub fn from_config(config: &Config) -> Self {
-        let radio_name = config.radio_setup().radio_name.clone();
-        let slack_token = config.radio_setup().slack_token.clone();
-        let slack_channel = config.radio_setup().slack_channel.clone();
-        let discord_webhook = config.radio_setup().discord_webhook.clone();
-        let telegram_token = config.radio_setup().telegram_token.clone();
-        let telegram_chat_id = config.radio_setup().telegram_chat_id;
-        let notification_mode = config.radio_setup().notification_mode.clone();
-        let notification_interval = config.radio_setup().notification_interval;
+        let radio_name = config.radio_infrastructure().radio_name.clone();
+        let slack_token = config.radio_infrastructure().slack_token.clone();
+        let slack_channel = config.radio_infrastructure().slack_channel.clone();
+        let discord_webhook = config.radio_infrastructure().discord_webhook.clone();
+        let telegram_token = config.radio_infrastructure().telegram_token.clone();
+        let telegram_chat_id = config.radio_infrastructure().telegram_chat_id;
+        let notification_mode = config.radio_infrastructure().notification_mode.clone();
+        let notification_interval = config.radio_infrastructure().notification_interval;
 
         Notifier::new(
             radio_name,

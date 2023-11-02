@@ -41,10 +41,9 @@ pub struct Config {
     #[command(flatten)]
     pub waku: Waku,
     #[command(flatten)]
-    pub radio_setup: RadioSetup,
+    pub radio_infrastructure: RadioInfrastructure,
     #[arg(
         short,
-        long,
         value_name = "config_file",
         env = "CONFIG_FILE",
         help = "Configuration file (toml or yaml format)"
@@ -67,9 +66,9 @@ impl Config {
             Config::parse()
         };
 
-        std::env::set_var("RUST_LOG", config.radio_setup().log_level.clone());
+        std::env::set_var("RUST_LOG", config.radio_infrastructure().log_level.clone());
         // Enables tracing under RUST_LOG variable
-        init_tracing(config.radio_setup().log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level`");
+        init_tracing(config.radio_infrastructure().log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level`");
         config
     }
 
@@ -100,7 +99,7 @@ impl Config {
         &self,
     ) -> Result<GraphcastAgentConfig, GraphcastAgentError> {
         let wallet_key = self.wallet_input().unwrap().to_string();
-        let topics = self.radio_setup().topics.clone();
+        let topics = self.radio_infrastructure().topics.clone();
         let mut discv5_enrs = self.waku().discv5_enrs.clone().unwrap_or_default();
         // Discovery network
         discv5_enrs.push("enr:-P-4QJI8tS1WTdIQxq_yIrD05oIIW1Xg-tm_qfP0CHfJGnp9dfr6ttQJmHwTNxGEl4Le8Q7YHcmi-kXTtphxFysS11oBgmlkgnY0gmlwhLymh5GKbXVsdGlhZGRyc7hgAC02KG5vZGUtMDEuZG8tYW1zMy53YWt1djIucHJvZC5zdGF0dXNpbS5uZXQGdl8ALzYobm9kZS0wMS5kby1hbXMzLndha3V2Mi5wcm9kLnN0YXR1c2ltLm5ldAYfQN4DiXNlY3AyNTZrMaEDbl1X_zJIw3EAJGtmHMVn4Z2xhpSoUaP5ElsHKCv7hlWDdGNwgnZfg3VkcIIjKIV3YWt1Mg8".to_string());
@@ -108,13 +107,13 @@ impl Config {
         GraphcastAgentConfig::new(
             wallet_key,
             self.graph_stack().indexer_address.clone(),
-            self.radio_setup().radio_name.clone(),
+            self.radio_infrastructure().radio_name.clone(),
             self.graph_stack().registry_subgraph.clone(),
             self.graph_stack().network_subgraph.clone(),
-            self.radio_setup().id_validation.clone(),
+            self.radio_infrastructure().id_validation.clone(),
             Some(self.graph_stack().graph_node_status_endpoint.clone()),
             Some(self.waku().boot_node_addresses.clone()),
-            Some(self.radio_setup().graphcast_network.to_string()),
+            Some(self.radio_infrastructure().graphcast_network.to_string()),
             Some(topics),
             self.waku().waku_node_key.clone(),
             self.waku().waku_host.clone(),
@@ -141,7 +140,7 @@ impl Config {
     }
 
     pub async fn init_radio_state(&self) -> PersistedState {
-        let file_path = &self.radio_setup().persistence_file_path.clone();
+        let file_path = &self.radio_infrastructure().persistence_file_path.clone();
 
         if let Some(path) = file_path {
             //TODO: set up synchronous panic hook as part of PersistedState functions
@@ -172,30 +171,30 @@ impl Config {
 
     /// Generate a set of unique topics along with given static topics
     #[autometrics]
-    pub async fn generate_topics(&self, coverage: &CoverageLevel) -> Vec<String> {
-        let static_topics = HashSet::from_iter(self.radio_setup().topics.to_vec());
+    pub async fn generate_topics(
+        &self,
+        coverage: &CoverageLevel,
+        indexer_address: &str,
+    ) -> Vec<String> {
+        let static_topics = HashSet::from_iter(self.radio_infrastructure().topics.to_vec());
         let topics = match coverage {
             CoverageLevel::None => HashSet::new(),
             CoverageLevel::Minimal => static_topics,
             CoverageLevel::OnChain => {
-                let mut topics: HashSet<String> = active_allocation_hashes(
-                    self.callbook().graph_network(),
-                    &self.graph_stack().indexer_address,
-                )
-                .await
-                .into_iter()
-                .collect();
+                let mut topics: HashSet<String> =
+                    active_allocation_hashes(self.callbook().graph_network(), indexer_address)
+                        .await
+                        .into_iter()
+                        .collect();
                 topics.extend(static_topics);
                 topics
             }
             CoverageLevel::Comprehensive => {
-                let active_topics: HashSet<String> = active_allocation_hashes(
-                    self.callbook().graph_network(),
-                    &self.graph_stack().indexer_address,
-                )
-                .await
-                .into_iter()
-                .collect();
+                let active_topics: HashSet<String> =
+                    active_allocation_hashes(self.callbook().graph_network(), indexer_address)
+                        .await
+                        .into_iter()
+                        .collect();
                 let mut additional_topics: HashSet<String> =
                     syncing_deployment_hashes(self.graph_stack().graph_node_status_endpoint())
                         .await
@@ -222,8 +221,8 @@ impl Config {
                 .last()
                 .and_then(|suf| suf.strip_prefix("graph-network-"))
                 .ok_or(ConfigError::ValidateInput(
-                    format!("Not a conventionally parseable graph-network subgraph API: {:#?}, please provide a protocol network specification",
-                    self.graph_stack().network_subgraph())
+                    "Not a conventionally parseable API, need a protocol network specification"
+                        .to_string(),
                 ))?
                 .to_string()
         };
@@ -302,7 +301,7 @@ pub struct GraphStack {
 
 #[derive(Clone, Debug, Args, Serialize, Deserialize, Default)]
 #[group(required = true, multiple = true)]
-pub struct RadioSetup {
+pub struct RadioInfrastructure {
     #[clap(
         long,
         value_name = "GRAPHCAST_NETWORK",
@@ -321,28 +320,28 @@ pub struct RadioSetup {
     pub topics: Vec<String>,
     #[clap(
         long,
-        value_name = "GOSSIP_TOPIC_COVERAGE",
+        value_name = "COVERAGE",
         value_enum,
         default_value = "comprehensive",
-        env = "GOSSIP_TOPIC_COVERAGE",
-        help = "Toggle for gossip topic coverage level",
-        long_help = "Topic gossip coverage level\ncomprehensive: Subscribe to on-chain topics, user defined static topics, and additional topics\n
+        env = "COVERAGE",
+        help = "Toggle for topic coverage level",
+        long_help = "Topic coverage level\ncomprehensive: Subscribe to on-chain topics, user defined static topics, and additional topics\n
             on-chain: Subscribe to on-chain topics and user defined static topics\nminimal: Only subscribe to user defined static topics.\n
             Default: comprehensive"
     )]
-    pub gossip_topic_coverage: CoverageLevel,
+    pub coverage: CoverageLevel,
     #[clap(
         long,
-        value_name = "AUTO_UPGRADE_COVERAGE",
+        value_name = "COVERAGE",
         value_enum,
         default_value = "comprehensive",
-        env = "AUTO_UPGRADE_COVERAGE",
+        env = "AUTO_UPGRADE",
         help = "Toggle for the types of subgraph the radio send offchain syncing commands to indexer management server. Default to upgrade all syncing deployments",
-        long_help = "Topic upgrade coverage level\ncomprehensive: on-chain allocations, user defined static topics, and additional topics\n
+        long_help = "Topic upgrade  coverage level\ncomprehensive: on-chain allocations, user defined static topics, and additional topics\n
             on-chain: Subscribe to on-chain topics and user defined static topics\nminimal: Only subscribe to user defined static topics.\n
             none: no automatic upgrade, only notifications.\nDefault: comprehensive"
     )]
-    pub auto_upgrade_coverage: CoverageLevel,
+    pub auto_upgrade: CoverageLevel,
     #[clap(
         long,
         value_parser = value_parser!(i64).range(1..),
@@ -351,7 +350,7 @@ pub struct RadioSetup {
         env = "RATELIMIT_THRESHOLD",
         help = "Set upgrade intent ratelimit in seconds: only one upgrade per subgraph within the threshold (default: 86400 seconds = 1 day)"
     )]
-    pub auto_upgrade_ratelimit: i64,
+    pub ratelimit_threshold: i64,
     #[clap(
         long,
         value_parser = value_parser!(i64).range(1..),
@@ -612,8 +611,32 @@ mod tests {
                 discv5_port: None,
                 filter_protocol: None,
             },
-            radio_setup: RadioSetup {
-                ..Default::default()
+            radio_infrastructure: RadioInfrastructure {
+                radio_name: String::from("test"),
+                topics: vec![String::from(
+                    "QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u",
+                )],
+                coverage: CoverageLevel::Comprehensive,
+                collect_message_duration: 10,
+                ratelimit_threshold: 60000,
+                log_level: String::from("info"),
+                slack_token: None,
+                slack_channel: None,
+                discord_webhook: None,
+                telegram_token: None,
+                telegram_chat_id: None,
+                metrics_host: String::from("0.0.0.0"),
+                metrics_port: None,
+                server_host: String::from("0.0.0.0"),
+                server_port: None,
+                persistence_file_path: None,
+                id_validation: IdentityValidation::NoCheck,
+                topic_update_interval: 600,
+                log_format: LogFormat::Pretty,
+                graphcast_network: GraphcastNetworkName::Testnet,
+                auto_upgrade: CoverageLevel::Comprehensive,
+                notification_mode: NotificationMode::Live,
+                notification_interval: 24,
             },
             config_file: None,
         }
@@ -622,6 +645,7 @@ mod tests {
     #[test]
     fn protocol_network() {
         let mut config = test_config();
+
         assert_eq!(&config.protocol_network().unwrap(), "goerli");
 
         config.graph_stack.protocol_network = Some("arbitrum-one".to_string());

@@ -3,7 +3,7 @@ use graphcast_sdk::{
     graphcast_agent::message_typing::IdentityValidation, GraphcastNetworkName, LogFormat,
 };
 use serde::{Deserialize, Serialize};
-use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioSetup, Waku};
+use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioInfrastructure, Waku};
 use subgraph_radio::operator::notifier::NotificationMode;
 
 #[derive(Clone, Debug, Parser, Serialize, Deserialize)]
@@ -54,12 +54,12 @@ pub fn test_config() -> Config {
                 filter_protocol: None,
             }
         },
-        radio_setup: {
-            RadioSetup {
+        radio_infrastructure: {
+            RadioInfrastructure {
                 graphcast_network: GraphcastNetworkName::Testnet,
                 topics: vec![],
-                gossip_topic_coverage: CoverageLevel::OnChain,
-                auto_upgrade_ratelimit: 60000,
+                coverage: CoverageLevel::OnChain,
+                ratelimit_threshold: 60000,
                 collect_message_duration: 60,
                 log_level:
                     "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_runner=trace"
@@ -78,7 +78,7 @@ pub fn test_config() -> Config {
                 telegram_token: None,
                 id_validation: IdentityValidation::ValidAddress,
                 topic_update_interval: 600,
-                auto_upgrade_coverage: CoverageLevel::OnChain,
+                auto_upgrade: CoverageLevel::OnChain,
                 notification_mode: NotificationMode::Live,
                 notification_interval: 24,
             }

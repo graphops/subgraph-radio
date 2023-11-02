@@ -9,11 +9,11 @@ indexer_management_server_endpoint = 'http://127.0.0.1:18000'
 [waku]
 boot_node_addresses = []
 
-[radio_setup]
+[radio_infrastructure]
 graphcast_network = 'Testnet'
 topics = ['QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB']
-gossip_topic_coverage = 'Comprehensive'
-auto_upgrade_coverage = 'Comprehensive'
+coverage = 'Comprehensive'
+auto_upgrade = 'Comprehensive'
 collect_message_duration = 10
 slack_token = 'xoxb-1231231231231-2312312312312-3abcabcabcabacabcabcabca'
 metrics_host = '0.0.0.0'
