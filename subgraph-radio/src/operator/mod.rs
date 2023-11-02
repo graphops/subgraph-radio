@@ -95,7 +95,7 @@ impl RadioOperator {
             topics = tracing::field::debug(&topics),
             "Found content topics for subscription",
         );
-        graphcast_agent.update_content_topics(topics.clone()).await;
+        graphcast_agent.update_content_topics(topics.clone());
 
         RadioOperator {
             config: config.clone(),
@@ -166,10 +166,9 @@ impl RadioOperator {
                     }
                     // Update topic subscription
                     let result = timeout(update_timeout,
-                        self.graphcast_agent()
-                        .update_content_topics(self.config.generate_topics(
+                        self.config.generate_topics(
                             &self.config.radio_infrastructure().coverage,
-                            &self.config.graph_stack().indexer_address).await)
+                            &self.config.graph_stack().indexer_address)
                     ).await;
 
                     if result.is_err() {
