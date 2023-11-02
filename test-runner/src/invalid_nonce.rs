@@ -16,8 +16,8 @@ pub async fn invalid_nonce_test() {
         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
 
     let mut config = test_config();
-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
-    config.radio_infrastructure.topics = radio_topics.clone();
+    config.radio_setup.persistence_file_path = Some(store_path.clone());
+    config.radio_setup.topics = radio_topics.clone();
 
     let mut test_sender_config = TestSenderConfig {
         topics: test_sender_topics,

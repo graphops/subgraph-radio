@@ -23,9 +23,9 @@ pub async fn topics_test() {
     ];
 
     let mut config = test_config();
-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
-    config.radio_infrastructure.topics = radio_topics.clone();
-    config.radio_infrastructure.topic_update_interval = 90;
+    config.radio_setup.persistence_file_path = Some(store_path.clone());
+    config.radio_setup.topics = radio_topics.clone();
+    config.radio_setup.topic_update_interval = 90;
 
     let mut test_sender_config = TestSenderConfig {
         topics: test_sender_topics,
@@ -43,7 +43,7 @@ pub async fn topics_test() {
 
     // can be sure that file path is set to Some (after test_config()
     let persisted_state =
-        PersistedState::load_cache(&config.radio_infrastructure.persistence_file_path.unwrap());
+        PersistedState::load_cache(&config.radio_setup.persistence_file_path.unwrap());
     debug!(
         local_attestations = tracing::field::debug(&persisted_state.local_attestations()),
         remote_ppoi_messages = tracing::field::debug(&persisted_state.remote_ppoi_messages()),

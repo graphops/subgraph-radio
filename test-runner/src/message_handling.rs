@@ -19,9 +19,9 @@ pub async fn send_and_receive_test() {
         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
 
     let mut config = test_config();
-    config.radio_infrastructure.persistence_file_path = Some(store_path.clone());
-    config.radio_infrastructure.topics = radio_topics.clone();
-    config.radio_infrastructure.topic_update_interval = 10;
+    config.radio_setup.persistence_file_path = Some(store_path.clone());
+    config.radio_setup.topics = radio_topics.clone();
+    config.radio_setup.topic_update_interval = 10;
 
     let mut test_sender_config = TestSenderConfig {
         topics: test_sender_topics,

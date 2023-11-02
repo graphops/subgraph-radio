@@ -75,10 +75,10 @@ impl RadioOperator {
         tokio::spawn(shutdown(control_flow.clone()));
 
         // Set up Prometheus metrics url if configured
-        if let Some(port) = config.radio_infrastructure().metrics_port {
+        if let Some(port) = config.radio_setup().metrics_port {
             debug!("Initializing metrics port");
             tokio::spawn(handle_serve_metrics(
-                config.radio_infrastructure().metrics_host.clone(),
+                config.radio_setup().metrics_host.clone(),
                 port,
                 control_flow.metrics_handle.clone(),
             ));
@@ -86,10 +86,7 @@ impl RadioOperator {
 
         // Provide generated topics to Graphcast agent
         let topics = config
-            .generate_topics(
-                &config.radio_infrastructure().coverage,
-                &config.graph_stack.indexer_address,
-            )
+            .generate_topics(&config.radio_setup().gossip_topic_coverage)
             .await;
         debug!(
             topics = tracing::field::debug(&topics),
@@ -119,7 +116,7 @@ impl RadioOperator {
     pub async fn run(&'static self) {
         // Control flow
         let mut topic_update_interval = interval(Duration::from_secs(
-            self.config.radio_infrastructure.topic_update_interval,
+            self.config.radio_setup.topic_update_interval,
         ));
 
         let mut state_update_interval = interval(Duration::from_secs(10));
@@ -127,7 +124,7 @@ impl RadioOperator {
         let mut comparison_interval = interval(Duration::from_secs(300));
 
         let mut notification_interval = tokio::time::interval(Duration::from_secs(
-            self.config.radio_infrastructure.notification_interval * 3600,
+            self.config.radio_setup.notification_interval * 3600,
         ));
 
         let iteration_timeout = Duration::from_secs(180);
@@ -143,7 +140,7 @@ impl RadioOperator {
         });
 
         // Initialize Http server with graceful shutdown if configured
-        if self.config.radio_infrastructure().server_port.is_some() {
+        if self.config.radio_setup().server_port.is_some() {
             let state_ref = &self.persisted_state;
             let config_cloned = self.config.clone();
             tokio::spawn(run_server(
@@ -193,7 +190,7 @@ impl RadioOperator {
 
                     info!(connected_peers, gossip_peers, diverged_num, "State update summary");
                     // Save cache if path provided
-                    let _ = &self.config.radio_infrastructure().persistence_file_path.as_ref().map(|path| {
+                    let _ = &self.config.radio_setup().persistence_file_path.as_ref().map(|path| {
                         self.persisted_state.update_cache(path);
                     });
                 },
@@ -311,7 +308,7 @@ impl RadioOperator {
                     }
                 },
                 _ = notification_interval.tick() => {
-                    match self.config.radio_infrastructure.notification_mode {
+                    match self.config.radio_setup.notification_mode {
                         NotificationMode::PeriodicReport => {
                         let comparison_results = self.persisted_state.comparison_results();
                             if !comparison_results.is_empty() {

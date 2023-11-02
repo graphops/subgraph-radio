@@ -93,7 +93,7 @@ impl UpgradeIntentMessage {
 
     /// Process the validated upgrade intent messages
     /// If notification is set up, then notify the indexer
-    /// If indexer management server endpoint is set up, radio checks `auto_upgrade` for
+    /// If indexer management server endpoint is set up, radio checks `auto_upgrade_coverage` for
     pub async fn process_valid_message(
         &self,
         config: &Config,
@@ -101,7 +101,7 @@ impl UpgradeIntentMessage {
         state: &PersistedState,
     ) -> Result<&Self, OperationError> {
         // ratelimit upgrades: return early if there was a recent upgrade
-        if state.recent_upgrade(self, config.radio_infrastructure.ratelimit_threshold) {
+        if state.recent_upgrade(self, config.radio_setup.auto_upgrade_ratelimit) {
             info!(subgraph = &self.subgraph_id, "Received an Upgrade Intent Message for a recently upgraded subgraph, skiping notification and auto deployment");
             return Ok(self);
         }
@@ -113,10 +113,7 @@ impl UpgradeIntentMessage {
         if let Some(url) = &config.graph_stack().indexer_management_server_endpoint {
             // If the identifier satisfy the config coverage level
             let covered_topics = config
-                .generate_topics(
-                    &config.radio_infrastructure().auto_upgrade,
-                    &config.graph_stack().indexer_address,
-                )
+                .generate_topics(&config.radio_setup().auto_upgrade_coverage)
                 .await;
             // Get the current deployment hash by querying network subgraph and take the latest hash of the subgraph id
             // Should be able to assume valid identifier since the message is valid

@@ -19,7 +19,7 @@ The key requirement for an Indexer to earn indexing rewards is to submit a valid
 
 When developers publish a new version (subgraph deployment) to their subgraph, data service instability may occur while their API queries the pre-existing version. Indexers may require some time to sync a subgraph to the chainhead after they have stopped syncing the previous deployment. To decrease the upgrade friction, developers can send a message before publishing the subgraph on current deployment hash's Graphcast channel, which includes the subgraph id, corresponding new deployment hash, and the represented graph account that must be validated to be the subgraph's owner. 
 
-Indexers running the subgraph radio and listening to that channel will in turn receive the message. Given valid configurations to notification, indexer management server, and `auto_upgrade` coverage level, the radio will send a notification to the indexer and/or an offchain request to their indexer management server that should automatically presync the deployment on graph node.
+Indexers running the subgraph radio and listening to that channel will in turn receive the message. Given valid configurations to notification, indexer management server, and `auto_upgrade_coverage` coverage level, the radio will send a notification to the indexer and/or an offchain request to their indexer management server that should automatically presync the deployment on graph node.
 
 Note that it is still at the subgraph developers' discretion to await for the indexers to sync upto chainhead, in which point they can publish the staged version without disrupting API usage.
 
