@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT identifier, block_number, ppoi, stake_weight, sender_group_hash\n        FROM local_attestations\n        WHERE identifier = ? AND block_number = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "identifier",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "block_number",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "ppoi",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "stake_weight",
+        "ordinal": 3,
+        "type_info": "Int64"
+      },
+      {
+        "name": "sender_group_hash",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a91f93372ec2fa5f368aa2e3dc85210361d85fd18745f1af79c926c5a89f4490"
+}

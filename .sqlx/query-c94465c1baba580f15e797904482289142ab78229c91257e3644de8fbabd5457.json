@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT timestamp\n            FROM local_attestation_timestamps\n            WHERE attestation_identifier = ? AND attestation_block_number = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "timestamp",
+        "ordinal": 0,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c94465c1baba580f15e797904482289142ab78229c91257e3644de8fbabd5457"
+}

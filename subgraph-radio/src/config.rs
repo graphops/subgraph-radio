@@ -14,10 +14,9 @@ use graphcast_sdk::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use tracing::{debug, info, trace};
+use tracing::info;
 
 use crate::operator::notifier::NotificationMode;
-use crate::state::{panic_hook, PersistedState};
 use crate::{active_allocation_hashes, syncing_deployment_hashes};
 
 #[derive(clap::ValueEnum, Clone, Debug, Serialize, Deserialize, Default)]
@@ -140,28 +139,6 @@ impl Config {
         Ok((my_address, my_stake))
     }
 
-    pub async fn init_radio_state(&self) -> PersistedState {
-        let file_path = &self.radio_setup().persistence_file_path.clone();
-
-        if let Some(path) = file_path {
-            //TODO: set up synchronous panic hook as part of PersistedState functions
-            // panic_hook(&path);
-            let state = PersistedState::load_cache(path);
-            trace!(
-                local_attestations = tracing::field::debug(&state.local_attestations()),
-                remote_ppoi_messages = tracing::field::debug(&state.remote_ppoi_messages()),
-                state = tracing::field::debug(&state),
-                "Loaded Persisted state cache"
-            );
-
-            panic_hook(path);
-            state
-        } else {
-            debug!("Created new state");
-            PersistedState::new(None, None, None, None, None)
-        }
-    }
-
     pub fn callbook(&self) -> CallBook {
         CallBook::new(
             self.graph_stack().registry_subgraph.clone(),
@@ -253,7 +230,7 @@ pub struct GraphStack {
         value_name = "SUBGRAPH",
         env = "REGISTRY_SUBGRAPH",
         help = "Subgraph endpoint to the Graphcast Registry",
-        default_value = "https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-goerli"
+        default_value = "https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-mainnet"
     )]
     pub registry_subgraph: String,
     #[clap(
@@ -261,7 +238,7 @@ pub struct GraphStack {
         value_name = "SUBGRAPH",
         env = "NETWORK_SUBGRAPH",
         help = "Subgraph endpoint to The Graph network subgraph",
-        default_value = "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli"
+        default_value = "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-mainnet"
     )]
     pub network_subgraph: String,
     #[clap(
@@ -306,7 +283,7 @@ pub struct RadioSetup {
     #[clap(
         long,
         value_name = "GRAPHCAST_NETWORK",
-        default_value = "testnet",
+        default_value = "mainnet",
         env = "GRAPHCAST_NETWORK",
         help = "Supported Graphcast networks: mainnet, testnet"
     )]
@@ -428,13 +405,6 @@ pub struct RadioSetup {
     pub server_port: Option<u16>,
     #[clap(
         long,
-        value_name = "PERSISTENCE_FILE_PATH",
-        help = "If set, the Radio will periodically store states of the program to the file in json format",
-        env = "PERSISTENCE_FILE_PATH"
-    )]
-    pub persistence_file_path: Option<String>,
-    #[clap(
-        long,
         value_name = "RADIO_NAME",
         env = "RADIO_NAME",
         default_value = "subgraph-radio"
@@ -497,6 +467,13 @@ pub struct RadioSetup {
         default_value = "24"
     )]
     pub notification_interval: u64,
+    #[clap(
+        long,
+        value_name = "SQLITE_FILE_PATH",
+        help = "Path to sqlite database file. If none is set, will spin up an in-memory db.",
+        env = "SQLITE_FILE_PATH"
+    )]
+    pub sqlite_file_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Args, Serialize, Deserialize, Default)]

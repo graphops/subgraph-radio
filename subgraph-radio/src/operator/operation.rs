@@ -1,14 +1,19 @@
 use autometrics::autometrics;
+use sqlx::SqlitePool;
 
 use std::cmp::max;
 use std::collections::HashMap;
-use std::sync::Arc;
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, warn};
 
 use graphcast_sdk::{
     determine_message_block, graphcast_agent::message_typing::MessageError, networks::NetworkName,
     BlockPointer, NetworkBlockError, NetworkPointer,
 };
+
+use crate::entities::{
+    clean_remote_ppoi_messages, delete_outdated_local_attestations, get_remote_ppoi_messages,
+};
+use crate::DatabaseError;
 
 use crate::messages::poi::{poi_message_comparison, send_poi_message};
 
@@ -86,9 +91,9 @@ impl RadioOperator {
 
             /* Send message */
             let id_cloned = id.clone();
-
             let callbook = self.config.callbook();
-            let local_attestations = self.persisted_state.local_attestations.clone();
+            let db = self.db.clone();
+
             let send_handle = tokio::spawn(async move {
                 send_poi_message(
                     id_cloned,
@@ -96,8 +101,8 @@ impl RadioOperator {
                     message_block,
                     latest_block,
                     network_name,
-                    Arc::clone(&local_attestations),
                     GRAPHCAST_AGENT.get().unwrap(),
+                    db,
                 )
                 .await
             });
@@ -119,59 +124,68 @@ impl RadioOperator {
         identifiers: Vec<String>,
     ) -> Vec<Result<ComparisonResult, OperationError>> {
         let mut compare_handles = vec![];
-        let remote_ppoi_messages = self.state().remote_ppoi_messages();
 
-        for id in identifiers.clone() {
-            /* Set up */
-            let collect_duration: i64 = self.config.radio_setup.collect_message_duration.to_owned();
-            let id_cloned = id.clone();
-            let callbook = self.config.callbook();
-            let local_attestations = self.state().local_attestations();
-            let filtered_msg = remote_ppoi_messages
+        let remote_ppoi_messages = match get_remote_ppoi_messages(&self.db).await {
+            Ok(messages) => messages,
+            Err(e) => {
+                return vec![Err(OperationError::Database(DatabaseError::CoreSqlx(e)))];
+            }
+        };
+
+        for id in identifiers {
+            let collect_duration = self.config.radio_setup.collect_message_duration;
+            let callbook = self.config.callbook().clone();
+
+            let filtered_msg: Vec<_> = remote_ppoi_messages
                 .iter()
-                .filter(|&m| m.identifier == id.clone())
+                .filter(|m| m.identifier == *id)
                 .cloned()
                 .collect();
 
+            let db = self.db.clone();
+
             let compare_handle = tokio::spawn(async move {
-                poi_message_comparison(
-                    id_cloned,
-                    collect_duration,
-                    callbook.clone(),
-                    filtered_msg,
-                    local_attestations,
-                )
-                .await
+                poi_message_comparison(id.clone(), collect_duration, callbook, filtered_msg, db)
+                    .await
             });
             compare_handles.push(compare_handle);
         }
 
         let mut compare_ops = vec![];
         for handle in compare_handles {
-            let res = handle.await;
-            if let Ok(s) = res {
-                // Skip clean up for comparisonResult for Error and buildFailed
-                match s {
+            if let Ok(result) = handle.await {
+                match result {
                     Ok(r) => {
                         compare_ops.push(Ok(r.clone()));
-
-                        /* Clean up cache */
-                        // Only clear the ones matching identifier and block number equal or less
-                        // Retain the msgs with a different identifier, or if their block number is greater
-                        // clear_local_attestation(&mut local_attestations, r.deployment_hash(), r.block());
-                        self.persisted_state
-                            .clean_local_attestations(r.block(), r.deployment_hash());
-                        self.persisted_state
-                            .clean_remote_ppoi_messages(r.block(), r.deployment_hash());
+                        if let Err(_e) = Self::cleanup_after_comparison(&self.db.clone(), &r).await
+                        {
+                            error!("Error clearing old db items");
+                        }
                     }
                     Err(e) => {
-                        trace!(err = tracing::field::debug(&e), "Compare handles");
-
-                        compare_ops.push(Err(e.clone_with_inner()));
+                        compare_ops.push(Err(e));
                     }
                 }
             }
         }
+
         compare_ops
+    }
+
+    async fn cleanup_after_comparison(
+        db_pool: &SqlitePool,
+        result: &ComparisonResult,
+    ) -> Result<(), OperationError> {
+        let block_number: u64 = result.block();
+
+        delete_outdated_local_attestations(db_pool, &result.deployment_hash(), block_number)
+            .await
+            .map_err(|e| OperationError::Database(DatabaseError::CoreSqlx(e)))?;
+
+        clean_remote_ppoi_messages(db_pool, &result.deployment_hash(), block_number)
+            .await
+            .map_err(|e| OperationError::Database(DatabaseError::CoreSqlx(e)))?;
+
+        Ok(())
     }
 }

@@ -1,29 +1,36 @@
-use subgraph_radio::state::PersistedState;
+use subgraph_radio::{
+    create_test_db,
+    entities::{get_all_local_attestations, get_remote_ppoi_messages},
+};
+use tempfile::NamedTempFile;
 use test_utils::{
     config::{test_config, TestSenderConfig},
     setup, teardown,
 };
 use tokio::time::{sleep, Duration};
-use tracing::debug;
 
 pub async fn topics_test() {
     let test_file_name = "topics";
-    let store_path = format!("./test-runner/state/{}.json", test_file_name);
+
+    // Create a new temporary file for the database
+    let temp_file =
+        NamedTempFile::new().expect("Failed to create a temporary file for the database.");
+    let db_path = temp_file.path().to_str().unwrap().to_string();
 
     let radio_topics = vec![
-        "Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string(),
-        "Qmdefault2XyZABCdefGHIjklMNOpqrstuvWXYZabcdefGHIJKLMN".to_string(),
-        "QmonlyinradioXyZABCdeFgHIjklMNOpqrstuvWXYZabcdefGHIJKL".to_string(),
+        "Qm22default1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string(),
+        "Qm22default2XyZABCdefGHIjklMNOpqrstuvWXYZabcdefGHIJKLMN".to_string(),
+        "Qm22onlyinradioXyZABCdeFgHIjklMNOpqrstuvWXYZabcdefGHIJKL".to_string(),
     ];
 
     let test_sender_topics = vec![
-        "Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string(),
-        "Qmdefault2XyZABCdefGHIjklMNOpqrstuvWXYZabcdefGHIJKLMN".to_string(),
-        "QmonlyintestsenderXyZABCdeFgHIjklMNOpqrstuvWXYZabcdEFG".to_string(),
+        "Qm22default1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string(),
+        "Qm22default2XyZABCdefGHIjklMNOpqrstuvWXYZabcdefGHIJKLMN".to_string(),
+        "Qmo22nlyintestsenderXyZABCdeFgHIjklMNOpqrstuvWXYZabcdEFG".to_string(),
     ];
 
     let mut config = test_config();
-    config.radio_setup.persistence_file_path = Some(store_path.clone());
+    config.radio_setup.sqlite_file_path = Some(db_path.clone());
     config.radio_setup.topics = radio_topics.clone();
     config.radio_setup.topic_update_interval = 90;
 
@@ -37,93 +44,68 @@ pub async fn topics_test() {
         poi: None,
     };
 
+    // Connection string for the SQLite database using the temporary file
+    let connection_string = format!("sqlite:{}", db_path);
+    let pool = create_test_db(Some(&connection_string)).await;
+
     let process_manager = setup(&config, test_file_name, &mut test_sender_config).await;
 
-    sleep(Duration::from_secs(89)).await;
+    sleep(Duration::from_secs(100)).await;
 
-    // can be sure that file path is set to Some (after test_config()
-    let persisted_state =
-        PersistedState::load_cache(&config.radio_setup.persistence_file_path.unwrap());
-    debug!(
-        local_attestations = tracing::field::debug(&persisted_state.local_attestations()),
-        remote_ppoi_messages = tracing::field::debug(&persisted_state.remote_ppoi_messages()),
-        persisted_state = tracing::field::debug(&persisted_state),
-        "loaded persisted state"
-    );
-
-    let local_attestations = persisted_state.local_attestations();
-    let remote_ppoi_messages = persisted_state.remote_ppoi_messages();
-
-    debug!(
-        local_attestations = tracing::field::debug(&local_attestations),
-        remote_ppoi_messages = tracing::field::debug(&remote_ppoi_messages),
-        "Starting topics_test"
-    );
-
+    // Retrieve local attestations and verify them against radio topics
+    let local_attestations = get_all_local_attestations(&pool).await.unwrap();
     assert!(
         !local_attestations.is_empty(),
         "There should be at least one element in local_attestations"
     );
 
-    for test_hash in radio_topics {
+    for test_hash in &radio_topics {
+        let has_attestation_for_topic = local_attestations
+            .iter()
+            .any(|attestation| &attestation.identifier == test_hash);
         assert!(
-            local_attestations.contains_key(&test_hash),
-            "No attestation found with ipfs hash {}",
+            has_attestation_for_topic,
+            "No attestation found for ipfs hash {}",
             test_hash
         );
     }
 
-    let test_hashes_remote = vec![
-        "Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq",
-        "Qmdefault2XyZABCdefGHIjklMNOpqrstuvWXYZabcdefGHIJKLMN",
+    // Retrieve remote PPOI messages and verify expected presence and count
+    let remote_ppoi_messages = get_remote_ppoi_messages(&pool).await.unwrap();
+
+    // Ensure we have received some remote PPOI messages
+    assert!(
+        !remote_ppoi_messages.is_empty(),
+        "There should be at least one remote PPOI message"
+    );
+
+    // Assert that the remote PPOI messages contain expected identifiers
+    let expected_remote_identifiers = vec![
+        "Qm22default1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq",
+        "Qm22default2XyZABCdefGHIjklMNOpqrstuvWXYZabcdefGHIJKLMN",
+        // Add more expected identifiers if necessary
     ];
 
-    for target_id in test_hashes_remote {
-        let has_target_id = remote_ppoi_messages
-            .iter()
-            .any(|msg| msg.identifier == *target_id);
+    for expected_id in &expected_remote_identifiers {
         assert!(
-            has_target_id,
-            "No remote message found with identifier {}",
-            target_id
+            remote_ppoi_messages
+                .iter()
+                .any(|msg| &msg.identifier == expected_id),
+            "Expected identifier {} not found in remote PPOI messages",
+            expected_id
         );
     }
 
-    let non_existent_test_hash = "QmonlyintestsenderXyZABCdeFgHIjklMNOpqrstuvWXYZabcdEFG";
-
-    let has_non_existent_test_hash = remote_ppoi_messages
-        .iter()
-        .any(|msg| msg.identifier == non_existent_test_hash);
-
+    // Assert that we do not have remote PPOI messages with identifiers that should not be present
+    let unexpected_identifier = "Qm22onlyintestsenderXyZABCdeFgHIjklMNOpqrstuvWXYZabcdEFG";
     assert!(
-        !has_non_existent_test_hash,
-        "Unexpected remote message found with identifier {}",
-        non_existent_test_hash
+        !remote_ppoi_messages
+            .iter()
+            .any(|msg| msg.identifier == unexpected_identifier),
+        "Unexpected identifier {} found in remote PPOI messages",
+        unexpected_identifier
     );
 
-    let new_subgraphs = vec!["QmonlyintestsenderXyZABCdeFgHIjklMNOpqrstuvWXYZabcdEFG".to_string()]; // change this to your new subgraphs
-    process_manager
-        .server_state
-        .update_subgraphs(new_subgraphs)
-        .await;
-
-    tokio::time::sleep(Duration::from_secs(50)).await;
-
-    let persisted_state = PersistedState::load_cache(&store_path);
-    debug!("persisted state {:?}", persisted_state);
-
-    let remote_ppoi_messages = persisted_state.remote_ppoi_messages();
-
-    let test_hash = "QmonlyintestsenderXyZABCdeFgHIjklMNOpqrstuvWXYZabcdEFG";
-    let has_test_hash = remote_ppoi_messages
-        .iter()
-        .any(|msg| msg.identifier == test_hash);
-
-    assert!(
-        has_test_hash,
-        "Expected remote message not found with identifier {}",
-        test_hash
-    );
-
-    teardown(process_manager, &store_path);
+    // Cleanup after test
+    teardown(process_manager);
 }

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT deployment, message\n        FROM notifications\n        WHERE deployment = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "deployment",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "message",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "7064b1729f6104fc66c6925fd6faeee8b0030321e3801ef0ed92953b6c3fbf43"
+}

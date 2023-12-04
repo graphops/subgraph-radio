@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO comparison_results (deployment, block_number, result_type, local_attestation_json, attestations_json)\n         VALUES (?, ?, ?, ?, ?)\n         ON CONFLICT(deployment)\n         DO UPDATE SET\n         block_number = excluded.block_number,\n         result_type = excluded.result_type,\n         local_attestation_json = excluded.local_attestation_json,\n         attestations_json = excluded.attestations_json",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "b6bb53e5fd3e36b7c5b627d743d010217827fe230a2674c168acb954978959d1"
+}

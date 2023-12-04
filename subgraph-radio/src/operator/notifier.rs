@@ -2,6 +2,7 @@ use derive_getters::Getters;
 use graphcast_sdk::bots::{DiscordBot, SlackBot, TelegramBot};
 
 use serde_derive::{Deserialize, Serialize};
+use sqlx::FromRow;
 use tracing::warn;
 
 use crate::config::Config;
@@ -107,4 +108,10 @@ impl Notifier {
             }
         }
     }
+}
+
+#[derive(FromRow, Debug, Serialize, Deserialize)]
+pub struct Notification {
+    pub deployment: String,
+    pub message: String,
 }

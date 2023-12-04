@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT COUNT(*)\n        FROM remote_ppoi_messages\n        WHERE identifier = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "COUNT(*)",
+        "ordinal": 0,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f95bb12bb4bb12ac80760150a2ffe049ba50431a90748d20d55fff5cd8ffa43c"
+}

@@ -4,7 +4,7 @@ use graphcast_sdk::{
     build_wallet,
     graphcast_agent::{
         message_typing::GraphcastMessage,
-        waku_handling::{connect_multiaddresses, gather_nodes, get_dns_nodes},
+        waku_handling::{connect_multiaddresses, gather_nodes},
     },
     init_tracing,
     networks::NetworkName,
@@ -29,15 +29,11 @@ async fn start_sender(config: TestSenderConfig) {
         ..Default::default()
     };
 
-    let pubsub_topic = WakuPubSubTopic::from_str("/waku/2/graphcast-v0-testnet/proto").unwrap();
-
-    let discv5_nodes: Vec<String> = get_dns_nodes(&pubsub_topic)
-        .into_iter()
-        .filter(|d| d.enr.is_some())
-        .map(|d| d.enr.unwrap().to_string())
-        .collect::<Vec<String>>();
     let port = find_random_udp_port();
+    let discv_port = find_random_udp_port();
     info!("Starting test sender instance on port {}", port);
+
+    let discv5_nodes = vec!["enr:-P-4QJI8tS1WTdIQxq_yIrD05oIIW1Xg-tm_qfP0CHfJGnp9dfr6ttQJmHwTNxGEl4Le8Q7YHcmi-kXTtphxFysS11oBgmlkgnY0gmlwhLymh5GKbXVsdGlhZGRyc7hgAC02KG5vZGUtMDEuZG8tYW1zMy53YWt1djIucHJvZC5zdGF0dXNpbS5uZXQGdl8ALzYobm9kZS0wMS5kby1hbXMzLndha3V2Mi5wcm9kLnN0YXR1c2ltLm5ldAYfQN4DiXNlY3AyNTZrMaEDbl1X_zJIw3EAJGtmHMVn4Z2xhpSoUaP5ElsHKCv7hlWDdGNwgnZfg3VkcIIjKIV3YWt1Mg8".to_string()];
 
     let node_config = WakuNodeConfig {
         host: IpAddr::from_str("127.0.0.1").ok(),
@@ -45,14 +41,14 @@ async fn start_sender(config: TestSenderConfig) {
         advertise_addr: None, // Fill this for boot nodes
         node_key: None,
         keep_alive_interval: None,
-        relay: Some(false), // Default true - will receive all msg on relay
+        relay: Some(true), // Default true - will receive all msg on relay
         min_peers_to_publish: Some(0), // Default 0
-        filter: Some(true), // Default false¡
+        filter: Some(false), // Default false
         log_level: None,
         relay_topics: [].to_vec(),
-        discv5: Some(false),
+        discv5: Some(true),
         discv5_bootstrap_nodes: discv5_nodes,
-        discv5_udp_port: None,
+        discv5_udp_port: Some(discv_port),
         store: None,
         database_url: None,
         store_retention_max_messages: None,
@@ -90,7 +86,7 @@ async fn start_sender(config: TestSenderConfig) {
                         topic.clone(),
                         config.poi.clone().unwrap(),
                         nonce.unwrap_or(timestamp),
-                        NetworkName::Goerli,
+                        NetworkName::Mainnet,
                         block_number.try_into().unwrap(),
                         config.block_hash.clone().unwrap(),
                         "0x7e6528e4ce3055e829a32b5dc4450072bac28bc6".to_string(),
