@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT deployment, nonce, graph_account, subgraph_id, new_hash, signature\n        FROM upgrade_intent_messages\n        WHERE subgraph_id = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "deployment",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "nonce",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "graph_account",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "subgraph_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "new_hash",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "signature",
+        "ordinal": 5,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1598168faa0e38d2bd87a7aba3a6d48ae19ada62770aaf97992173bc15f0beef"
+}

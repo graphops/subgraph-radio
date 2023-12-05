@@ -10,31 +10,34 @@ use graphcast_sdk::{
     graphql::client_graph_node::query_graph_node_network_block_hash,
     networks::NetworkName,
 };
+
 use prost::Message;
 use serde::{Deserialize, Serialize};
 
-use std::cmp::max;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex as SyncMutex};
-use tracing::{debug, error, trace, warn};
+use sqlx::SqlitePool;
+use tracing::{error, trace, warn};
 
 use graphcast_sdk::{
     graphcast_agent::{GraphcastAgent, GraphcastAgentError},
     BlockPointer,
 };
 
+use crate::database::{
+    count_remote_ppoi_messages, get_local_attestation, get_remote_ppoi_messages_by_identifier,
+    insert_local_attestation, insert_remote_ppoi_message,
+};
+use crate::operator::attestation::process_ppoi_message;
+use crate::DatabaseError;
 use crate::{
     metrics::CACHED_PPOI_MESSAGES,
     operator::{
         attestation::{
-            compare_attestations, local_comparison_point, save_local_attestation, Attestation,
-            ComparisonResult,
+            compare_attestations, local_comparison_point, Attestation, ComparisonResult,
         },
         callbook::CallBookRadioExtensions,
     },
     OperationError,
 };
-use crate::{operator::attestation::process_ppoi_message, state::PersistedState};
 
 #[derive(Eip712, EthAbiType, Clone, Message, Serialize, Deserialize, PartialEq, SimpleObject)]
 #[eip712(
@@ -182,8 +185,8 @@ pub async fn send_poi_message(
     message_block: u64,
     latest_block: BlockPointer,
     network_name: NetworkName,
-    local_attestations: Arc<SyncMutex<HashMap<String, HashMap<u64, Attestation>>>>,
     graphcast_agent: &GraphcastAgent,
+    db: SqlitePool,
 ) -> Result<String, OperationError> {
     trace!(
         message_block = message_block,
@@ -193,7 +196,6 @@ pub async fn send_poi_message(
 
     // Deployment did not sync to message_block
     if latest_block.number < message_block {
-        //TODO: fill in variant in SDK
         let err_msg = format!(
             "Did not send message for deployment {}: latest_block ({}) syncing status must catch up to the message block ({})",
             id.clone(),
@@ -201,16 +203,10 @@ pub async fn send_poi_message(
         );
         trace!(err = err_msg, "Skip send",);
         return Err(OperationError::SendTrigger(err_msg));
-    };
+    }
 
-    // Message has already been sent
-    if local_attestations
-        .lock()
-        .unwrap()
-        .get(&id.clone())
-        .and_then(|blocks| blocks.get(&message_block))
-        .is_some()
-    {
+    //Message has already been sent
+    if let Ok(Some(_)) = get_local_attestation(&db, &id, message_block).await {
         let err_msg = format!(
             "Repeated message for deployment {}, skip sending message for block: {}",
             id.clone(),
@@ -220,8 +216,7 @@ pub async fn send_poi_message(
         return Err(OperationError::SkipDuplicate(err_msg));
     }
 
-    let block_hash = match graphcast_agent
-        .callbook
+    let block_hash = match callbook
         .block_hash(&network_name.to_string(), message_block)
         .await
     {
@@ -249,21 +244,49 @@ pub async fn send_poi_message(
                 nonce,
                 network_name,
                 message_block,
-                block_hash,
+                block_hash.clone(),
                 graphcast_agent.graphcast_identity.graph_account.clone(),
             );
+
             match graphcast_agent
                 .send_message(&id, radio_message, nonce)
                 .await
             {
                 Ok(msg_id) => {
-                    save_local_attestation(
-                        local_attestations.clone(),
-                        content.clone(),
-                        id.clone(),
-                        message_block,
-                    );
-                    trace!("save local attestations: {:#?}", local_attestations);
+                    let timestamp_result: Result<u32, _> = Utc::now().timestamp().try_into();
+                    let timestamp = match timestamp_result {
+                        Ok(t) => t,
+                        Err(e) => {
+                            error!(
+                                err = tracing::field::debug(&e),
+                                "Timestamp conversion failed"
+                            );
+                            return Err(OperationError::Others(format!(
+                                "Timestamp conversion failed: {}",
+                                e
+                            )));
+                        }
+                    };
+
+                    // After successfully sending, save the attestation
+                    let new_attestation = Attestation {
+                        identifier: id.clone(),
+                        block_number: message_block,
+                        ppoi: content.clone(),
+                        stake_weight: 0,
+                        timestamp: vec![timestamp],
+                        senders: vec![],
+                        sender_group_hash: String::new(),
+                    };
+                    if let Err(e) = insert_local_attestation(&db, new_attestation).await {
+                        error!(
+                            err = tracing::field::debug(&e),
+                            "Failed to save local attestation"
+                        );
+                        return Err(OperationError::Database(DatabaseError::CoreSqlx(e)));
+                    }
+
+                    trace!("Saved local attestation for deployment: {}", id.clone());
                     Ok(msg_id)
                 }
                 Err(e) => {
@@ -288,93 +311,84 @@ pub async fn send_poi_message(
 /// we should update PersistedState::remote_ppoi_message standalone
 /// from GraphcastMessage field such as nonce
 #[autometrics(track_concurrency)]
-pub async fn process_valid_message(
-    msg: GraphcastMessage<PublicPoiMessage>,
-    state: &PersistedState,
-) {
+pub async fn process_valid_message(msg: GraphcastMessage<PublicPoiMessage>, pool: &SqlitePool) {
     let identifier = msg.identifier.clone();
 
-    state.add_remote_ppoi_message(msg.clone());
-    CACHED_PPOI_MESSAGES.with_label_values(&[&identifier]).set(
-        state
-            .remote_ppoi_messages()
-            .iter()
-            .filter(|m: &&GraphcastMessage<PublicPoiMessage>| m.identifier == identifier)
-            .collect::<Vec<&GraphcastMessage<PublicPoiMessage>>>()
-            .len()
-            .try_into()
-            .unwrap(),
-    );
+    if let Err(e) = insert_remote_ppoi_message(pool, &msg).await {
+        error!("Error adding remote ppoi message to database: {:?}", e);
+        return;
+    }
+
+    // If insertion is successful, proceed to count the messages
+    if let Ok(message_count) = count_remote_ppoi_messages(pool, &identifier).await {
+        // Update the metrics
+        CACHED_PPOI_MESSAGES
+            .with_label_values(&[&identifier])
+            .set(message_count as i64);
+    } else {
+        error!("Error counting remote ppoi messages.");
+    }
 }
 
-/// Compare validated messages
 #[allow(clippy::too_many_arguments)]
 #[autometrics(track_concurrency)]
 pub async fn poi_message_comparison(
     id: String,
     collect_window_duration: i64,
     callbook: CallBook,
-    messages: Vec<GraphcastMessage<PublicPoiMessage>>,
-    local_attestations: HashMap<String, HashMap<u64, Attestation>>,
+    db: SqlitePool,
 ) -> Result<ComparisonResult, OperationError> {
     let time = Utc::now().timestamp();
 
-    let (compare_block, collect_window_end) = match local_comparison_point(
-        &local_attestations,
-        &messages,
-        id.clone(),
-        collect_window_duration,
-    ) {
-        Some((block, window)) if time >= window => (block, window),
-        Some((compare_block, window)) => {
-            let err_msg = format!("Deployment {} comparison not triggered: collecting messages until time {}; currently {time}", id.clone(), window);
-            debug!(err = err_msg, "Collecting messages",);
-            return Err(OperationError::CompareTrigger(
-                id.clone(),
-                compare_block,
-                err_msg,
-            ));
-        }
-        _ => {
-            let err_msg = format!(
-                "Deployment {} comparison not triggered: no local attestation to compare",
-                id.clone()
-            );
-            debug!(err = err_msg, "No local attestations for comparison",);
-            return Err(OperationError::CompareTrigger(id.clone(), 0, err_msg));
+    // Determine the comparison point
+    let (compare_block, collect_window_end) =
+        match local_comparison_point(&id, collect_window_duration, db.clone()).await {
+            Ok((block, window)) if time >= window.into() => (block, window),
+            Ok((block, _window)) => {
+                // Construct error for early comparison attempt
+                return Err(OperationError::CompareTrigger(
+                    id,
+                    block,
+                    "Comparison window has not yet ended".to_string(),
+                ));
+            }
+            Err(e) => {
+                return Err(OperationError::ComparisonError(e));
+            }
+        };
+
+    let remote_ppoi_messages = match get_remote_ppoi_messages_by_identifier(&db, &id).await {
+        Ok(messages) => messages,
+        Err(e) => {
+            return Err(OperationError::Database(DatabaseError::CoreSqlx(e)));
         }
     };
 
-    let filter_msg: Vec<GraphcastMessage<PublicPoiMessage>> = messages
-        .iter()
-        .filter(|&m| m.payload.block_number == compare_block && m.nonce <= collect_window_end)
-        .cloned()
-        .collect();
-    debug!(
-        deployment_hash = id,
-        time,
-        comparison_time = collect_window_end,
+    // Filter messages for the current comparison
+    let filtered_messages = remote_ppoi_messages
+        .into_iter()
+        .filter(|m| m.payload.block_number == compare_block && m.nonce <= collect_window_end.into())
+        .collect::<Vec<_>>();
+
+    // Process the filtered POI messages to get remote attestations
+    let remote_attestations = process_ppoi_message(filtered_messages, &callbook)
+        .await
+        .map_err(OperationError::Attestation)?;
+
+    let local_attestation = get_local_attestation(&db, &id, compare_block)
+        .await
+        .map_err(|e| OperationError::Database(DatabaseError::CoreSqlx(e)))?
+        .ok_or(OperationError::Others(
+            "Local attestation record not found".to_string(),
+        ))?;
+
+    // Perform the comparison
+    let comparison_result = compare_attestations(
+        Some(local_attestation),
         compare_block,
-        comparison_countdown_seconds = max(0, time - collect_window_end),
-        number_of_messages_matched_to_compare = filter_msg.len(),
-        "Comparison state",
+        &remote_attestations,
+        &id,
     );
-    let remote_attestations_result = process_ppoi_message(filter_msg, &callbook).await;
-    let remote_attestations = match remote_attestations_result {
-        Ok(remote) => {
-            debug!(unique_remote_pPOIs = remote.len(), "Processed messages",);
-            remote
-        }
-        Err(err) => {
-            trace!(
-                err = tracing::field::debug(&err),
-                "An error occured while processing the messages",
-            );
-            return Err(OperationError::Attestation(err));
-        }
-    };
-    let comparison_result =
-        compare_attestations(compare_block, remote_attestations, &local_attestations, &id);
 
     Ok(comparison_result)
 }

@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+env:
+  SQLX_OFFLINE: true
+
 jobs:
   build-linux:
     runs-on: ubuntu-latest
@@ -35,27 +38,4 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./target/release/subgraph-radio
           asset_name: subgraph-radio-${{ github.event.release.tag_name }}-ubuntu
-          asset_content_type: binary/octet-stream
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - uses: actions/setup-go@v4
-        with:
-          go-version: "1.19.5"
-      - name: Build release binary
-        run: |
-          cargo build --release
-      - name: Upload MacOS binary
-        uses: actions/upload-release-asset@v1.0.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./target/release/subgraph-radio
-          asset_name: subgraph-radio-${{ github.event.release.tag_name }}-macos
           asset_content_type: binary/octet-stream

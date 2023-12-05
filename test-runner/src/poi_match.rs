@@ -1,14 +1,20 @@
-use subgraph_radio::{operator::attestation::ComparisonResultType, state::PersistedState};
+use subgraph_radio::{
+    create_test_db, database::get_comparison_results, operator::attestation::ComparisonResultType,
+};
+use tempfile::NamedTempFile;
 use test_utils::{
     config::{test_config, TestSenderConfig},
     setup, teardown,
 };
 use tokio::time::{sleep, Duration};
-use tracing::debug;
 
 pub async fn poi_match_test() {
     let test_file_name = "poi_match";
-    let store_path = format!("./test-runner/state/{}.json", test_file_name);
+
+    // Create a new temporary file for the database
+    let temp_file =
+        NamedTempFile::new().expect("Failed to create a temporary file for the database.");
+    let db_path = temp_file.path().to_str().unwrap().to_string();
 
     let radio_topics = vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
 
@@ -16,7 +22,7 @@ pub async fn poi_match_test() {
         vec!["Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq".to_string()];
 
     let mut config = test_config();
-    config.radio_setup.persistence_file_path = Some(store_path.clone());
+    config.radio_setup.sqlite_file_path = Some(db_path.clone());
     config.radio_setup.topics = radio_topics.clone();
 
     let mut test_sender_config = TestSenderConfig {
@@ -29,14 +35,15 @@ pub async fn poi_match_test() {
         poi: None,
     };
 
+    // Connection string for the SQLite database using the temporary file
+    let connection_string = format!("sqlite:{}", db_path);
+    let pool = create_test_db(Some(&connection_string)).await;
+
     let process_manager = setup(&config, test_file_name, &mut test_sender_config).await;
 
     sleep(Duration::from_secs(550)).await;
 
-    let persisted_state = PersistedState::load_cache(&store_path);
-    debug!("persisted state {:?}", persisted_state);
-
-    let comparison_results = persisted_state.comparison_results();
+    let comparison_results = get_comparison_results(&pool).await.unwrap();
 
     assert!(
         !comparison_results.is_empty(),
@@ -44,8 +51,8 @@ pub async fn poi_match_test() {
     );
 
     let has_match_result = comparison_results.iter().any(|result| {
-        result.1.deployment == "Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq"
-            && result.1.result_type == ComparisonResultType::Match
+        result.deployment == "Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq"
+            && result.result_type == ComparisonResultType::Match
     });
 
     assert!(
@@ -53,5 +60,5 @@ pub async fn poi_match_test() {
         "No comparison result found with deployment 'Qmdefault1AbcDEFghijKLmnoPQRstUVwxYzABCDEFghijklmnopq' and result type 'Match'"
     );
 
-    teardown(process_manager, &store_path);
+    teardown(process_manager);
 }

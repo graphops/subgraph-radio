@@ -5,6 +5,7 @@ use ethers_derive_eip712::*;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 
+use sqlx::SqlitePool;
 use tracing::{debug, info};
 
 use graphcast_sdk::{
@@ -12,8 +13,8 @@ use graphcast_sdk::{
     graphql::client_graph_account::{owned_subgraphs, subgraph_hash_by_id},
 };
 
-use crate::operator::notifier::Notifier;
-use crate::{config::Config, state::PersistedState};
+use crate::{config::Config, DatabaseError};
+use crate::{database::recent_upgrade, operator::notifier::Notifier};
 use crate::{
     operator::indexer_management::{check_decision_basis, offchain_sync_indexing_rules},
     OperationError,
@@ -27,18 +28,24 @@ use crate::{
     verifying_contract = "0xc944e90c64b2c07662a292be6244bdf05cda44a7"
 )]
 pub struct UpgradeIntentMessage {
-    /// subgraph id shared by both versions of the subgraph deployment
+    /// current subgraph deployment hash
     #[prost(string, tag = "1")]
+    pub deployment: String,
+    /// subgraph id shared by both versions of the subgraph deployment
+    #[prost(string, tag = "2")]
     pub subgraph_id: String,
     // new version of the subgraph has a new deployment hash
-    #[prost(string, tag = "2")]
+    #[prost(string, tag = "3")]
     pub new_hash: String,
     /// nonce cached to check against the next incoming message
-    #[prost(int64, tag = "3")]
+    #[prost(int64, tag = "4")]
     pub nonce: i64,
     /// Graph account sender - expect the sender to be subgraph owner
-    #[prost(string, tag = "4")]
+    #[prost(string, tag = "5")]
     pub graph_account: String,
+    /// Sender's signature - used to sign the message
+    #[prost(string, tag = "6")]
+    pub signature: String,
 }
 
 impl RadioPayload for UpgradeIntentMessage {
@@ -100,11 +107,16 @@ impl UpgradeIntentMessage {
         &self,
         config: &Config,
         notifier: &Notifier,
-        state: &PersistedState,
+        db: &SqlitePool,
     ) -> Result<&Self, OperationError> {
         // ratelimit upgrades: return early if there was a recent upgrade
-        if state.recent_upgrade(self, config.radio_setup.auto_upgrade_ratelimit) {
-            info!(subgraph = &self.subgraph_id, "Received an Upgrade Intent Message for a recently upgraded subgraph, skiping notification and auto deployment");
+        let recent_upgrade_result =
+            recent_upgrade(db, self, config.radio_setup.auto_upgrade_ratelimit)
+                .await
+                .map_err(|e| OperationError::Database(DatabaseError::CoreSqlx(e)))?;
+
+        if recent_upgrade_result {
+            info!(subgraph = &self.subgraph_id, "Received an Upgrade Intent Message for a recently upgraded subgraph, skipping notification and auto deployment");
             return Ok(self);
         }
         // send notifications

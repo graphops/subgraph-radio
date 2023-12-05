@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT sender\n            FROM local_attestation_senders\n            WHERE attestation_identifier = ? AND attestation_block_number = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "sender",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2884faf600bb544f526b0113879aad67a23a999d14b5b4aa0348b3a997c83f41"
+}

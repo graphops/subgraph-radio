@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT EXISTS (\n            SELECT 1 FROM upgrade_intent_messages\n            WHERE subgraph_id = ?\n            AND nonce > ?\n        ) AS \"exists_!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "exists_!",
+        "ordinal": 0,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7c61a1473e6f0ef143f49fb20b8cb8d6776113ac4c663502e01d2f81755e7457"
+}
