@@ -46,6 +46,7 @@ pub mod callbook;
 pub mod indexer_management;
 pub mod notifier;
 pub mod operation;
+pub mod summary;
 
 /// Radio operator contains all states needed for radio operations
 #[allow(unused)]
