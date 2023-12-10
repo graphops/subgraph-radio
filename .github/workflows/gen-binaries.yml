@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+env:
+  SQLX_OFFLINE: true
+
 jobs:
   build-linux:
     runs-on: ubuntu-latest

@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT identifier, nonce, graph_account, content, network, block_number, block_hash, signature\n        FROM remote_ppoi_messages\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "identifier",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "nonce",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "graph_account",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "content",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "network",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "block_number",
+        "ordinal": 5,
+        "type_info": "Int64"
+      },
+      {
+        "name": "block_hash",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "signature",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1da94d33f4debe43ccbacb3e3542736861030b7ef4e35d94f7d8a5051f5ba437"
+}

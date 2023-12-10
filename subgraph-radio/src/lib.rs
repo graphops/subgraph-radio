@@ -4,8 +4,10 @@ use autometrics::autometrics;
 use axum_server::Handle;
 use derive_getters::Getters;
 use once_cell::sync::OnceCell;
+use operator::attestation::{ComparisonError, ParseComparisonResultTypeError};
 use std::{
     collections::HashMap,
+    fmt,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -17,7 +19,7 @@ use tracing::{debug, error, info};
 
 use crate::operator::{attestation::AttestationError, RadioOperator};
 use graphcast_sdk::{
-    graphcast_agent::{GraphcastAgent, GraphcastAgentError},
+    graphcast_agent::{message_typing::MessageError, GraphcastAgent, GraphcastAgentError},
     graphql::{
         client_graph_node::get_indexing_statuses, client_network::query_network_subgraph,
         QueryError,
@@ -25,14 +27,15 @@ use graphcast_sdk::{
     networks::NetworkName,
     waku_set_event_callback, BlockPointer,
 };
+use sqlx::{sqlite::SqliteError, Error as CoreSqlxError};
 
 pub mod config;
+pub mod database;
 pub mod graphql;
 pub mod messages;
 pub mod metrics;
 pub mod operator;
 pub mod server;
-pub mod state;
 
 /// A global static (singleton) instance of GraphcastAgent. It is useful to ensure that we have only one GraphcastAgent
 /// per Radio instance, so that we can keep track of state and more easily test our Radio application.
@@ -138,6 +141,57 @@ pub async fn shutdown(control: ControlFlow) {
         .graceful_shutdown(Some(Duration::from_secs(3)));
 }
 
+#[derive(Debug)]
+pub enum DatabaseError {
+    Sqlite(SqliteError),
+    CoreSqlx(CoreSqlxError),
+    SerializationError(serde_json::Error),
+    ParseError(ParseComparisonResultTypeError),
+    Message(MessageError),
+}
+
+impl From<MessageError> for DatabaseError {
+    fn from(err: MessageError) -> Self {
+        DatabaseError::Message(err)
+    }
+}
+
+impl From<SqliteError> for DatabaseError {
+    fn from(err: SqliteError) -> Self {
+        DatabaseError::Sqlite(err)
+    }
+}
+
+impl From<CoreSqlxError> for DatabaseError {
+    fn from(err: CoreSqlxError) -> Self {
+        DatabaseError::CoreSqlx(err)
+    }
+}
+
+impl From<serde_json::Error> for DatabaseError {
+    fn from(err: serde_json::Error) -> Self {
+        DatabaseError::SerializationError(err)
+    }
+}
+
+impl fmt::Display for DatabaseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DatabaseError::Sqlite(err) => write!(f, "SQLite error: {}", err),
+            DatabaseError::CoreSqlx(err) => write!(f, "SQLx Core error: {}", err),
+            DatabaseError::SerializationError(err) => write!(f, "Serialization error: {}", err),
+            DatabaseError::ParseError(err) => write!(f, "Parse error: {}", err),
+            DatabaseError::Message(err) => write!(f, "Message error: {}", err), // Handle the Message variant
+        }
+    }
+}
+
+impl From<ParseComparisonResultTypeError> for DatabaseError {
+    fn from(err: ParseComparisonResultTypeError) -> DatabaseError {
+        DatabaseError::ParseError(err)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum OperationError {
     #[error("Send message trigger isn't met: {0}")]
@@ -152,6 +206,10 @@ pub enum OperationError {
     Query(QueryError),
     #[error("Attestation failure: {0}")]
     Attestation(AttestationError),
+    #[error("Database error: {0}")]
+    Database(DatabaseError),
+    #[error("Comparison error: {0}")]
+    ComparisonError(#[from] ComparisonError),
     #[error("Others: {0}")]
     Others(String),
 }

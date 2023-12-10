@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO upgrade_intent_messages (deployment, nonce, graph_account, subgraph_id, new_hash, signature)\n        VALUES (?, ?, ?, ?, ?, ?)\n        ON CONFLICT(subgraph_id)\n        DO UPDATE SET\n            nonce = excluded.nonce,\n            graph_account = excluded.graph_account,\n            deployment = excluded.deployment,\n            new_hash = excluded.new_hash,\n            signature = excluded.signature\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "ce7ba8a4a6062c72591c8c4594cddb4c18e10e18a871fb75488281d479d9220b"
+}

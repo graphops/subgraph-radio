@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT deployment, block_number, result_type, local_attestation_json, attestations_json\n        FROM comparison_results\n        WHERE deployment = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "deployment",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "block_number",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "result_type",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "local_attestation_json",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "attestations_json",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6c712ee2fe2bcf46090649b1d950e63673a6d1416bd8907ac5b44b25f46bcebe"
+}

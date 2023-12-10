@@ -53,8 +53,15 @@ async-trait = "0.1.71"
 metrics = "0.21.0"
 opentelemetry = { version = "0.19.0", features = ["rt-tokio", "trace"] }
 tracing-opentelemetry = "0.18.0"
-clap = { version = "4.4", features = ["cargo", "unstable-doc", "derive", "env"] }
+clap = { version = "4.4", features = [
+    "cargo",
+    "unstable-doc",
+    "derive",
+    "env",
+] }
 confy = "0.5.1"
+sqlx = { version = "0.7.2", features = ["sqlite", "runtime-tokio"] }
+cached = "0.26.2"
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["async", "async_futures"] }

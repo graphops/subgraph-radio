@@ -1,6 +1,7 @@
 use axum::{extract::Extension, routing::get, Router};
 use axum_server::Handle;
 use graphcast_sdk::graphcast_agent::GraphcastAgent;
+use sqlx::SqlitePool;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
@@ -13,7 +14,6 @@ use crate::{
         model::{build_schema, SubgraphRadioContext},
         routes::{graphql_handler, graphql_playground, health},
     },
-    state::PersistedState,
 };
 
 pub mod model;
@@ -25,7 +25,7 @@ pub mod routes;
 /// This function starts a API server at the configured server_host and server_port
 pub async fn run_server(
     config: Config,
-    persisted_state: &'static PersistedState,
+    db: &SqlitePool,
     graphcast_agent: &'static GraphcastAgent,
     handle: Handle,
 ) {
@@ -35,7 +35,7 @@ pub async fn run_server(
     let port = config.radio_setup().server_port.unwrap();
     let context = Arc::new(SubgraphRadioContext::init(
         config.clone(),
-        persisted_state,
+        db,
         graphcast_agent,
     ));
 

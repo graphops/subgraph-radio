@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO remote_ppoi_messages (identifier, nonce, graph_account, content, network, block_number, block_hash, signature)\n        VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "e8313865a187eca64442e3137cc5b382566f845f77a21a936008fbbfa939584a"
+}
