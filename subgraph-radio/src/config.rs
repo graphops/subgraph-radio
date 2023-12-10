@@ -100,9 +100,6 @@ impl Config {
     ) -> Result<GraphcastAgentConfig, GraphcastAgentError> {
         let wallet_key = self.wallet_input().unwrap().to_string();
         let topics = self.radio_setup().topics.clone();
-        let mut discv5_enrs = self.waku().discv5_enrs.clone().unwrap_or_default();
-        // Discovery network
-        discv5_enrs.push("enr:-P-4QJI8tS1WTdIQxq_yIrD05oIIW1Xg-tm_qfP0CHfJGnp9dfr6ttQJmHwTNxGEl4Le8Q7YHcmi-kXTtphxFysS11oBgmlkgnY0gmlwhLymh5GKbXVsdGlhZGRyc7hgAC02KG5vZGUtMDEuZG8tYW1zMy53YWt1djIucHJvZC5zdGF0dXNpbS5uZXQGdl8ALzYobm9kZS0wMS5kby1hbXMzLndha3V2Mi5wcm9kLnN0YXR1c2ltLm5ldAYfQN4DiXNlY3AyNTZrMaEDbl1X_zJIw3EAJGtmHMVn4Z2xhpSoUaP5ElsHKCv7hlWDdGNwgnZfg3VkcIIjKIV3YWt1Mg8".to_string());
 
         GraphcastAgentConfig::new(
             wallet_key,
@@ -120,7 +117,7 @@ impl Config {
             self.waku().waku_port.clone(),
             self.waku().waku_addr.clone(),
             self.waku().filter_protocol,
-            Some(discv5_enrs),
+            self.waku().discv5_enrs.clone(),
             self.waku().discv5_port,
         )
         .await
