@@ -186,19 +186,11 @@ pub fn start_radio(config: &Config) -> Child {
         .arg(config.waku().waku_port.as_deref().unwrap_or("None"))
         .arg("--log-level")
         .arg(&config.radio_setup().log_level)
-        .arg("--slack-token")
+        .arg("--slack-webhook")
         .arg(
             config
                 .radio_setup()
-                .slack_token
-                .as_deref()
-                .unwrap_or("None"),
-        )
-        .arg("--slack-channel")
-        .arg(
-            config
-                .radio_setup()
-                .slack_channel
+                .slack_webhook
                 .as_deref()
                 .unwrap_or("None"),
         )
