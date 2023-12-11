@@ -11,7 +11,7 @@ use graphcast_sdk::{
     wallet_address, WakuPubSubTopic,
 };
 use std::{net::IpAddr, str::FromStr, thread::sleep, time::Duration};
-use subgraph_radio::messages::poi::PublicPoiMessage;
+use subgraph_radio::messages::{poi::PublicPoiMessage, upgrade::UpgradeIntentMessage};
 use test_utils::{config::TestSenderConfig, dummy_msg::DummyMsg, find_random_udp_port};
 use tracing::{error, info};
 use waku::{waku_new, GossipSubParams, ProtocolId, WakuContentTopic, WakuNodeConfig};
@@ -135,6 +135,36 @@ async fn start_sender(config: TestSenderConfig) {
                     match graphcast_message.send_to_waku(
                         &node_handle,
                         WakuPubSubTopic::from_str("/waku/2/graphcast-v0-testnet/proto").unwrap(),
+                        content_topic.clone(),
+                    ) {
+                        Ok(id) => {
+                            info!("Message sent successfully. Mеssage id: {:?}", id);
+                        }
+                        Err(e) => {
+                            error!("Failed to send message: {:?}", e);
+                        }
+                    }
+
+                    let payload = UpgradeIntentMessage {
+                        deployment: "some_hash".to_string(),
+                        subgraph_id: "some_id".to_string(),
+                        new_hash: "new_hash".to_string(),
+                        nonce: 1,
+                        graph_account: "hello".to_string(),
+                    };
+                    let graphcast_message = GraphcastMessage::build(
+                        &wallet,
+                        topic.clone(),
+                        "0x7e6528e4ce3055e829a32b5dc4450072bac28bc6".to_string(),
+                        timestamp,
+                        payload,
+                    )
+                    .await
+                    .unwrap();
+
+                    match graphcast_message.send_to_waku(
+                        &node_handle,
+                        WakuPubSubTopic::from_str("/waku/2/graphcast-v0-testnet/proto").unwrap(),
                         content_topic,
                     ) {
                         Ok(id) => {
@@ -149,7 +179,7 @@ async fn start_sender(config: TestSenderConfig) {
 
             sleep(Duration::from_secs(1));
         }
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs(2));
     }
 }
 
