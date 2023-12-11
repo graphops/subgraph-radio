@@ -1,7 +1,5 @@
 use std::{
-    fs,
     net::{TcpListener, UdpSocket},
-    path::Path,
     process::{Child, Command},
     sync::{Arc, Mutex},
     thread,
@@ -70,13 +68,6 @@ pub async fn setup(
     test_file_name: &str,
     test_sender_config: &mut TestSenderConfig,
 ) -> ProcessManager {
-    if let Some(file_path) = &config.radio_setup().persistence_file_path {
-        let path = Path::new(file_path);
-        if path.exists() {
-            fs::remove_file(path).expect("Failed to remove file");
-        }
-    }
-
     let id = uuid::Uuid::new_v4().to_string();
     let radio_name = format!("{}-{}", test_file_name, id);
     test_sender_config.radio_name = radio_name.clone();
@@ -148,16 +139,12 @@ pub async fn setup(
     }
 }
 
-pub fn teardown(process_manager: ProcessManager, store_path: &str) {
+pub fn teardown(process_manager: ProcessManager) {
     // Kill the processes
     for sender in &process_manager.senders {
         let _ = sender.lock().unwrap().kill();
     }
     let _ = process_manager.radio.lock().unwrap().kill();
-
-    if Path::new(&store_path).exists() {
-        fs::remove_file(store_path).unwrap();
-    }
 }
 
 pub fn start_radio(config: &Config) -> Child {
@@ -166,7 +153,7 @@ pub fn start_radio(config: &Config) -> Child {
         .arg("-p")
         .arg("subgraph-radio")
         .arg("--")
-        .arg("--graph-node-endpoint")
+        .arg("--graph-node-status-endpoint")
         .arg(&config.graph_stack().graph_node_status_endpoint)
         .arg("--private-key")
         .arg(
@@ -223,11 +210,11 @@ pub fn start_radio(config: &Config) -> Child {
                 .as_deref()
                 .unwrap_or("None"),
         )
-        .arg("--persistence-file-path")
+        .arg("--sqlite-file-path")
         .arg(
             config
                 .radio_setup()
-                .persistence_file_path
+                .sqlite_file_path
                 .as_deref()
                 .unwrap_or("None"),
         )

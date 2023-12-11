@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use subgraph_radio::config::{Config, CoverageLevel, GraphStack, RadioSetup, Waku};
 use subgraph_radio::operator::notifier::NotificationMode;
 
+use crate::find_random_udp_port;
+
 #[derive(Clone, Debug, Parser, Serialize, Deserialize)]
 #[clap(name = "test-sender", about = "Mock message sender")]
 pub struct TestSenderConfig {
@@ -49,8 +51,8 @@ pub fn test_config() -> Config {
                 waku_addr: None,
                 boot_node_addresses: vec![],
                 waku_log_level: "fatal".to_string(),
-                discv5_enrs: None,
-                discv5_port: None,
+                discv5_enrs: Some(vec!["enr:-P-4QJI8tS1WTdIQxq_yIrD05oIIW1Xg-tm_qfP0CHfJGnp9dfr6ttQJmHwTNxGEl4Le8Q7YHcmi-kXTtphxFysS11oBgmlkgnY0gmlwhLymh5GKbXVsdGlhZGRyc7hgAC02KG5vZGUtMDEuZG8tYW1zMy53YWt1djIucHJvZC5zdGF0dXNpbS5uZXQGdl8ALzYobm9kZS0wMS5kby1hbXMzLndha3V2Mi5wcm9kLnN0YXR1c2ltLm5ldAYfQN4DiXNlY3AyNTZrMaEDbl1X_zJIw3EAJGtmHMVn4Z2xhpSoUaP5ElsHKCv7hlWDdGNwgnZfg3VkcIIjKIV3YWt1Mg8".to_string()]),
+                discv5_port: Some(find_random_udp_port()),
                 filter_protocol: None,
             }
         },
@@ -71,7 +73,6 @@ pub fn test_config() -> Config {
                 metrics_port: None,
                 server_host: String::new(),
                 server_port: None,
-                persistence_file_path: None,
                 log_format: LogFormat::Pretty,
                 radio_name: String::new(),
                 telegram_chat_id: None,
@@ -81,6 +82,7 @@ pub fn test_config() -> Config {
                 auto_upgrade_coverage: CoverageLevel::OnChain,
                 notification_mode: NotificationMode::Live,
                 notification_interval: 24,
+                sqlite_file_path: None,
             }
         },
         config_file: None,

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        DELETE FROM remote_ppoi_messages\n        WHERE identifier = ? AND block_number <= ?\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "f9468a1c5ce939b902185b1617a6266851a49709d1ec02bd7d14a0e36e58b056"
+}
