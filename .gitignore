@@ -9,6 +9,6 @@ boot_node_addr.conf
 data
 *.swp
 .vscode
-*.json
 .DS_Store
 configs
+*.sqlite*

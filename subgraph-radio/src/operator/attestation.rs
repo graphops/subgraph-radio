@@ -1,14 +1,23 @@
-use async_graphql::{Enum, Error, ErrorExtensions, SimpleObject};
+use crate::database::{
+    clear_all_notifications, create_notification, get_comparison_results_by_deployment,
+    get_notifications, get_remote_ppoi_messages_by_identifier, save_comparison_result,
+};
+use crate::operator::notifier::NotificationMode;
+use crate::DatabaseError;
+use async_graphql::{Enum, Error as AsyncGraphqlError, ErrorExtensions, SimpleObject};
 use autometrics::autometrics;
 use chrono::Utc;
-use num_traits::Zero;
 use serde_derive::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
+use sqlx::SqlitePool;
+use std::error::Error;
+use std::fmt;
+use std::str::FromStr;
 use std::{
-    collections::HashMap,
-    fmt::{self, Display},
-    sync::{Arc, Mutex as SyncMutex},
+    collections::{HashMap, HashSet},
+    fmt::Display,
 };
+use thiserror::Error;
 
 use tracing::{debug, error, info, trace, warn};
 
@@ -17,36 +26,44 @@ use graphcast_sdk::{
     graphcast_agent::message_typing::{get_indexer_stake, GraphcastMessage, MessageError},
 };
 
-use crate::operator::notifier::NotificationMode;
-use crate::{
-    messages::poi::PublicPoiMessage, metrics::ACTIVE_INDEXERS, state::PersistedState,
-    OperationError,
-};
+use crate::database::{get_local_attestations_by_identifier, insert_local_attestation};
+use crate::{messages::poi::PublicPoiMessage, metrics::ACTIVE_INDEXERS, OperationError};
 
+use super::notifier::Notification;
 use super::Notifier;
 
-/// A wrapper around an attested public POI, tracks Indexers that have sent it plus their accumulated stake
 #[derive(Clone, Debug, PartialEq, Eq, Hash, SimpleObject, Serialize, Deserialize)]
 pub struct Attestation {
+    pub identifier: String,
+    pub block_number: u64,
     pub ppoi: String,
-    pub stake_weight: i64,
+    pub stake_weight: u64,
     pub senders: Vec<String>,
     pub sender_group_hash: String,
-    pub timestamp: Vec<i64>,
+    pub timestamp: Vec<u64>,
 }
 
 #[autometrics]
 impl Attestation {
-    pub fn new(ppoi: String, stake_weight: f32, senders: Vec<String>, timestamp: Vec<i64>) -> Self {
+    pub fn new(
+        identifier: String,
+        block_number: u64,
+        ppoi: String,
+        stake_weight: u64,
+        senders: Vec<String>,
+        timestamp: Vec<u64>,
+    ) -> Self {
         let addresses = &mut senders.clone();
         sort_addresses(addresses);
         let sender_group_hash = hash_addresses(addresses);
         Attestation {
             ppoi,
-            stake_weight: stake_weight as i64,
+            stake_weight,
             senders,
             sender_group_hash,
             timestamp,
+            identifier,
+            block_number,
         }
     }
 
@@ -54,8 +71,8 @@ impl Attestation {
     pub fn update(
         base: &Self,
         address: String,
-        stake: f32,
-        timestamp: i64,
+        stake: u64,
+        timestamp: u64,
     ) -> Result<Self, AttestationError> {
         if base.senders.contains(&address) {
             Err(AttestationError::UpdateError(
@@ -63,8 +80,10 @@ impl Attestation {
             ))
         } else {
             Ok(Self::new(
+                base.identifier.clone(),
+                base.block_number,
                 base.ppoi.clone(),
-                (base.stake_weight as f32) + stake,
+                base.stake_weight + stake,
                 [base.senders.clone(), vec![address]].concat(),
                 [base.timestamp.clone(), vec![timestamp]].concat(),
             ))
@@ -84,26 +103,6 @@ impl fmt::Display for Attestation {
 
 pub type RemoteAttestationsMap = HashMap<String, HashMap<u64, Vec<Attestation>>>;
 pub type LocalAttestationsMap = HashMap<String, HashMap<u64, Attestation>>;
-
-#[derive(SimpleObject, Debug)]
-pub struct AttestationEntry {
-    pub deployment: String,
-    pub block_number: u64,
-    pub attestation: Attestation,
-}
-
-pub fn attestations_to_vec(attestations: &LocalAttestationsMap) -> Vec<AttestationEntry> {
-    attestations
-        .iter()
-        .flat_map(|(ppoi, inner_map)| {
-            inner_map.iter().map(move |(blk, att)| AttestationEntry {
-                deployment: ppoi.clone(),
-                block_number: *blk,
-                attestation: att.clone(),
-            })
-        })
-        .collect()
-}
 
 #[autometrics]
 pub async fn process_ppoi_message(
@@ -126,9 +125,9 @@ pub async fn process_ppoi_message(
         let sender_stake =
             get_indexer_stake(&radio_msg.graph_account.clone(), callbook.graph_network())
                 .await
-                .map_err(|e| AttestationError::BuildError(MessageError::FieldDerivations(e)))?;
+                .map_err(|e| AttestationError::BuildError(MessageError::FieldDerivations(e)))?
+                as u64;
 
-        //TODO: update this to utilize update_blocks?
         let blocks = remote_attestations
             .entry(msg.identifier.to_string())
             .or_default();
@@ -148,6 +147,8 @@ pub async fn process_ppoi_message(
             }
         } else {
             attestations.push(Attestation::new(
+                msg.identifier.clone(),
+                msg.payload.block_number,
                 radio_msg.payload_content().to_string(),
                 sender_stake,
                 vec![msg.graph_account.clone()],
@@ -183,96 +184,87 @@ pub fn combine_senders(attestations: &[Attestation]) -> Vec<String> {
         .collect()
 }
 
-/// Determine the comparison pointer on both block and time based on the local attestations
-/// If they don't exist, then return default value that shall never be validated to trigger
-pub fn local_comparison_point(
-    local_attestations: &LocalAttestationsMap,
-    remote_ppoi_messages: &[GraphcastMessage<PublicPoiMessage>],
-    id: String,
-    collect_window_duration: i64,
-) -> Option<(u64, i64)> {
-    if let Some(blocks_map) = local_attestations.get(&id) {
-        // Find the attestaion by the smallest block
-        let remote_blocks = remote_ppoi_messages
-            .iter()
-            .filter(|m| m.identifier == id.clone())
-            .map(|m| m.payload.block_number)
-            .collect::<Vec<u64>>();
-        blocks_map
-            .iter()
-            .filter(|(&block, _)| remote_blocks.contains(&block))
-            .min_by_key(|(&min_block, attestation)| {
-                // unwrap is okay because we add timestamp at local creation of attestation
-                (min_block, *attestation.timestamp.first().unwrap())
-            })
-            .map(|(&block, a)| {
-                (
-                    block,
-                    *a.timestamp.first().unwrap() + collect_window_duration,
-                )
-            })
-    } else {
-        None
-    }
+#[derive(Debug, Error)]
+pub enum ComparisonError {
+    #[error("Database error: {0}")]
+    DbError(DatabaseError),
+    #[error("No comparison point found")]
+    NoComparisonPoint,
 }
 
-/// Updates the `blocks` HashMap to include the new attestation.
-pub fn update_blocks(
-    block_number: u64,
-    blocks: &HashMap<u64, Vec<Attestation>>,
-    ppoi: String,
-    stake: f32,
-    address: String,
-    timestamp: i64,
-) -> HashMap<u64, Vec<Attestation>> {
-    let mut blocks_clone: HashMap<u64, Vec<Attestation>> = HashMap::new();
-    blocks_clone.extend(blocks.clone());
-    blocks_clone.insert(
-        block_number,
-        vec![Attestation::new(
-            ppoi,
-            stake,
-            vec![address],
-            vec![timestamp],
-        )],
-    );
-    blocks_clone
+/// Determine the comparison pointer on both block and time based on the local attestations
+/// If they don't exist, then return default value that shall never be validated to trigger
+pub async fn local_comparison_point(
+    id: &str,
+    collect_window_duration: u64,
+    db: SqlitePool,
+) -> Result<(u64, u64), ComparisonError> {
+    let local_attestations = get_local_attestations_by_identifier(&db, id)
+        .await
+        .map_err(ComparisonError::DbError)?;
+    let remote_messages = get_remote_ppoi_messages_by_identifier(&db, id)
+        .await
+        .map_err(ComparisonError::DbError)?;
+
+    let remote_blocks: HashSet<u64> = remote_messages
+        .iter()
+        .filter(|m| m.identifier == id)
+        .map(|m| m.payload.block_number)
+        .collect();
+
+    let min_attestation = local_attestations
+        .into_iter()
+        .filter(|attestation| remote_blocks.contains(&(attestation.block_number)))
+        .min_by_key(|attestation| {
+            attestation
+                .timestamp
+                .first()
+                .map_or((u64::MAX, u64::MAX), |&timestamp| {
+                    (attestation.block_number, timestamp)
+                })
+        });
+
+    let comparison_point = min_attestation
+        .map(|attestation| {
+            let timestamp = *attestation.timestamp.first().unwrap_or(&0) + collect_window_duration;
+            (attestation.block_number, timestamp)
+        })
+        .ok_or(ComparisonError::NoComparisonPoint)?;
+
+    Ok(comparison_point)
 }
 
 /// Saves PPOIs that we've generated locally, in order to compare them with remote ones later
-pub fn save_local_attestation(
-    local_attestations: Arc<SyncMutex<LocalAttestationsMap>>,
+pub async fn save_local_attestation(
+    pool: &SqlitePool,
     content: String,
     ipfs_hash: String,
     block_number: u64,
-) {
-    let attestation = Attestation::new(content, Zero::zero(), vec![], vec![Utc::now().timestamp()]);
-
-    let mut local_attestations = local_attestations.lock().unwrap();
-
-    local_attestations
-        .entry(ipfs_hash.clone())
-        .or_default()
-        .entry(block_number)
-        .and_modify(|existing_attestation| *existing_attestation = attestation.clone())
-        .or_insert(attestation);
-}
-
-/// Clear the expired local attestations after comparing with remote results
-pub fn clear_local_attestation(
-    local_attestations: Arc<SyncMutex<HashMap<String, HashMap<u64, Attestation>>>>,
-    ipfs_hash: String,
-    block_number: u64,
-) {
-    let mut local_attestations = local_attestations.lock().unwrap();
-    let blocks = local_attestations.get(&ipfs_hash);
-
-    if let Some(blocks) = blocks {
-        let mut blocks_clone: HashMap<u64, Attestation> = HashMap::new();
-        blocks_clone.extend(blocks.clone());
-        blocks_clone.remove(&block_number);
-        local_attestations.insert(ipfs_hash, blocks_clone);
+) -> Result<Attestation, OperationError> {
+    let timestamp: Result<u64, _> = Utc::now().timestamp().try_into();
+    let timestamp = match timestamp {
+        Ok(t) => t,
+        Err(e) => {
+            return Err(OperationError::Others(format!(
+                "Timestamp conversion failed: {}",
+                e
+            )));
+        }
     };
+
+    let attestation = Attestation {
+        identifier: ipfs_hash,
+        block_number,
+        ppoi: content,
+        stake_weight: 0,
+        sender_group_hash: String::new(),
+        senders: vec![],
+        timestamp: vec![timestamp],
+    };
+
+    insert_local_attestation(pool, attestation)
+        .await
+        .map_err(OperationError::Database)
 }
 
 /// Tracks results indexed by deployment hash and block number
@@ -305,6 +297,68 @@ impl ComparisonResult {
     }
 }
 
+pub async fn handle_comparison_result(
+    pool: &SqlitePool,
+    new_comparison_result: &ComparisonResult,
+) -> Result<ComparisonResultType, DatabaseError> {
+    let deployment_hash = new_comparison_result.deployment_hash();
+    let existing_result = get_comparison_results_by_deployment(pool, &deployment_hash)
+        .await?
+        .into_iter()
+        .next();
+
+    // Determine if the state has changed and if the database operation is successful
+    let is_state_changed = existing_result.as_ref().map_or(true, |current_result| {
+        current_result.result_type != new_comparison_result.result_type
+    });
+    let is_not_found_to_match = new_comparison_result.result_type == ComparisonResultType::Match
+        && existing_result.map_or(false, |r| r.result_type == ComparisonResultType::NotFound);
+
+    let rows_updated = save_comparison_result(pool, new_comparison_result).await?;
+
+    // Only notify if there is a state change and an update in the database,
+    // and exclude the case from NotFound to Match
+    let should_notify = rows_updated > 0 && is_state_changed && !is_not_found_to_match;
+
+    if should_notify {
+        let new_notification = Notification {
+            deployment: new_comparison_result.deployment.clone(),
+            message: new_comparison_result.to_string(),
+        };
+        create_notification(pool, new_notification).await?;
+    }
+
+    Ok(new_comparison_result.result_type)
+}
+
+#[derive(Debug, Clone)]
+pub struct ParseComparisonResultTypeError;
+
+impl fmt::Display for ParseComparisonResultTypeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "provided string did not match any ComparisonResultType variants"
+        )
+    }
+}
+
+impl Error for ParseComparisonResultTypeError {}
+
+impl FromStr for ComparisonResultType {
+    type Err = ParseComparisonResultTypeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "NotFound" => Ok(ComparisonResultType::NotFound),
+            "Divergent" => Ok(ComparisonResultType::Divergent),
+            "Match" => Ok(ComparisonResultType::Match), // Accepting both for compatibility
+            "BuildFailed" => Ok(ComparisonResultType::BuildFailed),
+            _ => Err(ParseComparisonResultTypeError),
+        }
+    }
+}
+
 impl Display for ComparisonResultType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -315,7 +369,7 @@ impl Display for ComparisonResultType {
                 write!(f, "Divergent")
             }
             ComparisonResultType::Match => {
-                write!(f, "Matched")
+                write!(f, "Match")
             }
             ComparisonResultType::BuildFailed => write!(f, "Failed to build message"),
         }
@@ -389,156 +443,93 @@ impl Clone for ComparisonResult {
 /// It takes our attestation (PPOI) for a given subgraph on a given block and compares it to the top-attested one from the remote attestations.
 /// The top remote attestation is found by grouping attestations together and increasing their total stake-weight every time we see a new message
 /// with the same PPOI from an Indexer (NOTE: one Indexer can only send 1 attestation per subgraph per block). The attestations are then sorted
-/// and we take the one with the highest total stake-weight.
+/// - `local_attestation`: The local attestation data for a given block, if it exists.
+/// - `attestation_block`: The specific block number we are comparing.
+/// - `remote`: A map with a similar structure to what `local` was, but contains remote attestations.
+/// - `ipfs_hash`: The identifier for the deployment whose attestations we are comparing.
 pub fn compare_attestations(
+    local_attestation: Option<Attestation>,
     attestation_block: u64,
-    remote: RemoteAttestationsMap,
-    local: &LocalAttestationsMap,
+    remote: &RemoteAttestationsMap,
     ipfs_hash: &str,
 ) -> ComparisonResult {
-    trace!(
-        local = tracing::field::debug(&local),
-        remote = tracing::field::debug(&remote),
-        "Comparing attestations",
-    );
+    // Attempt to retrieve remote attestations for the given IPFS hash and block number
+    let remote_attestations = remote
+        .get(ipfs_hash)
+        .and_then(|blocks| blocks.get(&attestation_block))
+        .cloned()
+        .unwrap_or_default();
 
-    // Filtering local and remote attestations
-    let blocks = match local.get(ipfs_hash) {
-        Some(blocks) => blocks,
-        None => {
-            debug!(ipfs_hash, local = tracing::field::debug(&local),
-            remote = tracing::field::debug(&remote),
-            "No local attestation stored for any blocks (Should not get here as attestation_block is determined by local_attestations)",);
-            return ComparisonResult {
-                deployment: ipfs_hash.to_string(),
-                block_number: attestation_block,
-                result_type: ComparisonResultType::NotFound,
-                local_attestation: None,
-                attestations: vec![],
-            };
-        }
-    };
-    let local_attestation = match blocks.get(&attestation_block) {
-        Some(attestations) => attestations,
-        None => {
-            debug!(ipfs_hash, attestation_block, local = tracing::field::debug(&local),
-            remote = tracing::field::debug(&remote),
-            "No local attestation stored for the block (Should not get here as attestation_block is determined by local_attestations)",);
-            return ComparisonResult {
-                deployment: ipfs_hash.to_string(),
-                block_number: attestation_block,
-                result_type: ComparisonResultType::NotFound,
-                local_attestation: None,
-                attestations: vec![],
-            };
-        }
-    };
+    // Sort remote attestations by stake weight in descending order
+    let mut sorted_remote_attestations = remote_attestations;
+    sorted_remote_attestations.sort_by(|a, b| {
+        b.stake_weight
+            .partial_cmp(&a.stake_weight)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
-    let remote_blocks = match remote.get(ipfs_hash) {
-        Some(blocks) => blocks,
-        None => {
-            debug!(ipfs_hash, "No remote attestation stored for any block");
-            return ComparisonResult {
-                deployment: ipfs_hash.to_string(),
-                block_number: attestation_block,
-                result_type: ComparisonResultType::NotFound,
-                local_attestation: Some(local_attestation.clone()),
-                attestations: vec![],
-            };
-        }
-    };
-    let remote_attestations = match remote_blocks.get(&attestation_block) {
-        Some(attestations) if !attestations.is_empty() => attestations,
-        _ => {
-            debug!(ipfs_hash, attestation_block, "No remote attestation stored",);
-            return ComparisonResult {
-                deployment: ipfs_hash.to_string(),
-                block_number: attestation_block,
-                result_type: ComparisonResultType::NotFound,
-                local_attestation: Some(local_attestation.clone()),
-                attestations: vec![],
-            };
-        }
-    };
-
-    let mut remote_attestations = remote_attestations.clone();
-    remote_attestations.sort_by(|a, b| a.stake_weight.partial_cmp(&b.stake_weight).unwrap());
-
-    if remote_attestations.len() > 1 {
-        warn!(
-            ipfs_hash,
-            attestation_block,
-            sorted_attestations = tracing::field::debug(&remote_attestations),
-            "More than 1 pPOI found",
-        );
-    }
-
-    let most_attested_ppoi = &remote_attestations.last().unwrap().ppoi;
-    if most_attested_ppoi == &local_attestation.ppoi {
-        trace!(
-            ipfs_hash,
-            attestation_block,
-            num_unique_ppois = remote_attestations.len(),
-            "pPOI matched",
-        );
-        ComparisonResult {
-            deployment: ipfs_hash.to_string(),
-            block_number: attestation_block,
-            result_type: ComparisonResultType::Match,
-            local_attestation: Some(local_attestation.clone()),
-            attestations: remote_attestations,
+    // Determine the comparison result based on the top attested remote PPOI
+    let result_type = if let Some(local_att) = &local_attestation {
+        if let Some(most_attested) = sorted_remote_attestations.last() {
+            if most_attested.ppoi == local_att.ppoi {
+                ComparisonResultType::Match
+            } else {
+                ComparisonResultType::Divergent
+            }
+        } else {
+            ComparisonResultType::NotFound
         }
     } else {
-        debug!(
-            attestation_block,
-            remote_attestations = tracing::field::debug(&remote_attestations),
-            local_attestation = tracing::field::debug(&local_attestation),
-            "Number of pPOI submitted",
-        );
-        ComparisonResult {
-            deployment: ipfs_hash.to_string(),
-            block_number: attestation_block,
-            result_type: ComparisonResultType::Divergent,
-            local_attestation: Some(local_attestation.clone()),
-            attestations: remote_attestations,
-        }
+        ComparisonResultType::NotFound
+    };
+
+    // Construct the comparison result
+    ComparisonResult {
+        deployment: ipfs_hash.to_string(),
+        block_number: attestation_block,
+        result_type,
+        local_attestation,
+        attestations: sorted_remote_attestations,
     }
 }
 
 /// Assume that local and remote has already been matched with the desired deployment and block
 pub fn compare_attestation(
-    local: AttestationEntry,
+    local_attestation: Attestation,
     remote_attestations: Vec<Attestation>,
 ) -> ComparisonResult {
-    let local_attestation = local.attestation;
     let mut remote_attestations = remote_attestations;
-    remote_attestations.sort_by(|a, b| a.stake_weight.partial_cmp(&b.stake_weight).unwrap());
+    remote_attestations.sort_by(|a, b| {
+        a.stake_weight
+            .partial_cmp(&b.stake_weight)
+            .expect("Could not compare stake values")
+    });
 
     let most_attested_ppoi = &remote_attestations.last().unwrap().ppoi;
     if most_attested_ppoi == &local_attestation.ppoi {
         trace!(
-            local.block_number,
+            local_attestation.block_number,
             remote_attestations = tracing::field::debug(&remote_attestations),
             local_attestation = tracing::field::debug(&local_attestation),
             "pPOI matched",
         );
         ComparisonResult {
-            deployment: local.deployment.to_string(),
-            block_number: local.block_number,
+            deployment: local_attestation.identifier.to_string(),
+            block_number: local_attestation.block_number,
             result_type: ComparisonResultType::Match,
             local_attestation: Some(local_attestation),
             attestations: remote_attestations,
         }
     } else {
         warn!(
-            block = local.block_number,
+            block = local_attestation.block_number,
             remote_attestations = tracing::field::debug(&remote_attestations),
             local_attestation = tracing::field::debug(&local_attestation),
             "Detected divergence",
         );
         ComparisonResult {
-            deployment: local.deployment.to_string(),
-            block_number: local.block_number,
+            deployment: local_attestation.identifier.to_string(),
+            block_number: local_attestation.block_number,
             result_type: ComparisonResultType::Divergent,
             local_attestation: Some(local_attestation),
             attestations: remote_attestations,
@@ -611,7 +602,7 @@ pub async fn process_comparison_results(
     num_topics: usize,
     result_strings: Vec<Result<ComparisonResult, OperationError>>,
     notifier: Notifier,
-    persisted_state: PersistedState,
+    db: SqlitePool,
 ) {
     // Generate attestation summary
     let mut match_strings = vec![];
@@ -624,33 +615,49 @@ pub async fn process_comparison_results(
     for result in result_strings {
         match result {
             Ok(comparison_result) => {
-                let result_type = persisted_state
-                    .handle_comparison_result(comparison_result.clone())
-                    .await;
-
-                match result_type {
-                    ComparisonResultType::Match => {
-                        match_strings.push(comparison_result.to_string());
+                match handle_comparison_result(&db, &comparison_result.clone()).await {
+                    Ok(result_type) => match result_type {
+                        ComparisonResultType::Match => {
+                            match_strings.push(comparison_result.to_string());
+                        }
+                        ComparisonResultType::NotFound => {
+                            not_found_strings.push(comparison_result.to_string());
+                        }
+                        ComparisonResultType::Divergent => {
+                            divergent_strings.push(comparison_result.to_string());
+                        }
+                        _ => attestation_failed.push(comparison_result.to_string()),
+                    },
+                    Err(e) => {
+                        let operation_error = OperationError::Database(e);
+                        cmp_errors.push(format!("{:?}", operation_error));
                     }
-                    ComparisonResultType::NotFound => {
-                        not_found_strings.push(comparison_result.to_string());
-                    }
-                    ComparisonResultType::Divergent => {
-                        divergent_strings.push(comparison_result.to_string());
-                    }
-                    _ => attestation_failed.push(comparison_result.to_string()),
                 }
             }
             Err(OperationError::CompareTrigger(_, _, e)) => cmp_trigger_failed.push(e.to_string()),
             Err(OperationError::Attestation(e)) => attestation_failed.push(e.to_string()),
-            Err(e) => cmp_errors.push(e.to_string()),
+            Err(e) => cmp_errors.push(format!("{:?}", e)),
         }
     }
 
-    let notifications = persisted_state.notifications();
-    if notifier.notification_mode == NotificationMode::Live && !notifications.is_empty() {
-        notifier.notify(notifications.join("\n")).await;
-        persisted_state.clear_notifications();
+    let notifications_result = get_notifications(&db).await;
+    match notifications_result {
+        Ok(notifications) => {
+            if notifier.notification_mode == NotificationMode::Live && !notifications.is_empty() {
+                let messages: Vec<String> = notifications
+                    .iter()
+                    .map(|notification| notification.message.clone())
+                    .collect();
+                notifier.notify(messages.join("\n")).await;
+
+                if let Err(e) = clear_all_notifications(&db).await {
+                    error!("Error clearing notifications: {:?}", e);
+                }
+            }
+        }
+        Err(e) => {
+            error!("Error getting notifications: {:?}", e);
+        }
     }
 
     info!(
@@ -673,447 +680,18 @@ pub enum AttestationError {
     BuildError(MessageError),
     #[error("Failed to update attestation: {0}")]
     UpdateError(String),
+    #[error("Integer conversion error: {0}")]
+    IntConversionError(String),
 }
 
 impl ErrorExtensions for AttestationError {
-    fn extend(&self) -> Error {
-        Error::new(format!("{}", self))
+    fn extend(&self) -> AsyncGraphqlError {
+        AsyncGraphqlError::new(format!("{}", self))
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO: add setup and teardown functions
-
-    #[test]
-    fn test_update_blocks() {
-        let mut blocks: HashMap<u64, Vec<Attestation>> = HashMap::new();
-        blocks.insert(
-            42,
-            vec![Attestation::new(
-                "default".to_string(),
-                0.0,
-                Vec::new(),
-                Vec::new(),
-            )],
-        );
-        let block_clone = update_blocks(
-            42,
-            &blocks,
-            "awesome-ppoi".to_string(),
-            0.0,
-            "0xadd3".to_string(),
-            1,
-        );
-
-        assert_eq!(
-            block_clone.get(&42).unwrap().first().unwrap().ppoi,
-            "awesome-ppoi".to_string()
-        );
-    }
-
-    #[test]
-    fn test_sort_sender_addresses_unique() {
-        let attestation = Attestation::new(
-            "awesome-ppoi".to_string(),
-            1.0,
-            vec!["0xaac5349585cbbf924026d25a520ffa9e8b51a39b".to_string()],
-            vec![1],
-        );
-        let attestation2 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            1.0,
-            vec!["0xbbc5349585cbbf924026d25a520ffa9e8b51a39b".to_string()],
-            vec![1],
-        );
-        assert_ne!(
-            attestation2.sender_group_hash,
-            attestation.sender_group_hash
-        );
-    }
-
-    #[test]
-    fn test_sort_sender_addresses() {
-        let attestation = Attestation::new(
-            "awesome-ppoi".to_string(),
-            1.0,
-            vec![
-                "0xaac5349585cbbf924026d25a520ffa9e8b51a39b".to_string(),
-                "0xbbc5349585cbbf924026d25a520ffa9e8b51a39b".to_string(),
-            ],
-            vec![1, 2],
-        );
-        let attestation2 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            1.0,
-            vec![
-                "0xbbc5349585cbbf924026d25a520ffa9e8b51a39b".to_string(),
-                "0xaac5349585cbbf924026d25a520ffa9e8b51a39b".to_string(),
-            ],
-            vec![1, 2],
-        );
-        assert_eq!(
-            attestation2.sender_group_hash,
-            attestation.sender_group_hash
-        );
-    }
-
-    #[test]
-    fn test_attestation_sorting() {
-        let attestation1 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            0.0,
-            vec!["0xa1".to_string()],
-            vec![0],
-        );
-
-        let attestation2 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            0.0,
-            vec!["0xa2".to_string()],
-            vec![1],
-        );
-
-        let attestation3 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            1.0,
-            vec!["0xa3".to_string()],
-            vec![2],
-        );
-
-        let mut attestations = vec![attestation1, attestation2, attestation3];
-
-        attestations.sort_by(|a, b| a.stake_weight.partial_cmp(&b.stake_weight).unwrap());
-
-        assert_eq!(attestations.last().unwrap().stake_weight, 1);
-        assert_eq!(
-            attestations.last().unwrap().senders.first().unwrap(),
-            &"0xa3".to_string()
-        );
-        assert_eq!(attestations.last().unwrap().timestamp, vec![2]);
-    }
-
-    #[test]
-    fn test_attestation_update_success() {
-        let attestation = Attestation::new(
-            "awesome-ppoi".to_string(),
-            0.0,
-            vec!["0xa1".to_string()],
-            vec![2],
-        );
-
-        let updated_attestation = Attestation::update(&attestation, "0xa2".to_string(), 1.0, 1);
-
-        assert!(updated_attestation.is_ok());
-        assert_eq!(updated_attestation.as_ref().unwrap().stake_weight, 1);
-        assert_eq!(updated_attestation.unwrap().timestamp, [2, 1]);
-    }
-
-    #[test]
-    fn test_attestation_update_fail() {
-        let attestation = Attestation::new(
-            "awesome-ppoi".to_string(),
-            0.0,
-            vec!["0xa1".to_string()],
-            vec![0],
-        );
-
-        let updated_attestation = Attestation::update(&attestation, "0xa1".to_string(), 0.0, 0);
-
-        assert!(updated_attestation.is_err());
-        assert_eq!(
-            updated_attestation.unwrap_err().to_string(),
-            "Failed to update attestation: There is already an attestation from this address. Skipping...".to_string()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_compare_attestations_generic_fail() {
-        let res = compare_attestations(
-            42,
-            HashMap::new(),
-            &HashMap::new(),
-            "non-existent-ipfs-hash",
-        );
-
-        assert_eq!(
-            res.to_string(),
-            "NotFound for local attestation: deployment non-existent-ipfs-hash at block 42"
-                .to_string()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_compare_attestations_remote_not_found_fail() {
-        let mut remote_blocks: HashMap<u64, Vec<Attestation>> = HashMap::new();
-        let mut local_blocks: HashMap<u64, Attestation> = HashMap::new();
-
-        remote_blocks.insert(
-            42,
-            vec![Attestation::new(
-                "awesome-ppoi".to_string(),
-                0.0,
-                vec!["0xa1".to_string()],
-                vec![1],
-            )],
-        );
-
-        local_blocks.insert(
-            42,
-            Attestation::new("awesome-ppoi".to_string(), 0.0, Vec::new(), vec![0]),
-        );
-
-        let mut remote_attestations: HashMap<String, HashMap<u64, Vec<Attestation>>> =
-            HashMap::new();
-        let mut local_attestations: HashMap<String, HashMap<u64, Attestation>> = HashMap::new();
-
-        remote_attestations.insert("my-awesome-hash".to_string(), remote_blocks);
-        local_attestations.insert("different-awesome-hash".to_string(), local_blocks);
-
-        let res = compare_attestations(
-            42,
-            remote_attestations,
-            &local_attestations,
-            "different-awesome-hash",
-        );
-
-        assert_eq!(
-            res.to_string(),
-            "NotFound for remote attestations: deployment different-awesome-hash at block 42"
-                .to_string()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_compare_attestations_local_not_found_fail() {
-        let remote_blocks: HashMap<u64, Vec<Attestation>> = HashMap::new();
-        let local_blocks: HashMap<u64, Attestation> = HashMap::new();
-
-        let mut remote_attestations: HashMap<String, HashMap<u64, Vec<Attestation>>> =
-            HashMap::new();
-        let mut local_attestations: HashMap<String, HashMap<u64, Attestation>> = HashMap::new();
-
-        remote_attestations.insert("my-awesome-hash".to_string(), remote_blocks);
-        local_attestations.insert("my-awesome-hash".to_string(), local_blocks);
-
-        let res = compare_attestations(
-            42,
-            remote_attestations,
-            &local_attestations,
-            "my-awesome-hash",
-        );
-
-        assert_eq!(
-            res.to_string(),
-            "NotFound for local attestation: deployment my-awesome-hash at block 42".to_string()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_compare_attestations_success() {
-        let mut remote_blocks: HashMap<u64, Vec<Attestation>> = HashMap::new();
-        let mut local_blocks: HashMap<u64, Attestation> = HashMap::new();
-
-        let remote = Attestation::new(
-            "awesome-ppoi".to_string(),
-            0.0,
-            vec!["0xa1".to_string()],
-            vec![0],
-        );
-        remote_blocks.insert(42, vec![remote.clone()]);
-
-        let local = Attestation::new("awesome-ppoi".to_string(), 0.0, Vec::new(), vec![0]);
-        local_blocks.insert(42, local.clone());
-
-        let mut remote_attestations: HashMap<String, HashMap<u64, Vec<Attestation>>> =
-            HashMap::new();
-        let mut local_attestations: HashMap<String, HashMap<u64, Attestation>> = HashMap::new();
-
-        remote_attestations.insert("my-awesome-hash".to_string(), remote_blocks);
-        local_attestations.insert("my-awesome-hash".to_string(), local_blocks);
-
-        let res = compare_attestations(
-            42,
-            remote_attestations,
-            &local_attestations,
-            "my-awesome-hash",
-        );
-
-        assert_eq!(
-            res,
-            ComparisonResult {
-                deployment: "my-awesome-hash".to_string(),
-                block_number: 42,
-                result_type: ComparisonResultType::Match,
-                local_attestation: Some(local),
-                attestations: vec![remote],
-            }
-        );
-    }
-
-    #[tokio::test]
-    async fn clear_local_attestation_success() {
-        let mut local_blocks: HashMap<u64, Attestation> = HashMap::new();
-        let attestation1 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            0.0,
-            vec!["0xa1".to_string()],
-            vec![0],
-        );
-
-        let attestation2 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            0.0,
-            vec!["0xa2".to_string()],
-            vec![1],
-        );
-
-        let attestation3 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            1.0,
-            vec!["0xa3".to_string()],
-            vec![2],
-        );
-
-        local_blocks.insert(42, attestation1);
-        local_blocks.insert(43, attestation2);
-        local_blocks.insert(44, attestation3);
-
-        let mut local_attestations: HashMap<String, HashMap<u64, Attestation>> = HashMap::new();
-        local_attestations.insert("hash".to_string(), local_blocks.clone());
-        local_attestations.insert("hash2".to_string(), local_blocks);
-        let local = Arc::new(SyncMutex::new(local_attestations));
-
-        clear_local_attestation(Arc::clone(&local), "hash".to_string(), 43);
-
-        assert_eq!(local.lock().unwrap().get("hash").unwrap().len(), 2);
-        assert!(local
-            .lock()
-            .unwrap()
-            .get("hash")
-            .unwrap()
-            .get(&43)
-            .is_none());
-        assert_eq!(local.lock().unwrap().get("hash2").unwrap().len(), 3);
-    }
-
-    pub fn test_msg_vec() -> Vec<GraphcastMessage<PublicPoiMessage>> {
-        vec![GraphcastMessage {
-            identifier: String::from("hash"),
-            nonce: 2,
-            graph_account: String::from("0x7e6528e4ce3055e829a32b5dc4450072bac28bc6"),
-            payload: PublicPoiMessage {
-                identifier: String::from("hash"),
-                content: String::from("awesome-ppoi"),
-                nonce: 2,
-                network: String::from("goerli"),
-                block_number: 42,
-                block_hash: String::from("4dbba1ba9fb18b0034965712598be1368edcf91ae2c551d59462aab578dab9c5"),
-                graph_account: String::from("0xa1"),
-            },
-            signature: String::from("03b197380ab9ee3a9fcaea1301224ad1ff02e9e414275fd79d6ee463b21eb6957af7670a26b0a7f8a6316d95dba8497f2bd67b32b39be07073cf81beff0b37961b"),
-        }]
-    }
-
-    #[tokio::test]
-    async fn local_attestation_pointer_success() {
-        let mut local_blocks: HashMap<u64, Attestation> = HashMap::new();
-        let attestation1 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            0.0,
-            vec!["0xa1".to_string()],
-            vec![2],
-        );
-
-        let attestation2 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            0.0,
-            vec!["0xa2".to_string()],
-            vec![4],
-        );
-
-        let attestation3 = Attestation::new(
-            "awesome-ppoi".to_string(),
-            1.0,
-            vec!["0xa3".to_string()],
-            vec![6],
-        );
-
-        local_blocks.insert(42, attestation1);
-        local_blocks.insert(43, attestation2);
-        local_blocks.insert(44, attestation3);
-
-        let mut local_attestations: HashMap<String, HashMap<u64, Attestation>> = HashMap::new();
-        local_attestations.insert("hash".to_string(), local_blocks.clone());
-        local_attestations.insert("hash2".to_string(), local_blocks);
-        let (block_num, collect_window_end) = local_comparison_point(
-            &local_attestations,
-            &test_msg_vec(),
-            "hash".to_string(),
-            120,
-        )
-        .unwrap();
-
-        assert_eq!(block_num, 42);
-        assert_eq!(collect_window_end, 122);
-    }
-
-    #[tokio::test]
-    async fn test_save_local_attestation() {
-        let local_attestations = Arc::new(SyncMutex::new(HashMap::new()));
-        save_local_attestation(
-            local_attestations.clone(),
-            "ppoi-x".to_string(),
-            "0xa1".to_string(),
-            0,
-        );
-
-        save_local_attestation(
-            local_attestations.clone(),
-            "ppoi-y".to_string(),
-            "0xa1".to_string(),
-            1,
-        );
-
-        save_local_attestation(
-            local_attestations.clone(),
-            "ppoi-z".to_string(),
-            "0xa2".to_string(),
-            2,
-        );
-
-        assert!(!local_attestations.lock().unwrap().is_empty());
-        assert_eq!(local_attestations.lock().unwrap().len(), 2);
-        assert_eq!(
-            local_attestations
-                .lock()
-                .unwrap()
-                .get("0xa1")
-                .unwrap()
-                .len(),
-            2
-        );
-        assert_eq!(
-            local_attestations
-                .lock()
-                .unwrap()
-                .get("0xa2")
-                .unwrap()
-                .len(),
-            1
-        );
-        assert_eq!(
-            local_attestations
-                .lock()
-                .unwrap()
-                .get("0xa1")
-                .unwrap()
-                .get(&0)
-                .unwrap()
-                .ppoi,
-            *"ppoi-x"
-        );
+impl From<std::num::TryFromIntError> for AttestationError {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        AttestationError::IntConversionError(err.to_string())
     }
 }

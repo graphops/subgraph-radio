@@ -1,18 +1,28 @@
 use async_graphql::{Context, EmptyMutation, EmptySubscription, Object, Schema, SimpleObject};
 use chrono::Utc;
+use sqlx::{sqlite::SqliteError, Error as CoreSqlxError, SqlitePool};
 
+use crate::{
+    database::{
+        get_comparison_results, get_comparison_results_by_deployment,
+        get_upgrade_intent_message_by_id, get_upgrade_intent_messages,
+    },
+    DatabaseError, OperationError,
+};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use crate::{
     config::Config,
+    database::{
+        get_local_attestation, get_local_attestations, get_local_attestations_by_identifier,
+        get_remote_ppoi_messages,
+    },
     messages::{poi::PublicPoiMessage, upgrade::UpgradeIntentMessage},
     operator::attestation::{
-        self, attestations_to_vec, compare_attestation, process_ppoi_message, Attestation,
-        AttestationEntry, AttestationError, ComparisonResult, ComparisonResultType,
-        LocalAttestationsMap,
+        self, compare_attestation, process_ppoi_message, Attestation, AttestationError,
+        ComparisonResult, ComparisonResultType,
     },
-    state::PersistedState,
 };
 use graphcast_sdk::{
     graphcast_agent::{message_typing::GraphcastMessage, GraphcastAgent, PeerData},
@@ -35,7 +45,8 @@ impl QueryRoot {
     ) -> Result<Vec<GraphcastMessage<PublicPoiMessage>>, HttpServiceError> {
         let msgs = ctx
             .data_unchecked::<Arc<SubgraphRadioContext>>()
-            .remote_ppoi_messages_filtered(&identifier, &block);
+            .remote_ppoi_messages_filtered(&identifier, &block)
+            .await;
         Ok(msgs)
     }
 
@@ -47,9 +58,7 @@ impl QueryRoot {
         let msgs = ctx
             .data_unchecked::<Arc<SubgraphRadioContext>>()
             .upgrade_intent_messages_filtered(&subgraph_id)
-            .into_iter()
-            .map(|m| m.payload)
-            .collect();
+            .await?;
         Ok(msgs)
     }
 
@@ -58,13 +67,14 @@ impl QueryRoot {
         ctx: &Context<'_>,
         identifier: Option<String>,
         block: Option<u64>,
-    ) -> Result<Vec<AttestationEntry>, HttpServiceError> {
+    ) -> Result<Vec<Attestation>, HttpServiceError> {
         let attestations = ctx
             .data_unchecked::<Arc<SubgraphRadioContext>>()
-            .local_attestations(identifier, block);
-        let filtered = attestations_to_vec(&attestations);
+            .local_attestations(identifier, block)
+            .await
+            .clone();
 
-        Ok(filtered)
+        Ok(attestations)
     }
 
     /// Function that optionally takes in identifier and block filters.
@@ -91,7 +101,8 @@ impl QueryRoot {
     ) -> Result<Option<ComparisonResult>, HttpServiceError> {
         let res = &ctx
             .data_unchecked::<Arc<SubgraphRadioContext>>()
-            .comparison_result(identifier);
+            .comparison_result(&identifier)
+            .await;
         Ok(res.clone())
     }
 
@@ -110,20 +121,24 @@ impl QueryRoot {
 
         let mut ratios = vec![];
         for r in res {
-            let (aggregated_attestations, local_ppoi) =
-                aggregate_attestation(r.clone(), &local_info);
-
-            let (stake_ratio, sender_ratio) = calc_ratios(
-                &aggregated_attestations,
-                local_ppoi.as_deref(),
-                local_info.stake,
-            );
-            ratios.push(CompareRatio::new(
-                r.deployment,
-                r.block_number,
-                sender_ratio,
-                stake_ratio,
-            ));
+            match aggregate_attestation(r.clone(), &local_info) {
+                Ok((aggregated_attestations, local_ppoi)) => {
+                    let (stake_ratio, sender_ratio) = calc_ratios(
+                        &aggregated_attestations,
+                        local_ppoi.as_deref(),
+                        local_info.stake,
+                    );
+                    ratios.push(CompareRatio::new(
+                        r.deployment,
+                        r.block_number,
+                        sender_ratio,
+                        stake_ratio,
+                    ));
+                }
+                Err(e) => {
+                    return Err(HttpServiceError::OperationError(e));
+                }
+            }
         }
         Ok(ratios)
     }
@@ -167,7 +182,7 @@ impl QueryRoot {
 pub fn calc_ratios(
     attestations: &[Attestation],
     local_ppoi: Option<&str>,
-    local_stake: f32,
+    local_stake: u64,
 ) -> (String, String) {
     // Clone and sort the attestations by descending stake weight
     let mut temp_attestations = attestations.to_owned();
@@ -178,7 +193,7 @@ pub fn calc_ratios(
 
     for att in temp_attestations.iter() {
         if local_ppoi.is_some() && att.ppoi.as_str() == local_ppoi.unwrap() {
-            stakes.push(format!("{}*", att.stake_weight + local_stake as i64));
+            stakes.push(format!("{}*", att.stake_weight + local_stake));
             senders.push(format!("{}*", att.senders.len() + 1));
         } else {
             // There is a local ppoi, but it's different compared to att.ppoi
@@ -201,72 +216,64 @@ pub fn calc_ratios(
 
 pub async fn build_schema(ctx: Arc<SubgraphRadioContext>) -> SubgraphRadioSchema {
     Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
-        .data(ctx.persisted_state)
+        .data(ctx.db.clone())
         .finish()
 }
 
 pub struct SubgraphRadioContext {
     pub radio_config: Config,
-    pub persisted_state: &'static PersistedState,
+    pub db: SqlitePool,
     pub graphcast_agent: &'static GraphcastAgent,
 }
 
 impl SubgraphRadioContext {
     pub fn init(
         radio_config: Config,
-        persisted_state: &'static PersistedState,
+        db: &SqlitePool,
         graphcast_agent: &'static GraphcastAgent,
     ) -> Self {
         Self {
             radio_config,
-            persisted_state,
+            db: db.clone(),
             graphcast_agent,
         }
     }
 
-    pub fn local_attestations(
+    pub async fn local_attestations(
         &self,
         identifier: Option<String>,
         block: Option<u64>,
-    ) -> LocalAttestationsMap {
-        let attestations = self.persisted_state.local_attestations();
-        let mut empty_attestations: LocalAttestationsMap = HashMap::new();
-
-        if let Some(deployment) = identifier {
-            if let Some(deployment_attestations) = attestations.get(&deployment) {
-                if let Some(block) = block {
-                    if let Some(attestation) = deployment_attestations.get(&block) {
-                        let single_entry = (block, attestation.clone());
-                        let inner_map = vec![single_entry].into_iter().collect();
-
-                        vec![(deployment, inner_map)].into_iter().collect()
-                    } else {
-                        // Return empty hashmap if no entry satisfy the supplied identifier and block
-                        empty_attestations
-                    }
-                } else {
-                    // Return all blocks since no block was specified
-                    empty_attestations.insert(deployment, deployment_attestations.clone());
-                    empty_attestations
-                }
-            } else {
-                empty_attestations
+    ) -> Vec<Attestation> {
+        let db_records: Vec<Attestation> = match (identifier, block) {
+            (Some(deployment_id), Some(block_num)) => {
+                get_local_attestation(&self.db, &deployment_id, block_num)
+                    .await
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect()
             }
-        } else {
-            attestations
-        }
+            (Some(deployment_id), None) => {
+                get_local_attestations_by_identifier(&self.db, &deployment_id)
+                    .await
+                    .unwrap_or_default()
+            }
+            (None, None) => get_local_attestations(&self.db).await.unwrap_or_default(),
+            (None, Some(_)) => Vec::new(),
+        };
+
+        db_records.into_iter().collect()
     }
 
-    pub fn remote_ppoi_messages(&self) -> Vec<GraphcastMessage<PublicPoiMessage>> {
-        self.persisted_state.remote_ppoi_messages()
+    pub async fn remote_ppoi_messages(&self) -> Vec<GraphcastMessage<PublicPoiMessage>> {
+        get_remote_ppoi_messages(&self.db).await.unwrap_or_default()
     }
 
-    pub fn remote_ppoi_messages_filtered(
+    pub async fn remote_ppoi_messages_filtered(
         &self,
         identifier: &Option<String>,
         block: &Option<u64>,
     ) -> Vec<GraphcastMessage<PublicPoiMessage>> {
-        let msgs = self.remote_ppoi_messages();
+        let msgs = self.remote_ppoi_messages().await;
         let filtered = msgs
             .iter()
             .filter(|&message| filter_remote_ppoi_messages(message, identifier, block))
@@ -275,25 +282,52 @@ impl SubgraphRadioContext {
         filtered
     }
 
-    pub fn upgrade_intent_messages(
+    pub async fn upgrade_intent_messages(
         &self,
-    ) -> HashMap<String, GraphcastMessage<UpgradeIntentMessage>> {
-        self.persisted_state.upgrade_intent_messages()
+    ) -> Result<HashMap<String, GraphcastMessage<UpgradeIntentMessage>>, DatabaseError> {
+        let records = get_upgrade_intent_messages(&self.db).await?;
+
+        let mut messages = HashMap::new();
+        for record in records {
+            let msg = GraphcastMessage {
+                identifier: record.identifier.clone(),
+                nonce: record.nonce,
+                graph_account: record.graph_account.clone(),
+                signature: record.signature.clone(),
+                payload: UpgradeIntentMessage {
+                    deployment: record.identifier,
+                    subgraph_id: record.payload.subgraph_id,
+                    new_hash: record.payload.new_hash,
+                    nonce: record.nonce,
+                    graph_account: record.graph_account,
+                },
+            };
+            messages.insert(msg.payload.subgraph_id.clone(), msg);
+        }
+
+        Ok(messages)
     }
 
-    pub fn upgrade_intent_messages_filtered(
+    pub async fn upgrade_intent_messages_filtered(
         &self,
         subgraph_id: &Option<String>,
-    ) -> Vec<GraphcastMessage<UpgradeIntentMessage>> {
-        subgraph_id
-            .as_ref()
-            .and_then(|id| self.upgrade_intent_messages().get(id).cloned())
-            .map_or(vec![], |m| vec![m])
+    ) -> Result<Vec<UpgradeIntentMessage>, DatabaseError> {
+        match subgraph_id {
+            Some(id) => match get_upgrade_intent_message_by_id(&self.db, id).await? {
+                Some(message) => Ok(vec![message.payload]),
+                None => Ok(vec![]),
+            },
+            None => Ok(vec![]),
+        }
     }
 
-    pub fn comparison_result(&self, identifier: String) -> Option<ComparisonResult> {
-        let cmp_results = self.persisted_state.comparison_results();
-        cmp_results.get(&identifier).cloned()
+    pub async fn comparison_result(&self, deployment_hash: &str) -> Option<ComparisonResult> {
+        let records = get_comparison_results_by_deployment(&self.db, deployment_hash)
+            .await
+            .ok()?;
+
+        let record = records.into_iter().next()?;
+        Some(record)
     }
 
     pub async fn comparison_results(
@@ -302,33 +336,24 @@ impl SubgraphRadioContext {
         block: Option<u64>,
         result_type: Option<ComparisonResultType>,
     ) -> Vec<ComparisonResult> {
-        // Simply take from persisted state if block is not specified
-        if block.is_none() {
-            let cmp_results = self.persisted_state.comparison_results();
-
-            cmp_results
-                .iter()
-                .filter(|&(deployment, cmp_res)| {
-                    (identifier.is_none() | (Some(deployment.clone()) == identifier))
-                        && (result_type.is_none() | (Some(cmp_res.result_type) == result_type))
-                })
-                .map(|(_, cmp_res)| cmp_res.clone())
-                .collect::<Vec<ComparisonResult>>()
-        } else {
-            // Calculate for the block if specified
-            let locals = attestations_to_vec(&self.local_attestations(identifier.clone(), block));
+        if let Some(block) = block {
+            let locals = self
+                .local_attestations(identifier.clone(), Some(block))
+                .await;
 
             let config = self.radio_config();
 
-            let mut res = vec![];
+            let mut res = Vec::new();
             for entry in locals {
-                let deployment_identifier = entry.deployment.clone();
-                let msgs = self.remote_ppoi_messages_filtered(&identifier, &block);
+                let msgs = self
+                    .remote_ppoi_messages_filtered(&identifier, &Some(block))
+                    .await;
+
                 let remote_attestations = process_ppoi_message(msgs, &config.callbook())
                     .await
                     .ok()
                     .and_then(|r| {
-                        r.get(&deployment_identifier)
+                        r.get(&entry.identifier)
                             .and_then(|deployment_attestations| {
                                 deployment_attestations.get(&entry.block_number).cloned()
                             })
@@ -336,12 +361,30 @@ impl SubgraphRadioContext {
                     .unwrap_or_default();
 
                 let r = compare_attestation(entry, remote_attestations);
-                if result_type.is_none() | (result_type.unwrap() == r.result_type) {
+                if result_type.is_none() || (Some(r.result_type) == result_type) {
                     res.push(r);
                 }
             }
 
             res
+        } else {
+            let comparison_results = match get_comparison_results(&self.db).await {
+                Ok(results) => results,
+                Err(_) => return Vec::new(),
+            };
+
+            // Filter the ComparisonResults based on identifier and result_type
+            let filtered_results = comparison_results
+                .into_iter()
+                .filter(|cmp_res| {
+                    (identifier.is_none() || Some(&cmp_res.deployment) == identifier.as_ref())
+                        && (result_type.is_none()
+                            || Some(cmp_res.result_type.to_string().as_str())
+                                == result_type.map(|rt| rt.to_string()).as_deref())
+                })
+                .collect::<Vec<ComparisonResult>>();
+
+            filtered_results
         }
     }
 
@@ -394,39 +437,49 @@ fn filter_remote_ppoi_messages(
 fn aggregate_attestation(
     r: ComparisonResult,
     local_info: &IndexerInfo,
-) -> (Vec<Attestation>, Option<String>) {
-    // Double check for local attestations to ensure there will be no divide by 0 during the ratio
+) -> Result<(Vec<Attestation>, Option<String>), OperationError> {
     let local_attestation = if let Some(local_attestation) = r.local_attestation {
         local_attestation
     } else {
-        // Simply return remote attestations
-        return (r.attestations, None);
+        return Ok((r.attestations, None));
     };
 
     let local_ppoi = local_attestation.ppoi.clone();
-    // Aggregate remote attestations with the local attestations
     let mut aggregated_attestations: Vec<Attestation> = vec![];
     let mut matched = false;
+
+    let current_timestamp: Result<_, _> = Utc::now().timestamp().try_into();
+    let current_timestamp = match current_timestamp {
+        Ok(t) => t,
+        Err(e) => {
+            return Err(OperationError::Others(format!(
+                "Timestamp conversion failed: {}",
+                e
+            )))
+        }
+    };
+
     for a in r.attestations {
         if a.ppoi == local_ppoi {
             let updated_attestation = attestation::Attestation::update(
                 &a,
                 local_info.address.clone(),
                 local_info.stake,
-                Utc::now().timestamp(),
+                current_timestamp, // Use the converted timestamp
             );
             if let Ok(updated_a) = updated_attestation {
                 aggregated_attestations.push(updated_a);
             }
             matched = true;
         } else {
-            aggregated_attestations.push(a)
+            aggregated_attestations.push(a);
         }
     }
+
     if !matched {
         aggregated_attestations.push(local_attestation);
     }
-    (aggregated_attestations, Some(local_ppoi))
+    Ok((aggregated_attestations, Some(local_ppoi)))
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, SimpleObject)]
@@ -456,7 +509,7 @@ impl CompareRatio {
 #[derive(Debug, PartialEq, SimpleObject)]
 struct IndexerInfo {
     address: String,
-    stake: f32,
+    stake: u64,
 }
 
 #[derive(Error, Debug)]
@@ -478,6 +531,28 @@ pub enum HttpServiceError {
     InvalidUrl(String),
     #[error("HTTP client error: {0}")]
     HttpClientError(#[from] reqwest::Error),
+    #[error("Operation error: {0}")]
+    OperationError(OperationError),
+    #[error("Database error: {0}")]
+    DatabaseError(DatabaseError),
+}
+
+impl From<DatabaseError> for HttpServiceError {
+    fn from(err: DatabaseError) -> Self {
+        HttpServiceError::DatabaseError(err)
+    }
+}
+
+impl From<SqliteError> for HttpServiceError {
+    fn from(err: SqliteError) -> Self {
+        HttpServiceError::DatabaseError(DatabaseError::Sqlite(err))
+    }
+}
+
+impl From<CoreSqlxError> for HttpServiceError {
+    fn from(err: CoreSqlxError) -> Self {
+        HttpServiceError::DatabaseError(DatabaseError::CoreSqlx(err))
+    }
 }
 
 #[cfg(test)]
@@ -486,12 +561,30 @@ mod tests {
 
     #[test]
     fn test_aggregate_attestations() {
-        let attestation1 =
-            Attestation::new("ppoi-1".to_string(), 1.0, vec!["0xa1".to_string()], vec![0]);
-        let attestation2 =
-            Attestation::new("ppoi-2".to_string(), 2.0, vec!["0xa2".to_string()], vec![1]);
-        let attestation3 =
-            Attestation::new("ppoi-3".to_string(), 3.0, vec!["0xa3".to_string()], vec![2]);
+        let attestation1 = Attestation::new(
+            "test_deployment".to_string(),
+            40,
+            "ppoi-1".to_string(),
+            1,
+            vec!["0xa1".to_string()],
+            vec![0],
+        );
+        let attestation2 = Attestation::new(
+            "test_deployment".to_string(),
+            40,
+            "ppoi-2".to_string(),
+            2,
+            vec!["0xa2".to_string()],
+            vec![1],
+        );
+        let attestation3 = Attestation::new(
+            "test_deployment".to_string(),
+            40,
+            "ppoi-3".to_string(),
+            3,
+            vec!["0xa3".to_string()],
+            vec![2],
+        );
 
         // Matched local attestation
         let local_attestation = attestation1.clone();
@@ -506,10 +599,10 @@ mod tests {
 
         let local_info = IndexerInfo {
             address: String::from("0xa0"),
-            stake: 1.0,
+            stake: 1,
         };
 
-        let aggregated_attestation = aggregate_attestation(r, &local_info);
+        let aggregated_attestation = aggregate_attestation(r, &local_info).unwrap();
         assert_eq!(aggregated_attestation.0.len(), 3);
         assert_eq!(
             aggregated_attestation.clone().1.unwrap(),
@@ -529,15 +622,17 @@ mod tests {
             block_number: 42,
             result_type: ComparisonResultType::Divergent,
             local_attestation: Some(Attestation::new(
+                "test_deployment".to_string(),
+                40,
                 String::from("unique_ppoi"),
-                1.0,
+                1,
                 vec![String::from("0xa0")],
                 vec![0],
             )),
             attestations: attestations.clone(),
         };
 
-        let aggregated_attestation = aggregate_attestation(r, &local_info);
+        let aggregated_attestation = aggregate_attestation(r, &local_info).unwrap();
         assert_eq!(aggregated_attestation.0.len(), 4);
         let (stake_ratio, _) = calc_ratios(
             &aggregated_attestation.0,
@@ -555,7 +650,7 @@ mod tests {
             attestations: attestations.clone(),
         };
 
-        let aggregated_attestation = aggregate_attestation(r, &local_info);
+        let aggregated_attestation = aggregate_attestation(r, &local_info).unwrap();
         assert_eq!(aggregated_attestation.0.len(), 3);
         assert_eq!(aggregated_attestation.1, None);
         let (stake_ratio, sender_ratio) = calc_ratios(

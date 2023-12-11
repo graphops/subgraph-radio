@@ -1,3 +1,5 @@
+use std::env;
+use std::path::Path;
 use std::sync::{atomic::Ordering, mpsc::Receiver, Arc};
 use std::time::Duration;
 
@@ -12,16 +14,20 @@ use graphcast_sdk::{
     WakuMessage,
 };
 
+use sqlx::SqlitePool;
 use tokio::time::{interval, sleep, timeout};
 use tracing::{debug, error, info, trace, warn};
 
+use crate::database::{
+    clear_all_notifications, get_comparison_results, get_comparison_results_by_type,
+    get_notifications, save_upgrade_intent_message,
+};
 use crate::messages::upgrade::UpgradeIntentMessage;
 use crate::metrics::handle_serve_metrics;
 use crate::operator::attestation::log_gossip_summary;
 use crate::operator::attestation::process_comparison_results;
 use crate::operator::notifier::NotificationMode;
 use crate::server::run_server;
-use crate::state::PersistedState;
 use crate::GRAPHCAST_AGENT;
 use crate::{
     chainhead_block_str,
@@ -45,19 +51,45 @@ pub mod operation;
 #[allow(unused)]
 pub struct RadioOperator {
     config: Config,
-    persisted_state: PersistedState,
     graphcast_agent: Arc<GraphcastAgent>,
     notifier: Notifier,
     control_flow: ControlFlow,
+    pub db: SqlitePool,
 }
 
 impl RadioOperator {
     /// Create a radio operator with radio configurations, persisted data,
     /// graphcast agent, and control flow
     pub async fn new(config: &Config, agent: GraphcastAgent) -> RadioOperator {
-        debug!("Initializing program state");
-        // Initialize program state
-        let persisted_state: PersistedState = config.init_radio_state().await;
+        debug!("Connecting to database");
+
+        let db = match &config.radio_setup().sqlite_file_path {
+            Some(path) => {
+                let cwd = env::current_dir().unwrap();
+                let absolute_path = cwd.join(path);
+
+                if !Path::new(&absolute_path).exists() {
+                    std::fs::File::create(&absolute_path)
+                        .expect("Failed to create the database file");
+                    debug!("Database file created at {}", absolute_path.display());
+                }
+
+                let db_url = format!("sqlite://{}", absolute_path.display());
+
+                SqlitePool::connect(&db_url)
+                    .await
+                    .expect("Could not connect to the SQLite database")
+            }
+            None => SqlitePool::connect("sqlite::memory:")
+                .await
+                .expect("Failed to connect to the in-memory database"),
+        };
+
+        debug!("Check for database migration");
+        sqlx::migrate!("../migrations")
+            .run(&db)
+            .await
+            .expect("Could not run migration");
 
         debug!("Initializing Graphcast Agent");
         let graphcast_agent = Arc::new(agent);
@@ -99,20 +131,15 @@ impl RadioOperator {
 
         RadioOperator {
             config: config.clone(),
-            persisted_state,
             graphcast_agent,
             notifier,
             control_flow,
+            db,
         }
     }
 
     pub fn graphcast_agent(&self) -> &GraphcastAgent {
         &self.graphcast_agent
-    }
-
-    /// Read persisted state at the time of access
-    pub fn state(&self) -> PersistedState {
-        self.persisted_state.clone()
     }
 
     /// Radio operations
@@ -144,11 +171,10 @@ impl RadioOperator {
 
         // Initialize Http server with graceful shutdown if configured
         if self.config.radio_setup().server_port.is_some() {
-            let state_ref = &self.persisted_state;
             let config_cloned = self.config.clone();
             tokio::spawn(run_server(
                 config_cloned,
-                state_ref,
+                &self.db,
                 self.graphcast_agent(),
                 self.control_flow.server_handle.clone(),
             ));
@@ -189,14 +215,17 @@ impl RadioOperator {
                     CONNECTED_PEERS.set(connected_peers);
                     GOSSIP_PEERS.set(gossip_peers);
 
-                    let diverged_num = self.persisted_state.comparison_result_typed(ComparisonResultType::Divergent).len();
-                    DIVERGING_SUBGRAPHS.set(diverged_num.try_into().unwrap());
+                    match get_comparison_results_by_type(&self.db, "Divergent").await {
+                        Ok(results) => {
+                            let diverged_num = results.len();
+                            DIVERGING_SUBGRAPHS.set(diverged_num.try_into().unwrap());
+                        },
+                        Err(e) => {
+                            error!("Error fetching divergent comparison results: {:?}", e);
+                        }
+                    }
 
-                    info!(connected_peers, gossip_peers, diverged_num, "State update summary");
-                    // Save cache if path provided
-                    let _ = &self.config.radio_setup().persistence_file_path.as_ref().map(|path| {
-                        self.persisted_state.update_cache(path);
-                    });
+                    info!(connected_peers, gossip_peers, "State update summary");
                 },
                 _ = gossip_poi_interval.tick() => {
                     if self.control_flow.skip_iteration.load(Ordering::SeqCst) {
@@ -286,11 +315,6 @@ impl RadioOperator {
                         let identifiers = self.graphcast_agent().content_identifiers();
                         let blocks_str = chainhead_block_str(&network_chainhead_blocks);
 
-                        trace!(
-                            state = tracing::field::debug(&self.state()),
-                            "current state",
-                        );
-
                         let comparison_res = self.compare_poi(
                             identifiers.clone(),
                         )
@@ -301,7 +325,7 @@ impl RadioOperator {
                             identifiers.len(),
                             comparison_res,
                             self.notifier.clone(),
-                            self.persisted_state.clone(),
+                            self.db.clone()
                         )
                     }).await;
 
@@ -314,43 +338,63 @@ impl RadioOperator {
                 _ = notification_interval.tick() => {
                     match self.config.radio_setup.notification_mode {
                         NotificationMode::PeriodicReport => {
-                        let comparison_results = self.persisted_state.comparison_results();
-                            if !comparison_results.is_empty() {
-                                let lines = {
-                                    let (mut matching, mut divergent) = (0, 0);
-                                    let mut lines = Vec::new();
-                                    let total = comparison_results.len();
+                            match get_comparison_results(&self.db.clone()).await {
+                                Ok(comparison_results) => {
+                                    if !comparison_results.is_empty() {
+                                        let lines = {
+                                            let (mut matching, mut divergent) = (0, 0);
+                                            let mut lines = Vec::new();
+                                            let total = comparison_results.len();
 
-                                    let divergent_lines: Vec<String> = comparison_results.iter().filter_map(|(identifier, res)| {
-                                        match res.result_type {
-                                            ComparisonResultType::Match => {
-                                                matching += 1;
-                                                None
-                                            },
-                                            ComparisonResultType::Divergent => {
-                                                divergent += 1;
-                                                Some(format!("{} - {}", identifier, res.block_number))
-                                            },
-                                            _ => None,
-                                        }
-                                    }).collect();
+                                            let divergent_lines: Vec<String> = comparison_results.iter().filter_map(|res| {
+                                                match res.result_type {
+                                                    ComparisonResultType::Match => {
+                                                        matching += 1;
+                                                        None
+                                                    },
+                                                    ComparisonResultType::Divergent => {
+                                                        divergent += 1;
+                                                        Some(format!("{} - {}", res.deployment, res.block_number))
+                                                    },
+                                                    _ => None,
+                                                }
+                                            }).collect();
 
-                                    lines.push(format!(
-                                        "Total subgraphs being cross-checked: {}\nMatching: {}\nDivergent: {}, identifiers and blocks:",
-                                        total, matching, divergent
-                                    ));
-                                    lines.extend(divergent_lines);
-                                    lines
-                                };
+                                            lines.push(format!(
+                                                "Total subgraphs being cross-checked: {}\nMatching: {}\nDivergent: {}, identifiers and blocks:",
+                                                total, matching, divergent
+                                            ));
+                                            lines.extend(divergent_lines);
+                                            lines
+                                        };
 
-                                self.notifier.notify(lines.join("\n")).await;
+                                        self.notifier.notify(lines.join("\n")).await;
+                                    }
+                                },
+                                Err(e) => {
+                                    error!("Error fetching comparison results: {:?}", e);
+                                }
                             }
                         },
-                        NotificationMode::PeriodicUpdate=> {
-                            let notifications = self.persisted_state.notifications();
-                            if !notifications.is_empty() {
-                                self.notifier.notify(notifications.join("\n")).await;
-                                self.persisted_state.clear_notifications();
+                        NotificationMode::PeriodicUpdate => {
+                            match get_notifications(&self.db).await {
+                                Ok(notifications) => {
+                                    if !notifications.is_empty() {
+                                        let notification_messages: Vec<String> = notifications
+                                            .iter()
+                                            .map(|n| format!("{}: {}", n.deployment, n.message))
+                                            .collect();
+
+                                        self.notifier.notify(notification_messages.join("\n")).await;
+
+                                        if let Err(e) = clear_all_notifications(&self.db).await {
+                                            error!("Error clearing notifications: {:?}", e);
+                                        }
+                                    }
+                                },
+                                Err(e) => {
+                                    error!("Error fetching notifications: {:?}", e);
+                                }
                             }
                         },
                         _ => {}
@@ -365,20 +409,21 @@ impl RadioOperator {
         }
     }
 
-    /// Process messages
     pub async fn message_processor(&self, receiver: Receiver<WakuMessage>) {
-        let state = self.persisted_state.clone();
         let notifier = self.notifier.clone();
         let config = self.config.clone();
+        let db = self.db.clone();
 
         tokio::spawn(async move {
             for msg in receiver {
                 let timeout_duration = Duration::from_secs(10);
+
                 let process_res = timeout(
                     timeout_duration,
-                    process_message(state.clone(), notifier.clone(), config.clone(), msg),
+                    process_message(notifier.clone(), config.clone(), msg, &db),
                 )
                 .await;
+
                 match process_res {
                     Ok(_) => trace!("New message processed"),
                     Err(e) => debug!(error = e.to_string(), "Message processor timed out"),
@@ -390,10 +435,10 @@ impl RadioOperator {
 
 /// Decode message into persistence, notifications, and other handlers
 pub async fn process_message(
-    state: PersistedState,
     notifier: Notifier,
     config: Config,
     msg: WakuMessage,
+    db: &SqlitePool,
 ) {
     trace!("Decoding waku message into Graphcast Message with Radio specified payload");
     RECEIVED_MESSAGES.inc();
@@ -432,7 +477,7 @@ pub async fn process_message(
                         VALIDATED_MESSAGES
                             .with_label_values(&[&msg.identifier, "public_poi_message"])
                             .inc();
-                        process_valid_message(msg.clone(), &state).await;
+                        process_valid_message(msg.clone(), db).await;
                     }
                 }
                 Err(e) => {
@@ -478,11 +523,11 @@ pub async fn process_message(
                     .with_label_values(&[&msg.identifier, "upgrade_intent_message"])
                     .inc();
                 if radio_msg
-                    .process_valid_message(&config, &notifier, &state)
+                    .process_valid_message(&config, &notifier, db)
                     .await
                     .is_ok()
                 {
-                    state.add_upgrade_intent_message(msg.clone());
+                    let _ = save_upgrade_intent_message(db, msg.clone()).await;
                 };
             };
         }
