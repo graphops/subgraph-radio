@@ -97,6 +97,8 @@ impl RadioOperator {
         debug!("Set global static instance of graphcast_agent");
         _ = GRAPHCAST_AGENT.set(graphcast_agent.clone());
 
+        config.validate_indexer_address().await;
+
         //TODO: Refactor indexer management server validation to SDK, similar to graph node status endpoint
         if let Some(url) = &config.graph_stack.indexer_management_server_endpoint {
             _ = health_query(url)

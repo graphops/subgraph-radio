@@ -3,6 +3,7 @@ use clap::value_parser;
 use clap::{command, Args, Parser};
 use derive_getters::Getters;
 use ethers::signers::WalletError;
+use graphcast_sdk::Account;
 use graphcast_sdk::{
     build_wallet,
     callbook::CallBook,
@@ -26,6 +27,22 @@ pub enum CoverageLevel {
     #[default]
     OnChain,
     Comprehensive,
+}
+
+fn is_valid_ethereum_address(address: &str) -> bool {
+    address.len() == 42
+        && address.starts_with("0x")
+        && address[2..].chars().all(|c| c.is_ascii_hexdigit())
+}
+
+fn parse_indexer_address(value: &str) -> Result<String, ConfigError> {
+    if !is_valid_ethereum_address(value) {
+        return Err(ConfigError::ValidateInput(
+            "Invalid Ethereum address".to_string(),
+        ));
+    }
+
+    Ok(value.to_string())
 }
 
 #[derive(Clone, Debug, Parser, Serialize, Deserialize, Getters, Default)]
@@ -70,6 +87,35 @@ impl Config {
         // Enables tracing under RUST_LOG variable
         init_tracing(config.radio_setup().log_format.to_string()).expect("Could not set up global default subscriber for logger, check environmental variable `RUST_LOG` or the CLI input `log-level`");
         config
+    }
+
+    pub async fn validate_indexer_address(&self) {
+        let input = self.wallet_input().unwrap();
+        let wallet = build_wallet(input).unwrap();
+        let agent = wallet_address(&wallet);
+
+        let account = Account::new(
+            agent.to_ascii_lowercase(),
+            self.graph_stack()
+                .indexer_address()
+                .to_string()
+                .to_ascii_lowercase(),
+        );
+
+        let verified = account
+            .verify(
+                self.graph_stack().network_subgraph(),
+                self.graph_stack().registry_subgraph(),
+                &IdentityValidation::Indexer,
+            )
+            .await;
+
+        if verified.is_err() {
+            panic!(
+                "Indexer address validation failed: {:?}",
+                verified.unwrap_err()
+            );
+        }
     }
 
     /// Validate that private key as an Eth wallet
@@ -220,6 +266,7 @@ pub struct GraphStack {
     pub graph_node_status_endpoint: String,
     #[clap(
         long,
+        value_parser = parse_indexer_address,
         value_name = "INDEXER_ADDRESS",
         env = "INDEXER_ADDRESS",
         help = "Graph account corresponding to Graphcast operator"
