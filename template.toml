@@ -15,7 +15,6 @@ topics = ['QmacQnSgia4iDPWHpeY6aWxesRFdb8o5DKZUx96zZqEWrB']
 gossip_topic_coverage = 'Comprehensive'
 auto_upgrade_coverage = 'Comprehensive'
 collect_message_duration = 10
-slack_token = 'xoxb-1231231231231-2312312312312-3abcabcabcabacabcabcabca'
 metrics_host = '0.0.0.0'
 server_host = '0.0.0.0'
 server_port = 7700

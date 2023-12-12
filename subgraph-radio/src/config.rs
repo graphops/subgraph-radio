@@ -384,18 +384,11 @@ pub struct RadioSetup {
     pub collect_message_duration: u64,
     #[clap(
         long,
-        value_name = "SLACK_TOKEN",
-        help = "Slack bot API token",
-        env = "SLACK_TOKEN"
+        value_name = "SLACK_WEBHOOK",
+        help = "Slack webhook URL to send messags to",
+        env = "SLACK_WEBHOOK"
     )]
-    pub slack_token: Option<String>,
-    #[clap(
-        long,
-        value_name = "SLACK_CHANNEL",
-        help = "Name of Slack channel to send messages to (has to be a public channel)",
-        env = "SLACK_CHANNEL"
-    )]
-    pub slack_channel: Option<String>,
+    pub slack_webhook: Option<String>,
     #[clap(
         long,
         value_name = "DISCORD_WEBHOOK",

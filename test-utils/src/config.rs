@@ -66,8 +66,7 @@ pub fn test_config() -> Config {
                 log_level:
                     "off,hyper=off,graphcast_sdk=trace,subgraph_radio=trace,test_runner=trace"
                         .to_string(),
-                slack_token: None,
-                slack_channel: None,
+                slack_webhook: None,
                 discord_webhook: None,
                 metrics_host: String::new(),
                 metrics_port: None,
