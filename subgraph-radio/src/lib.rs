@@ -258,7 +258,7 @@ impl ControlFlow {
         let server_handle = Handle::new();
 
         let update_event = Duration::from_secs(10);
-        let gossip_event = Duration::from_nanos(60);
+        let gossip_event = Duration::from_nanos(10);
         let compare_event = Duration::from_secs(300);
 
         let iteration_timeout = Duration::from_secs(120);

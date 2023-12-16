@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
 use sqlx::{Error as SqlxError, SqlitePool};
+use tracing::trace;
 
 use crate::messages::poi::PublicPoiMessage;
 use crate::messages::upgrade::UpgradeIntentMessage;
@@ -17,6 +18,8 @@ pub async fn insert_local_attestation(
     pool: &SqlitePool,
     new_attestation: Attestation,
 ) -> Result<Attestation, DatabaseError> {
+    trace!("Inserting record {:?}", new_attestation);
+
     let senders = serde_json::to_string(&new_attestation.senders)?;
     let timestamp = serde_json::to_string(&new_attestation.timestamp)?;
     let block = new_attestation.block_number.to_string();

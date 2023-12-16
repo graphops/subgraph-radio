@@ -15,7 +15,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 
 use sqlx::SqlitePool;
-use tracing::{error, trace, warn};
+use tracing::{error, info, trace, warn};
 
 use graphcast_sdk::{
     graphcast_agent::{GraphcastAgent, GraphcastAgentError},
@@ -192,6 +192,8 @@ pub async fn send_poi_message(
         latest_block = latest_block.number,
         "Check message send requirement",
     );
+
+    info!("are we never sending msgs??");
 
     // Deployment did not sync to message_block
     if latest_block.number < message_block {

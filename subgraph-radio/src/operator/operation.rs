@@ -3,7 +3,7 @@ use sqlx::SqlitePool;
 
 use std::cmp::max;
 use std::collections::HashMap;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 use graphcast_sdk::{
     determine_message_block, graphcast_agent::message_typing::MessageError, networks::NetworkName,
@@ -72,6 +72,8 @@ impl RadioOperator {
     ) -> Vec<Result<String, OperationError>> {
         let mut send_handles = vec![];
         for id in identifiers.clone() {
+            info!("why are we not in gossip_poi");
+
             /* Set up */
             let (network_name, latest_block, message_block) = if let Ok(params) = gossip_set_up(
                 id.clone(),
@@ -91,6 +93,8 @@ impl RadioOperator {
             let id_cloned = id.clone();
             let callbook = self.config.callbook();
             let db = self.db.clone();
+
+            info!("righ before creating handle");
 
             let send_handle = tokio::spawn(async move {
                 send_poi_message(

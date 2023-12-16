@@ -6,7 +6,6 @@ use crate::operator::notifier::NotificationMode;
 use crate::DatabaseError;
 use async_graphql::{Enum, Error as AsyncGraphqlError, ErrorExtensions, SimpleObject};
 use autometrics::autometrics;
-use chrono::Utc;
 use serde_derive::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use sqlx::SqlitePool;
@@ -26,7 +25,7 @@ use graphcast_sdk::{
     graphcast_agent::message_typing::{get_indexer_stake, GraphcastMessage, MessageError},
 };
 
-use crate::database::{get_local_attestations_by_identifier, insert_local_attestation};
+use crate::database::get_local_attestations_by_identifier;
 use crate::{messages::poi::PublicPoiMessage, metrics::ACTIVE_INDEXERS, OperationError};
 
 use super::notifier::Notification;
@@ -235,37 +234,37 @@ pub async fn local_comparison_point(
 }
 
 /// Saves PPOIs that we've generated locally, in order to compare them with remote ones later
-pub async fn save_local_attestation(
-    pool: &SqlitePool,
-    content: String,
-    ipfs_hash: String,
-    block_number: u64,
-) -> Result<Attestation, OperationError> {
-    let timestamp: Result<u64, _> = Utc::now().timestamp().try_into();
-    let timestamp = match timestamp {
-        Ok(t) => t,
-        Err(e) => {
-            return Err(OperationError::Others(format!(
-                "Timestamp conversion failed: {}",
-                e
-            )));
-        }
-    };
+// pub async fn save_local_attestation(
+//     pool: &SqlitePool,
+//     content: String,
+//     ipfs_hash: String,
+//     block_number: u64,
+// ) -> Result<Attestation, OperationError> {
+//     let timestamp: Result<u64, _> = Utc::now().timestamp().try_into();
+//     let timestamp = match timestamp {
+//         Ok(t) => t,
+//         Err(e) => {
+//             return Err(OperationError::Others(format!(
+//                 "Timestamp conversion failed: {}",
+//                 e
+//             )));
+//         }
+//     };
 
-    let attestation = Attestation {
-        identifier: ipfs_hash,
-        block_number,
-        ppoi: content,
-        stake_weight: 0,
-        sender_group_hash: String::new(),
-        senders: vec![],
-        timestamp: vec![timestamp],
-    };
+//     let attestation = Attestation {
+//         identifier: ipfs_hash,
+//         block_number,
+//         ppoi: content,
+//         stake_weight: 0,
+//         sender_group_hash: String::new(),
+//         senders: vec![],
+//         timestamp: vec![timestamp],
+//     };
 
-    insert_local_attestation(pool, attestation)
-        .await
-        .map_err(OperationError::Database)
-}
+//     insert_local_attestation(pool, attestation)
+//         .await
+//         .map_err(OperationError::Database)
+// }
 
 /// Tracks results indexed by deployment hash and block number
 #[derive(Enum, Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
