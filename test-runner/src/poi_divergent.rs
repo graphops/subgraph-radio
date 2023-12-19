@@ -30,10 +30,9 @@ pub async fn poi_divergent_test() {
         topics: test_sender_topics,
         radio_name: String::new(),
         block_hash: None,
-        staked_tokens: None,
         nonce: None,
-        radio_payload: None,
         poi: Some("0x8a937e93f72bf4396214fd519e3ded51a7f3b4316ada7b87d246b4626f7e9e8d".to_string()),
+        id_validation: None,
     };
 
     // Connection string for the SQLite database using the temporary file

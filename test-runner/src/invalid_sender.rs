@@ -29,10 +29,9 @@ pub async fn invalid_sender_test() {
         topics: test_sender_topics,
         radio_name: String::new(),
         block_hash: None,
-        staked_tokens: Some("1".to_string()),
         nonce: None,
-        radio_payload: None,
         poi: None,
+        id_validation: Some(IdentityValidation::ValidAddress),
     };
 
     let connection_string = format!("sqlite:{}", db_path);

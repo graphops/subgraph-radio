@@ -619,7 +619,7 @@ mod tests {
                 waku_host: None,
                 waku_port: None,
                 waku_node_key: None,
-                boot_node_addresses: vec![],
+                boot_node_addresses: vec!["/dns4/graph.myrandomdemos.online/tcp/31900/p2p/16Uiu2HAm5oH7pmpoTQoS5PgdehCinnrtpPAUhBuajG6AG3XHrR2P".to_string(), "/dns4/graph.myrandomdemos.online/tcp/8000/wss/p2p/16Uiu2HAm5oH7pmpoTQoS5PgdehCinnrtpPAUhBuajG6AG3XHrR2P".to_string()],
                 waku_log_level: "fatal".to_string(),
                 waku_addr: None,
                 discv5_enrs: None,

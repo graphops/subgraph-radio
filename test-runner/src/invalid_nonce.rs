@@ -26,10 +26,9 @@ pub async fn invalid_nonce_test() {
         topics: test_sender_topics,
         radio_name: String::new(),
         block_hash: None,
-        staked_tokens: None,
         nonce: Some("1655850000".to_string()),
-        radio_payload: None,
         poi: None,
+        id_validation: None,
     };
 
     let connection_string = format!("sqlite:{}", db_path);

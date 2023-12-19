@@ -1,11 +1,30 @@
+use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
 use sqlx::SqlitePool;
-use subgraph_radio::database::{get_local_attestations, get_remote_ppoi_messages};
+use subgraph_radio::{
+    database::{get_local_attestations, get_remote_ppoi_messages},
+    messages::poi::PublicPoiMessage,
+};
 use tempfile::NamedTempFile;
 use test_utils::{
     config::{test_config, TestSenderConfig},
     setup, teardown,
 };
 use tokio::time::{sleep, Duration};
+pub fn assert_all_messages_are_public_poi(
+    remote_ppoi_messages: &[GraphcastMessage<PublicPoiMessage>],
+) {
+    for message in remote_ppoi_messages {
+        let _ = PublicPoiMessage {
+            identifier: message.payload.identifier.clone(),
+            content: message.payload.content.clone(),
+            nonce: message.payload.nonce,
+            network: message.payload.network.clone(),
+            block_number: message.payload.block_number,
+            block_hash: message.payload.block_hash.clone(),
+            graph_account: message.payload.graph_account.clone(),
+        };
+    }
+}
 
 pub async fn send_and_receive_test() {
     let test_file_name = "message_handling";
@@ -28,10 +47,9 @@ pub async fn send_and_receive_test() {
         topics: test_sender_topics,
         radio_name: String::new(),
         block_hash: None,
-        staked_tokens: None,
         nonce: None,
-        radio_payload: None,
         poi: None,
+        id_validation: None,
     };
 
     // Connection string for the SQLite database using the temporary file
@@ -74,4 +92,5 @@ pub async fn send_and_receive_test() {
         "The number of remote messages should be at least 5. Actual: {}",
         remote_ppoi_messages.len()
     );
+    assert_all_messages_are_public_poi(&remote_ppoi_messages);
 }
