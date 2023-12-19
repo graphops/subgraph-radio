@@ -30,10 +30,9 @@ pub async fn poi_match_test() {
         topics: test_sender_topics,
         radio_name: String::new(),
         block_hash: None,
-        staked_tokens: None,
         nonce: None,
-        radio_payload: None,
         poi: None,
+        id_validation: None,
     };
 
     // Connection string for the SQLite database using the temporary file

@@ -13,3 +13,9 @@ opt-level = 3
 
 [workspace.dependencies]
 graphcast-sdk = { git = "https://github.com/graphops/graphcast-sdk" }
+clap = { version = "4.4", features = [
+    "cargo",
+    "unstable-doc",
+    "derive",
+    "env",
+] }

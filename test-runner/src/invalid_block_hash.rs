@@ -29,10 +29,9 @@ pub async fn invalid_block_hash_test() {
         block_hash: Some(
             "3071f4b00c2fc57c7f97d18e77b0e9c377cebae15959e6254b1a1d48a83b92e8".to_string(),
         ),
-        staked_tokens: None,
         nonce: None,
-        radio_payload: None,
         poi: None,
+        id_validation: None,
     };
 
     let connection_string = format!("sqlite:{}", db_path);

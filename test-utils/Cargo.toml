@@ -22,6 +22,7 @@ categories = [
 
 [dependencies]
 waku = { version = "0.4.0", package = "waku-bindings" }
+clap = { workspace = true }
 graphcast-sdk = { workspace = true }
 subgraph-radio = { path = "../subgraph-radio" }
 tokio = { version = "1.1.1", features = ["full", "rt"] }
@@ -36,7 +37,6 @@ uuid = "1.3.3"
 serde = { version = "1.0.163", features = ["rc"] }
 serde_json = "1.0.96"
 serde_derive = "1.0"
-clap = { version = "3.2.25", features = ["derive"] }
 prost = "0.11"
 ethers = "2.0.4"
 ethers-contract = "2.0.4"
@@ -44,3 +44,4 @@ ethers-core = "2.0.4"
 ethers-derive-eip712 = "1.0.2"
 async-graphql = "4.0.16"
 sqlx = { version = "0.7.2", features = ["sqlite", "runtime-tokio"] }
+once_cell = "1.17"

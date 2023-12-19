@@ -1,12 +1,18 @@
+use axum::{response::IntoResponse, Json};
 use axum::{routing::post, Router};
 use chrono::Utc;
-use rand::Rng;
-use std::fmt::Write;
+use ethers::signers::Signer;
+use graphcast_sdk::{build_wallet, wallet_address};
+use serde_json::{json, Value};
 use std::sync::Arc;
 use std::{convert::Infallible, net::SocketAddr, str::FromStr};
 use tokio::sync::Mutex;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
+
+use crate::{
+    is_address_derived_from_keys, GRAPHCAST_REGISTERED_ACCOUNTS, GRAPH_NETWORK_ACCOUNTS, INDEXERS,
+};
 
 pub struct ServerState {
     subgraphs: Arc<Mutex<Vec<String>>>,
@@ -19,14 +25,9 @@ impl ServerState {
     }
 }
 
-pub async fn start_mock_server(
-    address: String,
-    initial_subgraphs: Vec<String>,
-    staked_tokens: Option<String>,
-) -> ServerState {
+pub async fn start_mock_server(address: String, initial_subgraphs: Vec<String>) -> ServerState {
     let subgraphs = Arc::new(Mutex::new(initial_subgraphs));
 
-    // Define cloned versions of subgraphs here
     let subgraphs_for_graphql = Arc::clone(&subgraphs);
     let subgraphs_for_network_subgraph = Arc::clone(&subgraphs);
 
@@ -38,11 +39,8 @@ pub async fn start_mock_server(
         .route("/registry-subgraph", post(handler_graphcast_registry))
         .route(
             "/network-subgraph",
-            post(move || {
-                handler_network_subgraph(
-                    subgraphs_for_network_subgraph.clone(),
-                    staked_tokens.unwrap_or("10000000000000000000000".to_string()),
-                )
+            post(move |json_payload: Json<Value>| {
+                handler_network_subgraph(subgraphs_for_network_subgraph.clone(), json_payload)
             }),
         )
         .layer(
@@ -62,7 +60,6 @@ async fn handler_graphql(subgraphs: Arc<Mutex<Vec<String>>>) -> Result<String, I
     let block_number = (timestamp + 9) / 10 * 10;
     let subgraphs = subgraphs.lock().await;
 
-    // Prepare indexingStatuses part of the response dynamically from the subgraphs vector
     let indexing_statuses: Vec<String> = subgraphs
         .iter()
         .map(|hash| format!(
@@ -71,7 +68,6 @@ async fn handler_graphql(subgraphs: Arc<Mutex<Vec<String>>>) -> Result<String, I
         ))
         .collect();
 
-    // Prepare indexingStatuses part of the response by joining individual status strings with comma
     let indexing_statuses = indexing_statuses.join(",");
 
     let response_body = format!(
@@ -82,77 +78,133 @@ async fn handler_graphql(subgraphs: Arc<Mutex<Vec<String>>>) -> Result<String, I
     Ok(response_body)
 }
 
-async fn handler_graphcast_registry() -> Result<String, Infallible> {
-    // Generate a random Ethereum address
-    let mut rng = rand::thread_rng();
-    let graphcast_id: String = (0..20)
-        .map(|_| rng.gen::<u8>())
-        .collect::<Vec<u8>>()
-        .iter()
-        .fold(String::new(), |mut acc, &n| {
-            write!(&mut acc, "{:02x}", n).unwrap();
-            acc
-        });
+async fn handler_graphcast_registry(
+    Json(payload): Json<Value>,
+) -> Result<impl IntoResponse, Infallible> {
+    let graph_account = payload["variables"]["address"].as_str().unwrap_or_default();
 
-    let indexer: String = (0..20)
-        .map(|_| rng.gen::<u8>())
-        .collect::<Vec<u8>>()
-        .iter()
-        .fold(String::new(), |mut acc, &n| {
-            write!(&mut acc, "{:02x}", n).unwrap();
-            acc
-        });
+    let mut response_data = json!({});
 
-    let response_body = format!(
-        r#"{{
-        "data": {{
-            "graphcast_ids": [
-                {{
-                    "indexer": "0x{}",
-                    "graphcastID": "0x{}"
-                }}
-            ]
-        }},
-        "errors": null,
-        "extensions": null
-    }}"#,
-        indexer, graphcast_id
-    );
+    for &pk in GRAPHCAST_REGISTERED_ACCOUNTS.iter() {
+        if let Ok(wallet) = build_wallet(pk) {
+            if wallet_address(&wallet) == graph_account {
+                let graphcast_id = wallet.address();
 
-    Ok(response_body)
+                response_data = json!({
+                    "indexer": graph_account,
+                    "graphcastID": graphcast_id
+                });
+
+                break;
+            }
+        }
+    }
+
+    let response = if response_data != json!({}) {
+        json!({
+            "data": {
+                "graphcast_ids": [response_data]
+            }
+        })
+    } else {
+        json!({
+            "data": {
+                "graphcast_ids": []
+            }
+        })
+    };
+
+    Ok(Json(response))
 }
 
 async fn handler_network_subgraph(
     subgraphs: Arc<Mutex<Vec<String>>>,
-    staked_tokens: String,
+    Json(payload): Json<Value>,
 ) -> Result<String, Infallible> {
     let subgraphs = subgraphs.lock().await;
 
-    // Prepare allocations part of the response dynamically from the subgraphs vector
     let allocations: Vec<String> = subgraphs
         .iter()
         .map(|hash| format!(r#"{{"subgraphDeployment": {{"ipfsHash": "{}"}}}}"#, hash))
         .collect();
 
-    // Prepare allocations part of the response by joining individual allocation strings with comma
     let allocations = allocations.join(",");
 
-    let response_body = format!(
-        r#"
+    let mut graph_account = payload["variables"]["account_addr"]
+        .as_str()
+        .unwrap_or_default();
+
+    if graph_account.is_empty() {
+        graph_account = payload["variables"]["address"].as_str().unwrap();
+    }
+
+    if is_address_derived_from_keys(graph_account, &GRAPH_NETWORK_ACCOUNTS) {
+        let response_body = format!(
+            r#"{{
+                "data": {{
+                    "graphAccounts": [{{
+                        "id": "{}",
+                        "operators": [],
+                        "subgraphs": [],
+                        "indexer": {{
+                            "id": "{}",
+                            "stakedTokens": "200000000000000000000000",
+                            "allocations": [{}]
+                        }}
+                    }}]
+                }},
+                "errors": null
+            }}"#,
+            graph_account, graph_account, allocations
+        );
+
+        return Ok(response_body);
+    }
+
+    if is_address_derived_from_keys(graph_account, &INDEXERS) {
+        let response_body = format!(
+            r#"{{
+                "data": {{
+                    "graphAccounts": [{{
+                        "id": "{}",
+                        "operators": [],
+                        "subgraphs": [],
+                        "indexer": {{
+                            "id": "{}",
+                            "stakedTokens": "200000000000000000000000",
+                            "allocations": [{}]
+                        }}
+                    }}],
+                    "indexer": {{
+                        "stakedTokens": "200000000000000000000000",
+                        "allocations": [{}]
+                    }},
+                    "graphNetwork": {{
+                        "minimumIndexerStake": "10000000000000000000000"
+                    }}
+                }},
+                "errors": null
+            }}"#,
+            graph_account, graph_account, allocations, allocations
+        );
+
+        return Ok(response_body);
+    }
+
+    let response_body = r#"
         {{
             "data": {{
                 "indexer": {{
-                    "stakedTokens": "{}",
-                    "allocations": [{}]
+                    "stakedTokens": "0",
+                    "allocations": []
                 }},
                 "graphNetwork": {{
                     "minimumIndexerStake": "10000000000000000000000"
                 }}
             }},
             "errors": null
-        }}"#,
-        staked_tokens, allocations
-    );
+        }}"#
+    .to_string();
 
     Ok(response_body)
 }
