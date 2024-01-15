@@ -33,4 +33,4 @@ cargo nextest run
 
 ## Contributing
 
-We welcome and appreciate your contributions! Please see the [Contributor Guide](/CONTRIBUTING.md), [Code Of Conduct](/CODE_OF_CONDUCT.md) and [Security Notes](/SECURITY.md) for this repository.
+We welcome and appreciate your contributions! Please see the [Contributor Guide](/contributing.md), [Code Of Conduct](/code_of_conduct.md) and [Security Notes](/security.md) for this repository.
