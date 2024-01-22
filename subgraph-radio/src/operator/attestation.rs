@@ -2,6 +2,10 @@ use crate::database::{
     clear_all_notifications, create_notification, get_comparison_results_by_deployment,
     get_notifications, get_remote_ppoi_messages_by_identifier, save_comparison_result,
 };
+use crate::metrics::{
+    ATTESTED_MAX_STAKE_WEIGHT, AVERAGE_PROCESSING_TIME, FREQUENT_SENDERS_COUNTER,
+    LATEST_MESSAGE_TIMESTAMP,
+};
 use crate::operator::notifier::NotificationMode;
 use crate::DatabaseError;
 use async_graphql::{Enum, Error as AsyncGraphqlError, ErrorExtensions, SimpleObject};
@@ -13,6 +17,7 @@ use sqlx::SqlitePool;
 use std::error::Error;
 use std::fmt;
 use std::str::FromStr;
+use std::time::Instant;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -109,6 +114,8 @@ pub async fn process_ppoi_message(
     messages: Vec<GraphcastMessage<PublicPoiMessage>>,
     callbook: &CallBook,
 ) -> Result<RemoteAttestationsMap, AttestationError> {
+    let start_time = Instant::now();
+
     let mut remote_attestations: RemoteAttestationsMap = HashMap::new();
     // Check if there are existing attestations for the block
     let first_message = messages.first();
@@ -127,6 +134,14 @@ pub async fn process_ppoi_message(
                 .await
                 .map_err(|e| AttestationError::BuildError(MessageError::FieldDerivations(e)))?
                 as u64;
+
+        FREQUENT_SENDERS_COUNTER
+            .with_label_values(&[&radio_msg.graph_account])
+            .inc();
+
+        LATEST_MESSAGE_TIMESTAMP
+            .with_label_values(&[&msg.identifier])
+            .set(radio_msg.nonce as f64);
 
         let blocks = remote_attestations
             .entry(msg.identifier.to_string())
@@ -173,6 +188,10 @@ pub async fn process_ppoi_message(
     let active_indexers = ACTIVE_INDEXERS.with_label_values(&[&first_msg.identifier.to_string()]);
     let senders = combine_senders(blocks.entry(first_msg.payload.block_number).or_default());
     active_indexers.set(senders.len().try_into().unwrap());
+
+    let duration = start_time.elapsed();
+    let average_time = duration.as_secs_f64() / messages.len() as f64;
+    AVERAGE_PROCESSING_TIME.set(average_time);
 
     Ok(remote_attestations)
 }
@@ -468,9 +487,17 @@ pub fn compare_attestations(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
+    let most_attested_poi = sorted_remote_attestations.last().cloned();
+
+    if let Some(attestation) = &most_attested_poi {
+        ATTESTED_MAX_STAKE_WEIGHT
+            .with_label_values(&[ipfs_hash])
+            .set(attestation.stake_weight as f64);
+    }
+
     // Determine the comparison result based on the top attested remote PPOI
     let result_type = if let Some(local_att) = &local_attestation {
-        if let Some(most_attested) = sorted_remote_attestations.last() {
+        if let Some(most_attested) = &most_attested_poi {
             if most_attested.ppoi == local_att.ppoi {
                 ComparisonResultType::Match
             } else {
