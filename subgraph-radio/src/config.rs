@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tracing::info;
 
+use crate::metrics::NUM_TOPICS;
 use crate::operator::notifier::NotificationMode;
 use crate::{active_allocation_hashes, syncing_deployment_hashes};
 
@@ -227,6 +228,8 @@ impl Config {
                 additional_topics
             }
         };
+
+        NUM_TOPICS.set(topics.len() as i64);
         topics.into_iter().collect::<Vec<String>>()
     }
 
