@@ -88,7 +88,7 @@ pub struct ProcessManager {
 
 impl Drop for ProcessManager {
     fn drop(&mut self) {
-        let _ = self.senders.get(0).unwrap().lock().unwrap().kill();
+        let _ = self.senders.first().unwrap().lock().unwrap().kill();
         let _ = self.radio.lock().unwrap().kill();
     }
 }
