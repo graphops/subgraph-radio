@@ -3,7 +3,6 @@ use clap::value_parser;
 use clap::{command, Args, Parser};
 use derive_getters::Getters;
 use ethers::signers::WalletError;
-use graphcast_sdk::Account;
 use graphcast_sdk::{
     build_wallet,
     callbook::CallBook,
@@ -13,10 +12,12 @@ use graphcast_sdk::{
     graphql::{client_network::query_network_subgraph, QueryError},
     init_tracing, wallet_address, GraphcastNetworkName, LogFormat,
 };
+use graphcast_sdk::{cf_nameserver, Account};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tracing::info;
 
+use crate::metrics::NUM_TOPICS;
 use crate::operator::notifier::NotificationMode;
 use crate::{active_allocation_hashes, syncing_deployment_hashes};
 
@@ -165,6 +166,8 @@ impl Config {
             self.waku().filter_protocol,
             self.waku().discv5_enrs.clone(),
             self.waku().discv5_port,
+            self.waku().discv5_enrs.clone().unwrap_or_default(),
+            Some(cf_nameserver().to_string()),
         )
         .await
     }
@@ -227,6 +230,8 @@ impl Config {
                 additional_topics
             }
         };
+
+        NUM_TOPICS.set(topics.len() as i64);
         topics.into_iter().collect::<Vec<String>>()
     }
 

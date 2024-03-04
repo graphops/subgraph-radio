@@ -154,6 +154,7 @@ impl RadioOperator {
         let mut state_update_interval = interval(self.control_flow.update_event);
         let mut gossip_poi_interval = interval(self.control_flow.gossip_event);
         let mut comparison_interval = interval(self.control_flow.compare_event);
+        let mut network_check_interval = interval(self.control_flow.network_check_event);
 
         let mut notification_interval = tokio::time::interval(Duration::from_secs(
             self.config.radio_setup.notification_interval * 3600,
@@ -402,7 +403,11 @@ impl RadioOperator {
                         _ => {}
                     }
                 },
-
+                _ = network_check_interval.tick() => {
+                    if let Err(e) = GRAPHCAST_AGENT.get().unwrap().network_check() {
+                        error!("Error checking network connections: {:?}", e);
+                    }
+                },
                 else => break,
             }
 
