@@ -74,9 +74,15 @@ pub async fn get_local_attestation(
 
         let attestation = Attestation {
             identifier: data.identifier,
-            block_number: data.block_number as u64,
+            block_number: data
+                .block_number
+                .parse::<u64>()
+                .expect("should be a valid u64"),
             ppoi: data.ppoi,
-            stake_weight: data.stake_weight as u64,
+            stake_weight: data
+                .stake_weight
+                .parse::<u64>()
+                .expect("should be a valid u64"),
             senders,
             sender_group_hash: data.sender_group_hash,
             timestamp: timestamps,
@@ -119,9 +125,15 @@ pub async fn get_local_attestations_by_identifier(
 
         full_attestations.push(Attestation {
             identifier: att.identifier,
-            block_number: att.block_number as u64,
+            block_number: att
+                .block_number
+                .parse::<u64>()
+                .expect("should be a valid u64"),
             ppoi: att.ppoi,
-            stake_weight: att.stake_weight as u64,
+            stake_weight: att
+                .stake_weight
+                .parse::<u64>()
+                .expect("should be a valid u64"),
             senders,
             sender_group_hash: att.sender_group_hash,
             timestamp: timestamps,
@@ -158,9 +170,15 @@ pub async fn get_local_attestations(pool: &SqlitePool) -> Result<Vec<Attestation
 
         full_attestations.push(Attestation {
             identifier: record.identifier,
-            block_number: record.block_number as u64,
+            block_number: record
+                .block_number
+                .parse::<u64>()
+                .expect("should be a valid u64"),
             ppoi: record.ppoi,
-            stake_weight: record.stake_weight as u64,
+            stake_weight: record
+                .stake_weight
+                .parse::<u64>()
+                .expect("should be a valid u64"),
             sender_group_hash: record.sender_group_hash,
             senders,
             timestamp: timestamps,
@@ -251,15 +269,18 @@ pub async fn get_remote_ppoi_messages(
         .into_iter()
         .map(|row| GraphcastMessage {
             identifier: row.identifier.clone(),
-            nonce: row.nonce as u64,
+            nonce: row.nonce.parse::<u64>().expect("should be a valid u64"),
             graph_account: row.graph_account.clone(),
             signature: row.signature,
             payload: PublicPoiMessage {
                 identifier: row.identifier,
                 content: row.content,
-                nonce: row.nonce as u64,
+                nonce: row.nonce.parse::<u64>().expect("should be a valid u64"),
                 network: row.network,
-                block_number: row.block_number as u64,
+                block_number: row
+                    .block_number
+                    .parse::<u64>()
+                    .expect("should be a valid u64"),
                 block_hash: row.block_hash,
                 graph_account: row.graph_account,
             },
@@ -288,15 +309,18 @@ pub async fn get_remote_ppoi_messages_by_identifier(
         .into_iter()
         .map(|row| GraphcastMessage {
             identifier: row.identifier.clone(),
-            nonce: row.nonce as u64,
+            nonce: row.nonce.parse::<u64>().expect("should be a valid u64"),
             graph_account: row.graph_account.clone(),
             signature: row.signature,
             payload: PublicPoiMessage {
                 identifier: row.identifier,
                 content: row.content,
-                nonce: row.nonce as u64,
+                nonce: row.nonce.parse::<u64>().expect("should be a valid u64"),
                 network: row.network,
-                block_number: row.block_number as u64,
+                block_number: row
+                    .block_number
+                    .parse::<u64>()
+                    .expect("should be a valid u64"),
                 block_hash: row.block_hash,
                 graph_account: row.graph_account,
             },
@@ -381,13 +405,13 @@ pub async fn get_upgrade_intent_message(
                 deployment: msg.deployment.clone(),
                 subgraph_id: msg.subgraph_id,
                 new_hash: msg.new_hash,
-                nonce: msg.nonce as u64,
+                nonce: msg.nonce.parse::<u64>().expect("should be a valid u64"),
                 graph_account: msg.graph_account.clone(),
             };
 
             let graphcast_message = GraphcastMessage::new(
                 msg.deployment,
-                msg.nonce as u64,
+                msg.nonce.parse::<u64>().expect("should be a valid u64"),
                 msg.graph_account,
                 payload,
                 msg.signature,
@@ -420,13 +444,15 @@ pub async fn get_upgrade_intent_message_by_id(
                 deployment: msg.deployment.clone(),
                 subgraph_id: msg.subgraph_id,
                 new_hash: msg.new_hash,
-                nonce: msg.nonce as u64,
+                nonce: msg.nonce.parse::<u64>().expect("should be a valid u64"),
                 graph_account: msg.graph_account.clone(),
             };
 
             let graphcast_message = GraphcastMessage::new(
                 msg.deployment,
-                msg.nonce as u64,
+                msg.nonce
+                    .parse::<u64>()
+                    .expect("Nonce should be a valid u64"),
                 msg.graph_account,
                 payload,
                 msg.signature,
@@ -456,13 +482,13 @@ pub async fn get_upgrade_intent_messages(
             deployment: msg.deployment.clone(),
             subgraph_id: msg.subgraph_id,
             new_hash: msg.new_hash,
-            nonce: msg.nonce as u64,
+            nonce: msg.nonce.parse::<u64>().expect("should be a valid u64"),
             graph_account: msg.graph_account.clone(),
         };
 
         let graphcast_message = GraphcastMessage::new(
             msg.deployment,
-            msg.nonce as u64,
+            msg.nonce.parse::<u64>().expect("should be a valid u64"),
             msg.graph_account,
             payload,
             msg.signature,
@@ -622,7 +648,10 @@ pub async fn get_comparison_results(
 
         results.push(ComparisonResult {
             deployment: row.deployment,
-            block_number: row.block_number as u64,
+            block_number: row
+                .block_number
+                .parse::<u64>()
+                .expect("should be a valid u64"),
             result_type: ComparisonResultType::from_str(&row.result_type)?,
             local_attestation,
             attestations,
@@ -659,7 +688,10 @@ pub async fn get_comparison_results_by_type(
                 .map_err(DatabaseError::ParseError)
                 .map(|result_type| ComparisonResult {
                     deployment: row.deployment,
-                    block_number: row.block_number as u64,
+                    block_number: row
+                        .block_number
+                        .parse::<u64>()
+                        .expect("should be a valid u64"),
                     result_type,
                     local_attestation,
                     attestations,
@@ -692,7 +724,10 @@ pub async fn get_comparison_results_by_deployment(
 
         Ok(ComparisonResult {
             deployment: row.deployment,
-            block_number: row.block_number as u64,
+            block_number: row
+                .block_number
+                .parse::<u64>()
+                .expect("should be a valid u64"),
             result_type: ComparisonResultType::from_str(&row.result_type)?,
             local_attestation,
             attestations,

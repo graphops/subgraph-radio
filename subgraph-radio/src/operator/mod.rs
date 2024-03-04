@@ -86,10 +86,10 @@ impl RadioOperator {
         };
 
         debug!("Check for database migration");
-        sqlx::migrate!("../migrations")
-            .run(&db)
-            .await
-            .expect("Could not run migration");
+        // sqlx::migrate!("../migrations")
+        //     .run(&db)
+        //     .await
+        //     .expect("Could not run migration");
 
         debug!("Initializing Graphcast Agent");
         let graphcast_agent = Arc::new(agent);
