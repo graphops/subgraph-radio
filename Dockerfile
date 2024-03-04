@@ -1,5 +1,6 @@
 FROM rust:1-bullseye AS build-image
 
+# Update and install necessary packages, including libc6-dev for libresolv
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         wget \
@@ -9,19 +10,28 @@ RUN apt-get update \
         libssl-dev \
         clang \
         build-essential \
+        libc6-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Ensure CA certificates are installed
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 
+# Copy project files to the container
 COPY . /subgraph-radio
 WORKDIR /subgraph-radio
 
+# Install Golang
 RUN sh install-golang.sh
 ENV PATH=$PATH:/usr/local/go/bin
 
+# Set Rust flags to link against libresolv
+ENV RUSTFLAGS="-C link-arg=-lresolv"
+
+# Build the Rust project
 RUN cargo build --release -p subgraph-radio
 
+# Setup the runtime environment
 FROM alpine:3.17.3 as alpine
 RUN set -x \
     && apk update \

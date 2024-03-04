@@ -243,6 +243,7 @@ pub struct ControlFlow {
     update_event: Duration,
     gossip_event: Duration,
     compare_event: Duration,
+    network_check_event: Duration,
     iteration_timeout: Duration,
     update_timeout: Duration,
     gossip_timeout: Duration,
@@ -260,6 +261,7 @@ impl ControlFlow {
         let update_event = Duration::from_secs(10);
         let gossip_event = Duration::from_nanos(60);
         let compare_event = Duration::from_secs(300);
+        let network_check_event = Duration::from_secs(300);
 
         let iteration_timeout = Duration::from_secs(120);
         let update_timeout = Duration::from_secs(5);
@@ -274,6 +276,7 @@ impl ControlFlow {
             gossip_event,
             compare_event,
             iteration_timeout,
+            network_check_event,
             update_timeout,
             gossip_timeout,
         }

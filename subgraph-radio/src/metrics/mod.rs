@@ -5,7 +5,7 @@ use axum::Router;
 use axum_server::Handle;
 use once_cell::sync::Lazy;
 use prometheus::{core::Collector, Registry};
-use prometheus::{IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts};
+use prometheus::{Gauge, GaugeVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, Opts};
 
 use std::{net::SocketAddr, str::FromStr};
 use tracing::{debug, info};
@@ -45,14 +45,14 @@ pub static CACHED_PPOI_MESSAGES: Lazy<IntGaugeVec> = Lazy::new(|| {
 pub static ACTIVE_INDEXERS: Lazy<IntGaugeVec> = Lazy::new(|| {
     let m = IntGaugeVec::new(
         Opts::new(
-            "ACTIVE_INDEXERS",
+            "active_indexers",
             "Number of indexers actively crosschecking on the deployment (self excluded)",
         )
         .namespace("graphcast")
         .subsystem("subgraph_radio"),
         &["deployment"],
     )
-    .expect("Failed to create ACTIVE_INDEXERS gauges");
+    .expect("Failed to create active_indexers gauge");
     prometheus::register(Box::new(m.clone())).expect("Failed to register ACTIVE_INDEXERS counter");
     m
 });
@@ -114,6 +114,99 @@ pub static RECEIVED_MESSAGES: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 #[allow(dead_code)]
+pub static AVERAGE_PROCESSING_TIME: Lazy<Gauge> = Lazy::new(|| {
+    let m = Gauge::with_opts(
+        Opts::new(
+            "average_processing_time",
+            "Average time taken to process each POI message",
+        )
+        .namespace("graphcast")
+        .subsystem("subgraph_radio"),
+    )
+    .expect("Failed to create average_processing_time gauge");
+    prometheus::register(Box::new(m.clone()))
+        .expect("Failed to register average_processing_time gauge");
+    m
+});
+
+#[allow(dead_code)]
+pub static FREQUENT_SENDERS_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
+    let m = IntCounterVec::new(
+        Opts::new(
+            "frequent_senders",
+            "Count of messages received from each indexer",
+        )
+        .namespace("graphcast")
+        .subsystem("subgraph_radio"),
+        &["indexer_address"],
+    )
+    .expect("Failed to create frequent_senders counter");
+    prometheus::register(Box::new(m.clone())).expect("Failed to register frequent_senders counter");
+    m
+});
+
+#[allow(dead_code)]
+pub static LATEST_MESSAGE_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
+    let m = GaugeVec::new(
+        Opts::new(
+            "latest_message_timestamp",
+            "Timestamp of the last received public POI message",
+        )
+        .namespace("graphcast")
+        .subsystem("subgraph_radio"),
+        &["deployment_hash"],
+    )
+    .expect("Failed to create latest_message_timestamp gauge");
+    prometheus::register(Box::new(m.clone()))
+        .expect("Failed to register latest_message_timestamp gauge");
+    m
+});
+
+#[allow(dead_code)]
+pub static ATTESTED_MAX_STAKE_WEIGHT: Lazy<GaugeVec> = Lazy::new(|| {
+    let m = GaugeVec::new(
+        Opts::new("attested_max_stake_weight", "Highest stake-backed POI")
+            .namespace("graphcast")
+            .subsystem("subgraph_radio"),
+        &["deployment_hash"],
+    )
+    .expect("Failed to create attested_max_stake_weight gauge");
+    prometheus::register(Box::new(m.clone())).expect("Failed to register max_poi_stake gauge");
+    m
+});
+
+#[allow(dead_code)]
+pub static NUM_TOPICS: Lazy<IntGauge> = Lazy::new(|| {
+    let m = IntGauge::with_opts(
+        Opts::new(
+            "num_topics",
+            "Number of topics (subgraphs) being actively cross-checked",
+        )
+        .namespace("graphcast")
+        .subsystem("subgraph_radio"),
+    )
+    .expect("Failed to create num_topics gauge");
+    prometheus::register(Box::new(m.clone())).expect("Failed to register num_topics gauge");
+    m
+});
+
+#[allow(dead_code)]
+pub static COMPARISON_RESULTS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    let m = IntGaugeVec::new(
+        Opts::new(
+            "comparison_results",
+            "Rate of comparison results for each deployment",
+        )
+        .namespace("graphcast")
+        .subsystem("subgraph_radio"),
+        &["deployment"],
+    )
+    .expect("Failed to create comparison_results gauge");
+    prometheus::register(Box::new(m.clone())).expect("Failed to register COMPARISON_RESULTS gauge");
+    m
+});
+
+#[allow(dead_code)]
 pub static REGISTRY: Lazy<prometheus::Registry> = Lazy::new(prometheus::Registry::new);
 
 #[allow(dead_code)]
@@ -136,6 +229,12 @@ pub fn start_metrics() {
             Box::new(CONNECTED_PEERS.clone()),
             Box::new(GOSSIP_PEERS.clone()),
             Box::new(RECEIVED_MESSAGES.clone()),
+            Box::new(AVERAGE_PROCESSING_TIME.clone()),
+            Box::new(FREQUENT_SENDERS_COUNTER.clone()),
+            Box::new(LATEST_MESSAGE_TIMESTAMP.clone()),
+            Box::new(ATTESTED_MAX_STAKE_WEIGHT.clone()),
+            Box::new(NUM_TOPICS.clone()),
+            Box::new(COMPARISON_RESULTS.clone()),
         ],
     );
 }

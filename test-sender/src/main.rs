@@ -1,7 +1,7 @@
 use chrono::Utc;
 use clap::Parser;
 use graphcast_sdk::{
-    build_wallet,
+    build_wallet, cf_nameserver,
     graphcast_agent::{
         message_typing::{GraphcastMessage, IdentityValidation},
         waku_handling::{connect_multiaddresses, gather_nodes},
@@ -49,7 +49,6 @@ async fn start_sender(config: TestSenderConfig) {
         keep_alive_interval: None,
         relay: Some(true),
         min_peers_to_publish: Some(0),
-        filter: Some(false),
         log_level: None,
         relay_topics: [].to_vec(),
         discv5: Some(true),
@@ -62,6 +61,8 @@ async fn start_sender(config: TestSenderConfig) {
         gossipsub_params: Some(gossipsub_params),
         dns4_domain_name: None,
         websocket_params: None,
+        dns_discovery_urls: vec![],
+        dns_discovery_nameserver: Some(cf_nameserver().to_string()),
     };
 
     let node_handle = waku_new(Some(node_config)).unwrap().start().unwrap();
