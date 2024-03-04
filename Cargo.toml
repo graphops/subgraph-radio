@@ -12,7 +12,7 @@ panic = 'unwind'
 opt-level = 3
 
 [workspace.dependencies]
-graphcast-sdk = { git = "https://github.com/graphops/graphcast-sdk" }
+graphcast-sdk = "0.7.0"
 clap = { version = "4.4", features = [
     "cargo",
     "unstable-doc",
