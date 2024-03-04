@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2024-03-04
+
+### Bug Fixes
+- Readme links
+- Memory leak
+
+### Miscellaneous Tasks
+
+- Release 1.0.1
+
+## [1.0.0] - 2023-12-19
+
+### Features
+
+- Update e2e tests
+- Validate indexer address config variable
+
+### Refactor
+
+- Slack bot switched to using webhook instead of bot token
+- Remove waku discovery enr from Radio
+- Switch to sqlite instead of json for state persistence
+- Effective control of event durations and timeouts
+- Better message type determiniation
+- Radio payload trait
+- Updated a few config names
+- Rename radio_infrastructure to radio_setup
+
+### Miscellaneous Tasks
+
+- Release 1.0.0
+
 ## [0.1.9] - 2023-10-31
 
 ### Features
