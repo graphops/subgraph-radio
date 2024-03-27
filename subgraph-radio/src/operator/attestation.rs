@@ -620,9 +620,9 @@ pub async fn log_gossip_summary(
     info!(
         chainhead = blocks_str,
         num_topics,
-        num_sent_success = send_success.len(),
-        num_sent_previously = skip_repeated.len(),
+        num_messages_sent = send_success.len() + skip_repeated.len(),
         num_syncing_to_chainhead = trigger_failed.len(),
+        num_failed_to_send = build_errors.len(),
         build_errors = tracing::field::debug(&build_errors),
         "Gossip summary",
     );

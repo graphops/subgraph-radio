@@ -15,7 +15,7 @@ use graphcast_sdk::{
 };
 
 use sqlx::SqlitePool;
-use tokio::time::{interval, sleep, timeout};
+use tokio::time::{interval, timeout};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::database::{
@@ -339,6 +339,11 @@ impl RadioOperator {
                     }
                 },
                 _ = notification_interval.tick() => {
+                    if self.control_flow.skip_iteration.load(Ordering::SeqCst) {
+                        self.control_flow.skip_iteration.store(false, Ordering::SeqCst);
+                        continue;
+                    }
+
                     match self.config.radio_setup.notification_mode {
                         NotificationMode::PeriodicReport => {
                             match get_comparison_results(&self.db.clone()).await {
@@ -404,6 +409,11 @@ impl RadioOperator {
                     }
                 },
                 _ = network_check_interval.tick() => {
+                    if self.control_flow.skip_iteration.load(Ordering::SeqCst) {
+                        self.control_flow.skip_iteration.store(false, Ordering::SeqCst);
+                        continue;
+                    }
+
                     if let Err(e) = GRAPHCAST_AGENT.get().unwrap().network_check() {
                         error!("Error checking network connections: {:?}", e);
                     }
@@ -411,7 +421,6 @@ impl RadioOperator {
                 else => break,
             }
 
-            sleep(Duration::from_secs(5)).await;
             continue;
         }
     }

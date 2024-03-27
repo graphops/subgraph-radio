@@ -210,6 +210,8 @@ pub enum OperationError {
     Database(DatabaseError),
     #[error("Comparison error: {0}")]
     ComparisonError(#[from] ComparisonError),
+    #[error("Send message error: {0}")]
+    SendMessage(String),
     #[error("Others: {0}")]
     Others(String),
 }
@@ -250,7 +252,17 @@ pub struct ControlFlow {
 }
 
 impl ControlFlow {
-    /// Create basic control flow settings
+    /// This function creates basic control flow settings.
+    /// These intervals are based on hollistic observations about when Radio functions should be called,
+    /// in relation to Waku network specifics.
+    /// For instance, `gossip_event` has a 30 second interval between runs, because on average the `gossip_poi`
+    /// function, that performs a batch send operation, takes anywhere between 2 and 30 seconds. Within it,
+    /// sending individual messages (using `send_poi_message`) takes between 2 milliseconds and 5 seconds.
+    /// This huge inconsistency in message sending time is due to the nature of the Waku network, especially
+    /// given that the Graphcast SDK relies on the Waku discovery network. This means that when the Waku network
+    /// is congested or has other connectivity/speed issues, this affects the performance of the Graphcast SDK.
+    /// For those reasons `gossip_timeout` is 300 seconds (5 minutes), this also fits well with our expected
+    /// block interval of 5 minutes (defined in `networks.rs` in the Graphcast SDK).
     fn new() -> Self {
         let running = Arc::new(AtomicBool::new(true));
         let skip_iteration = Arc::new(AtomicBool::new(false));
@@ -259,13 +271,13 @@ impl ControlFlow {
         let server_handle = Handle::new();
 
         let update_event = Duration::from_secs(10);
-        let gossip_event = Duration::from_nanos(60);
+        let gossip_event = Duration::from_secs(30);
         let compare_event = Duration::from_secs(300);
         let network_check_event = Duration::from_secs(300);
 
-        let iteration_timeout = Duration::from_secs(120);
+        let iteration_timeout = Duration::from_secs(360);
         let update_timeout = Duration::from_secs(5);
-        let gossip_timeout = Duration::from_nanos(120);
+        let gossip_timeout = Duration::from_secs(300);
 
         ControlFlow {
             running,

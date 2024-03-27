@@ -70,6 +70,8 @@ impl RadioOperator {
         subgraph_network_latest_blocks: &HashMap<String, NetworkPointer>,
     ) -> Vec<Result<String, OperationError>> {
         let mut send_handles = vec![];
+        let mut send_ops = vec![];
+
         for id in identifiers.clone() {
             /* Set up */
             let (network_name, latest_block, message_block) = if let Ok(params) = gossip_set_up(
@@ -83,6 +85,10 @@ impl RadioOperator {
             } else {
                 let err_msg = "Failed to set up message parameters".to_string();
                 warn!(id, err_msg, "Gossip POI failed");
+                send_ops.push(Err(OperationError::SendMessage(format!(
+                    "Gossip POI failed, id: {} error: {}",
+                    id, err_msg
+                ))));
                 continue;
             };
 
@@ -107,7 +113,6 @@ impl RadioOperator {
             send_handles.push(send_handle);
         }
 
-        let mut send_ops = vec![];
         for handle in send_handles {
             if let Ok(s) = handle.await {
                 send_ops.push(s);
