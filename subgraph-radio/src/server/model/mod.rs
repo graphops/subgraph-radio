@@ -3,13 +3,17 @@ use chrono::Utc;
 use sqlx::{sqlite::SqliteError, Error as CoreSqlxError, SqlitePool};
 
 use crate::{
+    active_allocation_hashes,
     database::{
         get_comparison_results, get_comparison_results_by_deployment,
         get_upgrade_intent_message_by_id, get_upgrade_intent_messages,
     },
     DatabaseError, OperationError,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use thiserror::Error;
 
 use crate::{
@@ -115,11 +119,28 @@ impl QueryRoot {
         result_type: Option<ComparisonResultType>,
     ) -> Result<Vec<CompareRatio>, HttpServiceError> {
         let res = self
-            .comparison_results(ctx, deployment, block, result_type)
+            .comparison_results(ctx, deployment.clone(), block, result_type)
             .await?;
         let local_info = self.indexer_info(ctx).await?;
 
         let mut ratios = vec![];
+
+        let config = ctx
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
+            .radio_config();
+
+        let agent = ctx
+            .data_unchecked::<Arc<SubgraphRadioContext>>()
+            .graphcast_agent;
+
+        let allocated_subgraphs: HashSet<String> = active_allocation_hashes(
+            config.graph_stack().network_subgraph(),
+            &agent.graphcast_identity.graph_account,
+        )
+        .await
+        .into_iter()
+        .collect();
+
         for r in res {
             match aggregate_attestation(r.clone(), &local_info) {
                 Ok((aggregated_attestations, local_ppoi)) => {
@@ -128,11 +149,14 @@ impl QueryRoot {
                         local_ppoi.as_deref(),
                         local_info.stake,
                     );
+                    let allocated = allocated_subgraphs.contains(&r.deployment);
+
                     ratios.push(CompareRatio::new(
                         r.deployment,
                         r.block_number,
                         sender_ratio,
                         stake_ratio,
+                        allocated,
                     ));
                 }
                 Err(e) => {
@@ -349,16 +373,25 @@ impl SubgraphRadioContext {
                     .remote_ppoi_messages_filtered(&identifier, &Some(block))
                     .await;
 
-                let remote_attestations = process_ppoi_message(msgs, &config.callbook())
-                    .await
-                    .ok()
-                    .and_then(|r| {
-                        r.get(&entry.identifier)
-                            .and_then(|deployment_attestations| {
-                                deployment_attestations.get(&entry.block_number).cloned()
-                            })
-                    })
-                    .unwrap_or_default();
+                let allocated_subgraphs: HashSet<String> = active_allocation_hashes(
+                    config.graph_stack().network_subgraph(),
+                    &self.graphcast_agent.graphcast_identity.graph_account,
+                )
+                .await
+                .into_iter()
+                .collect();
+
+                let remote_attestations =
+                    process_ppoi_message(msgs, &config.callbook(), allocated_subgraphs)
+                        .await
+                        .ok()
+                        .and_then(|r| {
+                            r.get(&entry.identifier)
+                                .and_then(|deployment_attestations| {
+                                    deployment_attestations.get(&entry.block_number).cloned()
+                                })
+                        })
+                        .unwrap_or_default();
 
                 let r = compare_attestation(entry, remote_attestations);
                 if result_type.is_none() || (Some(r.result_type) == result_type) {
@@ -488,6 +521,7 @@ struct CompareRatio {
     block_number: u64,
     sender_ratio: String,
     stake_ratio: String,
+    allocated: bool,
 }
 
 impl CompareRatio {
@@ -496,12 +530,14 @@ impl CompareRatio {
         block_number: u64,
         sender_ratio: String,
         stake_ratio: String,
+        allocated: bool,
     ) -> Self {
         CompareRatio {
             deployment,
             block_number,
             sender_ratio,
             stake_ratio,
+            allocated,
         }
     }
 }

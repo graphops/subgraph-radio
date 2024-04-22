@@ -7,7 +7,7 @@ mod attestation {
     use criterion::{black_box, criterion_group, Criterion};
     use graphcast_sdk::graphcast_agent::message_typing::GraphcastMessage;
     use sqlx::SqlitePool;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use subgraph_radio::{
         database::{insert_local_attestation, insert_remote_ppoi_message},
         messages::poi::PublicPoiMessage,
@@ -75,6 +75,7 @@ mod attestation {
                     42,
                     black_box(&remote_attestations.clone()),
                     "my-awesome-hash",
+                    HashSet::new(),
                 )
             })
         });
@@ -87,6 +88,7 @@ mod attestation {
                 .await
                 .expect("Failed to connect to the in-memory database"),
         );
+
         black_box(
             sqlx::migrate!("../migrations")
                 .run(&pool)

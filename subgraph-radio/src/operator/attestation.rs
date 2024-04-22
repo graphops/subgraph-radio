@@ -113,6 +113,7 @@ pub type LocalAttestationsMap = HashMap<String, HashMap<u64, Attestation>>;
 pub async fn process_ppoi_message(
     messages: Vec<GraphcastMessage<PublicPoiMessage>>,
     callbook: &CallBook,
+    allocated_subgraphs: HashSet<String>,
 ) -> Result<RemoteAttestationsMap, AttestationError> {
     let start_time = Instant::now();
 
@@ -124,6 +125,8 @@ pub async fn process_ppoi_message(
     } else {
         first_message.unwrap()
     };
+
+    let allocated = allocated_subgraphs.contains(&first_msg.identifier);
 
     for msg in messages.iter() {
         let radio_msg = &msg.payload.clone();
@@ -140,7 +143,7 @@ pub async fn process_ppoi_message(
             .inc();
 
         LATEST_MESSAGE_TIMESTAMP
-            .with_label_values(&[&msg.identifier])
+            .with_label_values(&[&msg.identifier, &allocated.to_string()])
             .set(radio_msg.nonce as f64);
 
         let blocks = remote_attestations
@@ -185,7 +188,8 @@ pub async fn process_ppoi_message(
         .entry(first_msg.identifier.to_string())
         .or_default();
 
-    let active_indexers = ACTIVE_INDEXERS.with_label_values(&[&first_msg.identifier.to_string()]);
+    let active_indexers = ACTIVE_INDEXERS
+        .with_label_values(&[&first_msg.identifier.to_string(), &allocated.to_string()]);
     let senders = combine_senders(blocks.entry(first_msg.payload.block_number).or_default());
     active_indexers.set(senders.len().try_into().unwrap());
 
@@ -319,6 +323,7 @@ impl ComparisonResult {
 pub async fn handle_comparison_result(
     pool: &SqlitePool,
     new_comparison_result: &ComparisonResult,
+    allocated_subgraphs: HashSet<String>,
 ) -> Result<ComparisonResultType, DatabaseError> {
     let deployment_hash = new_comparison_result.deployment_hash();
     let existing_result = get_comparison_results_by_deployment(pool, &deployment_hash)
@@ -326,8 +331,10 @@ pub async fn handle_comparison_result(
         .into_iter()
         .next();
 
+    let allocated = allocated_subgraphs.contains(&deployment_hash.to_string());
+
     COMPARISON_RESULTS
-        .with_label_values(&[&deployment_hash])
+        .with_label_values(&[&deployment_hash, &allocated.to_string()])
         .inc();
 
     // Determine if the state has changed and if the database operation is successful
@@ -475,7 +482,10 @@ pub fn compare_attestations(
     attestation_block: u64,
     remote: &RemoteAttestationsMap,
     ipfs_hash: &str,
+    allocated_subgraphs: HashSet<String>,
 ) -> ComparisonResult {
+    let allocated = allocated_subgraphs.contains(&ipfs_hash.to_string());
+
     // Attempt to retrieve remote attestations for the given IPFS hash and block number
     let remote_attestations = remote
         .get(ipfs_hash)
@@ -496,19 +506,19 @@ pub fn compare_attestations(
     let result_type = match (&most_attested_poi, &local_attestation) {
         (Some(most_attested), Some(local_att)) if most_attested.ppoi == local_att.ppoi => {
             ATTESTED_MAX_STAKE_WEIGHT
-                .with_label_values(&[ipfs_hash])
+                .with_label_values(&[ipfs_hash, &allocated.to_string()])
                 .set(most_attested.stake_weight as f64);
             ComparisonResultType::Match
         }
         (Some(most_attested), Some(_)) => {
             ATTESTED_MAX_STAKE_WEIGHT
-                .with_label_values(&[ipfs_hash])
+                .with_label_values(&[ipfs_hash, &allocated.to_string()])
                 .set(most_attested.stake_weight as f64);
             ComparisonResultType::Divergent
         }
         (Some(most_attested), None) => {
             ATTESTED_MAX_STAKE_WEIGHT
-                .with_label_values(&[ipfs_hash])
+                .with_label_values(&[ipfs_hash, &allocated.to_string()])
                 .set(most_attested.stake_weight as f64);
             ComparisonResultType::NotFound
         }
@@ -635,6 +645,7 @@ pub async fn process_comparison_results(
     result_strings: Vec<Result<ComparisonResult, OperationError>>,
     notifier: Notifier,
     db: SqlitePool,
+    allocated_subgraphs: HashSet<String>,
 ) {
     // Generate attestation summary
     let mut match_strings = vec![];
@@ -647,7 +658,13 @@ pub async fn process_comparison_results(
     for result in result_strings {
         match result {
             Ok(comparison_result) => {
-                match handle_comparison_result(&db, &comparison_result.clone()).await {
+                match handle_comparison_result(
+                    &db,
+                    &comparison_result.clone(),
+                    allocated_subgraphs.clone(),
+                )
+                .await
+                {
                     Ok(result_type) => match result_type {
                         ComparisonResultType::Match => {
                             match_strings.push(comparison_result.to_string());

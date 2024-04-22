@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use graphcast_sdk::{graphcast_agent::message_typing::GraphcastMessage, networks::NetworkName};
     use sqlx::SqlitePool;
 
@@ -189,7 +191,7 @@ mod tests {
             attestations: Vec::new(),
         };
 
-        let _ = handle_comparison_result(&pool, &new_result).await;
+        let _ = handle_comparison_result(&pool, &new_result, HashSet::new()).await;
         let comparison_results = get_comparison_results(&pool).await.unwrap();
         let result = comparison_results.first().unwrap();
 
@@ -223,7 +225,7 @@ mod tests {
         };
 
         let _ = save_comparison_result(&pool, &old_result).await;
-        let _ = handle_comparison_result(&pool, &new_result).await;
+        let _ = handle_comparison_result(&pool, &new_result, HashSet::new()).await;
 
         let comparison_results = get_comparison_results(&pool).await.unwrap();
         assert_eq!(
