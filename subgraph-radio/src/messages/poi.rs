@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use async_graphql::SimpleObject;
 use autometrics::autometrics;
 use chrono::Utc;
@@ -27,6 +29,7 @@ use crate::database::{
     insert_local_attestation, insert_remote_ppoi_message,
 };
 use crate::operator::attestation::process_ppoi_message;
+
 use crate::{
     metrics::CACHED_PPOI_MESSAGES,
     operator::{
@@ -295,7 +298,11 @@ pub async fn send_poi_message(
 /// we should update PersistedState::remote_ppoi_message standalone
 /// from GraphcastMessage field such as nonce
 #[autometrics(track_concurrency)]
-pub async fn process_valid_message(msg: GraphcastMessage<PublicPoiMessage>, pool: &SqlitePool) {
+pub async fn process_valid_message(
+    msg: GraphcastMessage<PublicPoiMessage>,
+    allocated: bool,
+    pool: &SqlitePool,
+) {
     let identifier = msg.identifier.clone();
 
     if let Err(e) = insert_remote_ppoi_message(pool, &msg).await {
@@ -307,7 +314,7 @@ pub async fn process_valid_message(msg: GraphcastMessage<PublicPoiMessage>, pool
     if let Ok(message_count) = count_remote_ppoi_messages(pool, &identifier).await {
         // Update the metrics
         CACHED_PPOI_MESSAGES
-            .with_label_values(&[&identifier])
+            .with_label_values(&[&identifier, &allocated.to_string()])
             .set(message_count.into());
     } else {
         error!("Error counting remote ppoi messages.");
@@ -321,6 +328,7 @@ pub async fn poi_message_comparison(
     collect_window_duration: u64,
     callbook: CallBook,
     db: SqlitePool,
+    allocated_subgraphs: HashSet<String>,
 ) -> Result<ComparisonResult, OperationError> {
     let time = Utc::now().timestamp() as u64;
 
@@ -355,9 +363,10 @@ pub async fn poi_message_comparison(
         .collect::<Vec<_>>();
 
     // Process the filtered POI messages to get remote attestations
-    let remote_attestations = process_ppoi_message(filtered_messages, &callbook)
-        .await
-        .map_err(OperationError::Attestation)?;
+    let remote_attestations =
+        process_ppoi_message(filtered_messages, &callbook, allocated_subgraphs.clone())
+            .await
+            .map_err(OperationError::Attestation)?;
 
     let local_attestation = get_local_attestation(&db, &id, compare_block)
         .await
@@ -372,6 +381,7 @@ pub async fn poi_message_comparison(
         compare_block,
         &remote_attestations,
         &id,
+        allocated_subgraphs,
     );
 
     Ok(comparison_result)

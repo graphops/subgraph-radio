@@ -1,7 +1,7 @@
 use autometrics::autometrics;
 use sqlx::SqlitePool;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, warn};
 
 use graphcast_sdk::{
@@ -10,7 +10,7 @@ use graphcast_sdk::{
 };
 
 use crate::database::{clean_remote_ppoi_messages, delete_outdated_local_attestations};
-use crate::DatabaseError;
+use crate::{active_allocation_hashes, DatabaseError};
 
 use crate::messages::poi::{poi_message_comparison, send_poi_message};
 
@@ -132,10 +132,24 @@ impl RadioOperator {
             let callbook = self.config.callbook().clone();
             let db = self.db.clone();
 
+            let allocated_subgraphs: HashSet<String> = active_allocation_hashes(
+                self.config.graph_stack().network_subgraph(),
+                &self.graphcast_agent.graphcast_identity.graph_account,
+            )
+            .await
+            .into_iter()
+            .collect();
+
             let compare_handle = tokio::spawn(async move {
-                poi_message_comparison(id.clone(), collect_duration, callbook, db)
-                    .await
-                    .map_err(OperationError::from)
+                poi_message_comparison(
+                    id.clone(),
+                    collect_duration,
+                    callbook,
+                    db,
+                    allocated_subgraphs,
+                )
+                .await
+                .map_err(OperationError::from)
             });
             compare_handles.push(compare_handle);
         }

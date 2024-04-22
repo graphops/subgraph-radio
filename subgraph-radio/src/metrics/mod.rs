@@ -17,7 +17,7 @@ pub static VALIDATED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new("validated_messages", "Number of validated messages")
             .namespace("graphcast")
             .subsystem("subgraph_radio"),
-        &["deployment", "message_type"],
+        &["deployment", "message_type", "allocated"],
     )
     .expect("Failed to create validated_messages counters");
     prometheus::register(Box::new(m.clone()))
@@ -32,11 +32,11 @@ pub static CACHED_PPOI_MESSAGES: Lazy<IntGaugeVec> = Lazy::new(|| {
         Opts::new("cached_ppoi_messages", "Number of messages in cache")
             .namespace("graphcast")
             .subsystem("subgraph_radio"),
-        &["deployment"],
+        &["deployment", "allocated"],
     )
     .expect("Failed to create cached_ppoi_messages gauges");
     prometheus::register(Box::new(m.clone()))
-        .expect("Failed to register cached_ppoi_messages guage");
+        .expect("Failed to register cached_ppoi_messages gauge");
     m
 });
 
@@ -50,7 +50,7 @@ pub static ACTIVE_INDEXERS: Lazy<IntGaugeVec> = Lazy::new(|| {
         )
         .namespace("graphcast")
         .subsystem("subgraph_radio"),
-        &["deployment"],
+        &["deployment", "allocated"],
     )
     .expect("Failed to create active_indexers gauge");
     prometheus::register(Box::new(m.clone())).expect("Failed to register ACTIVE_INDEXERS counter");
@@ -154,7 +154,7 @@ pub static LATEST_MESSAGE_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
         )
         .namespace("graphcast")
         .subsystem("subgraph_radio"),
-        &["deployment_hash"],
+        &["deployment_hash", "allocated"],
     )
     .expect("Failed to create latest_message_timestamp gauge");
     prometheus::register(Box::new(m.clone()))
@@ -168,7 +168,7 @@ pub static ATTESTED_MAX_STAKE_WEIGHT: Lazy<GaugeVec> = Lazy::new(|| {
         Opts::new("attested_max_stake_weight", "Highest stake-backed POI")
             .namespace("graphcast")
             .subsystem("subgraph_radio"),
-        &["deployment_hash"],
+        &["deployment_hash", "allocated"],
     )
     .expect("Failed to create attested_max_stake_weight gauge");
     prometheus::register(Box::new(m.clone())).expect("Failed to register max_poi_stake gauge");
@@ -199,7 +199,7 @@ pub static COMPARISON_RESULTS: Lazy<IntGaugeVec> = Lazy::new(|| {
         )
         .namespace("graphcast")
         .subsystem("subgraph_radio"),
-        &["deployment"],
+        &["deployment", "allocation"],
     )
     .expect("Failed to create comparison_results gauge");
     prometheus::register(Box::new(m.clone())).expect("Failed to register COMPARISON_RESULTS gauge");

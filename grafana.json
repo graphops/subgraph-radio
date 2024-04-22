@@ -494,7 +494,7 @@
           "datasource": "${DS_SUBGRAPHRADIOGRAPHQL}",
           "endTimePath": "endTime",
           "groupBy": "null",
-          "queryText": "query {\n  data:comparisonRatio{\n    deployment\n    blockNumber\n    senderRatio\n    stakeRatio\n  }\n}",
+          "queryText": "query {\n  data:comparisonRatio{\n    deployment\n    blockNumber\n    senderRatio\n    stakeRatio\n   allocated\n}\n}",
           "refId": "A",
           "timePath": "Time"
         }
@@ -512,7 +512,8 @@
               "_blockNumber": "Block Number",
               "_deployment": "Deployment",
               "_senderRatio": "Count Ratio",
-              "_stakeRatio": "Stake Ratio"
+              "_stakeRatio": "Stake Ratio",
+              "_allocated": "Allocated"
             }
           }
         }

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 use std::sync::{atomic::Ordering, mpsc::Receiver, Arc};
@@ -28,7 +29,7 @@ use crate::operator::attestation::log_gossip_summary;
 use crate::operator::attestation::process_comparison_results;
 use crate::operator::notifier::NotificationMode;
 use crate::server::run_server;
-use crate::GRAPHCAST_AGENT;
+use crate::{active_allocation_hashes, GRAPHCAST_AGENT};
 use crate::{
     chainhead_block_str,
     messages::poi::{process_valid_message, PublicPoiMessage},
@@ -323,12 +324,19 @@ impl RadioOperator {
                         )
                         .await;
 
+                        let allocated_subgraphs: HashSet<String> =
+                            active_allocation_hashes(self.config.graph_stack().network_subgraph(), &self.graphcast_agent().graphcast_identity.graph_account)
+                                .await
+                                .into_iter()
+                                .collect();
+
                         process_comparison_results(
                             blocks_str,
                             identifiers.len(),
                             comparison_res,
                             self.notifier.clone(),
-                            self.db.clone()
+                            self.db.clone(),
+                            allocated_subgraphs
                         )
                     }).await;
 
@@ -466,9 +474,19 @@ pub async fn process_message(
     let nonces = agent.nonces.clone();
     let local_sender = agent.graphcast_identity.graphcast_id.clone();
 
+    let allocated_subgraphs: HashSet<String> = active_allocation_hashes(
+        config.graph_stack().network_subgraph(),
+        &agent.graphcast_identity.graph_account,
+    )
+    .await
+    .into_iter()
+    .collect();
+
     // handle each message based on their type
     match determine_message_type(msg) {
         TypedMessage::PublicPoi(msg) => {
+            let allocated = allocated_subgraphs.contains(&msg.identifier);
+
             trace!(
                 message = tracing::field::debug(&msg),
                 "Handling a Public PoI message",
@@ -491,9 +509,13 @@ pub async fn process_message(
                         .is_ok()
                     {
                         VALIDATED_MESSAGES
-                            .with_label_values(&[&msg.identifier, "public_poi_message"])
+                            .with_label_values(&[
+                                &msg.identifier,
+                                &allocated.to_string(),
+                                "public_poi_message",
+                            ])
                             .inc();
-                        process_valid_message(msg.clone(), db).await;
+                        process_valid_message(msg.clone(), allocated, db).await;
                     }
                 }
                 Err(e) => {
@@ -535,8 +557,14 @@ pub async fn process_message(
                 .validity_check(msg, &config.graph_stack.network_subgraph.clone())
                 .await
             {
+                let allocated = allocated_subgraphs.contains(&msg.identifier);
+
                 VALIDATED_MESSAGES
-                    .with_label_values(&[&msg.identifier, "upgrade_intent_message"])
+                    .with_label_values(&[
+                        &msg.identifier,
+                        &allocated.to_string(),
+                        "upgrade_intent_message",
+                    ])
                     .inc();
                 if radio_msg
                     .process_valid_message(&config, &notifier, db)
