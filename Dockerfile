@@ -39,12 +39,11 @@ RUN set -x \
 COPY --from=build-image /subgraph-radio/target/release/subgraph-radio /subgraph-radio/target/release/subgraph-radio
 RUN upx --overlay=strip --best /subgraph-radio/target/release/subgraph-radio
 
-FROM gcr.io/distroless/cc AS runtime
+FROM debian:bullseye-slim as runtime
 COPY --from=build-image /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build-image /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build-image /etc/passwd /etc/passwd
 COPY --from=build-image /etc/group /etc/group
 COPY --from=alpine /usr/bin/dumb-init /usr/bin/dumb-init
 COPY --from=alpine "/subgraph-radio/target/release/subgraph-radio" "/usr/local/bin/subgraph-radio"
-COPY --from=busybox:1.35.0-uclibc /bin/sh /bin/sh
 ENTRYPOINT [ "/usr/bin/dumb-init", "--", "/usr/local/bin/subgraph-radio" ]
