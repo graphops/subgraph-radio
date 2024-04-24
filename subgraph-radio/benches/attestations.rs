@@ -89,12 +89,11 @@ mod attestation {
                 .expect("Failed to connect to the in-memory database"),
         );
 
-        black_box(
-            sqlx::migrate!("../migrations")
-                .run(&pool)
-                .await
-                .expect("Could not run migration"),
-        );
+        sqlx::migrate!("../migrations")
+            .run(&pool)
+            .await
+            .expect("Could not run migration");
+        black_box(());
 
         let attestations = vec![
             black_box(Attestation::new(
