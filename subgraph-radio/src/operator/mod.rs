@@ -1,6 +1,6 @@
 use std::collections::HashSet;
-use std::env;
-use std::path::Path;
+
+use std::str::FromStr;
 use std::sync::{atomic::Ordering, mpsc::Receiver, Arc};
 use std::time::Duration;
 
@@ -15,6 +15,7 @@ use graphcast_sdk::{
     WakuMessage,
 };
 
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 use sqlx::SqlitePool;
 use tokio::time::{interval, timeout};
 use tracing::{debug, error, info, trace, warn};
@@ -58,39 +59,55 @@ pub struct RadioOperator {
     pub db: SqlitePool,
 }
 
+async fn setup_database_connection(db_url: &str) -> Result<SqlitePool, sqlx::Error> {
+    let connect_options = SqliteConnectOptions::from_str(db_url)?
+        .create_if_missing(true)
+        .journal_mode(SqliteJournalMode::Wal)
+        .busy_timeout(std::time::Duration::from_secs(5));
+
+    let pool = SqlitePool::connect_with(connect_options).await?;
+
+    Ok(pool)
+}
+
+async fn connect_to_database(config: &Config) -> Result<SqlitePool, Box<dyn std::error::Error>> {
+    debug!("Connecting to database");
+
+    let db_url = match &config.radio_setup().sqlite_file_path {
+        Some(path) => {
+            let cwd = std::env::current_dir().unwrap();
+            let absolute_path = cwd.join(path);
+
+            if !std::path::Path::new(&absolute_path).exists() {
+                std::fs::File::create(&absolute_path).expect("Failed to create the database file");
+                debug!("Database file created at {}", absolute_path.display());
+            }
+
+            format!("sqlite://{}", absolute_path.display())
+        }
+        None => String::from("sqlite::memory:"),
+    };
+
+    let db_pool = setup_database_connection(&db_url).await?;
+
+    debug!("Check for database migration");
+    sqlx::migrate!("../migrations")
+        .run(&db_pool)
+        .await
+        .expect("Could not run migration");
+
+    Ok(db_pool)
+}
+
 impl RadioOperator {
     /// Create a radio operator with radio configurations, persisted data,
     /// graphcast agent, and control flow
     pub async fn new(config: &Config, agent: GraphcastAgent) -> RadioOperator {
         debug!("Connecting to database");
 
-        let db = match &config.radio_setup().sqlite_file_path {
-            Some(path) => {
-                let cwd = env::current_dir().unwrap();
-                let absolute_path = cwd.join(path);
-
-                if !Path::new(&absolute_path).exists() {
-                    std::fs::File::create(&absolute_path)
-                        .expect("Failed to create the database file");
-                    debug!("Database file created at {}", absolute_path.display());
-                }
-
-                let db_url = format!("sqlite://{}", absolute_path.display());
-
-                SqlitePool::connect(&db_url)
-                    .await
-                    .expect("Could not connect to the SQLite database")
-            }
-            None => SqlitePool::connect("sqlite::memory:")
-                .await
-                .expect("Failed to connect to the in-memory database"),
-        };
-
-        debug!("Check for database migration");
-        sqlx::migrate!("../migrations")
-            .run(&db)
+        let db = connect_to_database(config)
             .await
-            .expect("Could not run migration");
+            .expect("Failed to connect to database");
 
         debug!("Initializing Graphcast Agent");
         let graphcast_agent = Arc::new(agent);
