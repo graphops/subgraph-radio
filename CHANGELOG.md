@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2024-04-30
+
+### Bug Fixes
+
+- Fixed DB locked error
+
 ## [1.0.3] - 2024-04-23
 
 ### Features
