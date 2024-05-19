@@ -1,16 +1,17 @@
+# Build Stage
 FROM rust:1-bullseye AS build-image
 
-# Update and install necessary packages, including libc6-dev for libresolv
+# Update and install necessary packages, including profiling tools
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         wget \
         curl \
         libpq-dev \
         pkg-config \
-        libssl-dev \
         clang \
         build-essential \
         libc6-dev \
+        heaptrack \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,19 +32,30 @@ ENV RUSTFLAGS="-C link-arg=-lresolv"
 # Build the Rust project
 RUN cargo build --release -p subgraph-radio
 
-# Setup the runtime environment
-FROM alpine:3.17.3 as alpine
-RUN set -x \
-    && apk update \
-    && apk add --no-cache upx dumb-init
-COPY --from=build-image /subgraph-radio/target/release/subgraph-radio /subgraph-radio/target/release/subgraph-radio
-RUN upx --overlay=strip --best /subgraph-radio/target/release/subgraph-radio
+# Check if the binary is successfully built
+RUN ls -lh /subgraph-radio/target/release/
 
+# Runtime Stage
 FROM debian:bullseye-slim as runtime
+
+# Update and install necessary packages, including heaptrack dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libc6-dev \
+        heaptrack \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy necessary files from the build stage
 COPY --from=build-image /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build-image /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build-image /etc/passwd /etc/passwd
 COPY --from=build-image /etc/group /etc/group
-COPY --from=alpine /usr/bin/dumb-init /usr/bin/dumb-init
-COPY --from=alpine "/subgraph-radio/target/release/subgraph-radio" "/usr/local/bin/subgraph-radio"
-ENTRYPOINT [ "/usr/bin/dumb-init", "--", "/usr/local/bin/subgraph-radio" ]
+COPY --from=build-image /usr/bin/heaptrack /usr/bin/heaptrack
+COPY --from=build-image /subgraph-radio/target/release/subgraph-radio /usr/local/bin/subgraph-radio
+
+# Ensure the binary exists in the correct path
+RUN ls -lh /usr/local/bin/subgraph-radio
+
+# Set the entry point to run the application
+ENTRYPOINT [ "/usr/local/bin/subgraph-radio" ]
