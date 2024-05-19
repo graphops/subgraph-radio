@@ -1,5 +1,5 @@
 use derive_getters::Getters;
-use graphcast_sdk::bots::{DiscordBot, SlackBot, TelegramBot};
+use graphcast_sdk::bots::{DiscordBot, SlackBot};
 
 use serde_derive::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -88,18 +88,18 @@ impl Notifier {
             }
         }
 
-        if let (Some(token), Some(chat_id)) = (self.telegram_token.clone(), self.telegram_chat_id) {
-            let telegram_bot = TelegramBot::new(token);
-            if let Err(e) = telegram_bot
-                .send_message(chat_id, &self.radio_name, &content)
-                .await
-            {
-                warn!(
-                    err = tracing::field::debug(e),
-                    "Failed to send notification to Telegram"
-                );
-            }
-        }
+        // if let (Some(token), Some(chat_id)) = (self.telegram_token.clone(), self.telegram_chat_id) {
+        //     let telegram_bot = TelegramBot::new(token);
+        //     if let Err(e) = telegram_bot
+        //         .send_message(chat_id, &self.radio_name, &content)
+        //         .await
+        //     {
+        //         warn!(
+        //             err = tracing::field::debug(e),
+        //             "Failed to send notification to Telegram"
+        //         );
+        //     }
+        // }
     }
 }
 

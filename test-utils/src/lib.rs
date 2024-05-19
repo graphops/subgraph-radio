@@ -136,7 +136,7 @@ pub async fn setup(
     test_file_name: &str,
     test_sender_config: &mut TestSenderConfig,
 ) -> ProcessManager {
-    let id = uuid::Uuid::new_v4().to_string();
+    let id = uuid::Uuid::default();
     let radio_name = format!("{}-{}", test_file_name, id);
     test_sender_config.radio_name = radio_name.clone();
 

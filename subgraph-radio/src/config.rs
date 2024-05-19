@@ -13,8 +13,10 @@ use graphcast_sdk::{
     init_tracing, wallet_address, GraphcastNetworkName, LogFormat,
 };
 use graphcast_sdk::{cf_nameserver, Account};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::net::UdpSocket;
 use tracing::info;
 
 use crate::metrics::NUM_TOPICS;
@@ -142,6 +144,29 @@ impl Config {
         }
     }
 
+    pub fn find_random_udp_port() -> u16 {
+        let mut rng = rand::thread_rng();
+        let mut port = 0;
+
+        for _ in 0..10 {
+            // Generate a random port number within the range 49152 to 65535
+            let test_port = rng.gen_range(49152..=65535);
+            match UdpSocket::bind(("0.0.0.0", test_port)) {
+                Ok(_) => {
+                    port = test_port;
+                    break;
+                }
+                Err(_) => continue,
+            }
+        }
+
+        if port == 0 {
+            panic!("Could not find a free port");
+        }
+
+        port
+    }
+
     pub async fn to_graphcast_agent_config(
         &self,
     ) -> Result<GraphcastAgentConfig, GraphcastAgentError> {
@@ -165,7 +190,7 @@ impl Config {
             self.waku().waku_addr.clone(),
             self.waku().filter_protocol,
             self.waku().discv5_enrs.clone(),
-            self.waku().discv5_port,
+            Some(Self::find_random_udp_port()),
             self.waku().discv5_enrs.clone().unwrap_or_default(),
             Some(cf_nameserver().to_string()),
         )
