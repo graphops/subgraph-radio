@@ -5,11 +5,11 @@
 
 ## Introduction
 
-This is a Graphcast Radio focused on sending gossips about particular subgraphs on a P2P network. The available message types are Public Proof of Indexing (PoI) messages from an indexer, or a version intent message from a subgraph owner.
+This is a [Graphcast](https://docs.graphops.xyz/graphcast/sdk/intro) Radio focused on sending messages about particular Subgraphs on a P2P network. The available message types are Public Proof of Indexing (PoI) messages from an indexer, or a version intent message from a subgraph owner.
 
 Reaching Public PoI consensus and ensuring data availability during subgraph upgrades is critical to the indexing service. Both messages should find value from indexers, subgraph owners, and ultimately data consumers.
 
-[Documentation](https://docs.graphops.xyz/graphcast/radios/subgraph-radio) | [Packages](https://github.com/graphops/subgraph-radio/pkgs/container/subgraph-radio) | [Chat](https://discord.com/channels/438038660412342282/1087503343410225152) 
+[Documentation](https://docs.graphops.xyz/graphcast/radios/subgraph-radio/intro) | [Packages](https://github.com/graphops/subgraph-radio/pkgs/container/subgraph-radio) | [Chat](https://discord.com/channels/438038660412342282/1087503343410225152) 
 
 ### Public PoI message
 
