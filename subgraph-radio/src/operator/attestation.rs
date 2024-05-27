@@ -484,7 +484,7 @@ pub fn compare_attestations(
     ipfs_hash: &str,
     allocated_subgraphs: HashSet<String>,
 ) -> ComparisonResult {
-    let allocated = allocated_subgraphs.contains(&ipfs_hash.to_string());
+    let allocated = allocated_subgraphs.contains(ipfs_hash);
 
     // Attempt to retrieve remote attestations for the given IPFS hash and block number
     let remote_attestations = remote

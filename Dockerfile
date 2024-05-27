@@ -7,7 +7,6 @@ RUN apt-get update \
         curl \
         libpq-dev \
         pkg-config \
-        libssl-dev \
         clang \
         build-essential \
         libc6-dev \

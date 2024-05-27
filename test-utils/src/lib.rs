@@ -138,7 +138,7 @@ pub async fn setup(
 ) -> ProcessManager {
     let id = uuid::Uuid::new_v4().to_string();
     let radio_name = format!("{}-{}", test_file_name, id);
-    test_sender_config.radio_name = radio_name.clone();
+    test_sender_config.radio_name.clone_from(&radio_name);
 
     let basic_sender = Arc::new(Mutex::new(
         Command::new("cargo")
