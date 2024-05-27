@@ -23,7 +23,7 @@ pub async fn id_validation_test_stricter_radio_level() {
 
     let mut config = test_config();
     config.radio_setup.sqlite_file_path = Some(db_path.clone());
-    config.radio_setup.topics = radio_topics.clone();
+    config.radio_setup.topics.clone_from(&radio_topics);
     config.radio_setup.topic_update_interval = 90;
     config.radio_setup.id_validation = IdentityValidation::Indexer;
 
@@ -75,7 +75,7 @@ pub async fn id_validation_test_looser_radio_level() {
 
     let mut config = test_config();
     config.radio_setup.sqlite_file_path = Some(db_path.clone());
-    config.radio_setup.topics = radio_topics.clone();
+    config.radio_setup.topics.clone_from(&radio_topics);
     config.radio_setup.topic_update_interval = 90;
     config.radio_setup.id_validation = IdentityValidation::ValidAddress;
 
@@ -127,7 +127,7 @@ pub async fn id_validation_test_matching_radio_level() {
 
     let mut config = test_config();
     config.radio_setup.sqlite_file_path = Some(db_path.clone());
-    config.radio_setup.topics = radio_topics.clone();
+    config.radio_setup.topics.clone_from(&radio_topics);
     config.radio_setup.topic_update_interval = 90;
     config.radio_setup.id_validation = IdentityValidation::GraphNetworkAccount;
 
@@ -179,7 +179,7 @@ pub async fn id_validation_test_invalid_address_loose() {
 
     let mut config = test_config();
     config.radio_setup.sqlite_file_path = Some(db_path.clone());
-    config.radio_setup.topics = radio_topics.clone();
+    config.radio_setup.topics.clone_from(&radio_topics);
     config.radio_setup.topic_update_interval = 90;
     config.radio_setup.id_validation = IdentityValidation::NoCheck;
 

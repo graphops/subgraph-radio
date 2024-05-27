@@ -29,7 +29,7 @@ pub async fn topics_test() {
 
     let mut config = test_config();
     config.radio_setup.sqlite_file_path = Some(db_path.clone());
-    config.radio_setup.topics = radio_topics.clone();
+    config.radio_setup.topics.clone_from(&radio_topics);
     config.radio_setup.topic_update_interval = 90;
 
     let mut test_sender_config = TestSenderConfig {
