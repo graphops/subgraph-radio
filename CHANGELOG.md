@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.5] - 2024-05-27
+
+### Bug Fixes
+
+- Remove dependency on native-tls entirely
+- Update README
+
 ## [1.0.4] - 2024-04-30
 
 ### Bug Fixes
