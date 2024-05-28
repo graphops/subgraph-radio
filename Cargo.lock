@@ -2495,8 +2495,8 @@ dependencies = [
 
 [[package]]
 name = "graphcast-sdk"
-version = "0.7.1"
-source = "git+https://github.com/graphops/graphcast-sdk#329fa90660ab666cce29c9578eeb093674b3c731"
+version = "0.7.2"
+source = "git+https://github.com/graphops/graphcast-sdk#f1caa674ec7ebf82e9882b5093599cf73bb93940"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -5676,7 +5676,7 @@ dependencies = [
 
 [[package]]
 name = "subgraph-radio"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "anyhow",
  "async-graphql",
