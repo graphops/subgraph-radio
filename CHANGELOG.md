@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.6] - 2024-06-04
+
+### Miscellaneous Tasks
+
+- Update Graphcast SDK dependency
+
 ## [1.0.5] - 2024-05-27
 
 ### Bug Fixes
