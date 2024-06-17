@@ -1,8 +1,8 @@
 [graph_stack]
 graph_node_status_endpoint = 'http://localhost:8030/graphql'
 indexer_address = '0xgossipssssssssssssssssssssssssssssssssss'
-registry_subgraph = 'https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-goerli'
-network_subgraph = 'https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-goerli'
+registry_subgraph = 'https://gateway-arbitrum.network.thegraph.com/api/{api-key}/subgraphs/id/9bnkkKmSqX3FpoxnBVNFcQfmdSJt2Zc8PrsY1ek64jPr'
+network_subgraph = 'https://gateway-arbitrum.network.thegraph.com/api/[api-key]/subgraphs/id/3xQHhMudr1oh69ut36G2mbzpYmYxwqCeU6wwqyCDCnqV'
 private_key = 'abcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefghabcdefgh'
 indexer_management_server_endpoint = 'http://127.0.0.1:18000'
 
