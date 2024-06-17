@@ -278,16 +278,14 @@ pub struct GraphStack {
         long,
         value_name = "SUBGRAPH",
         env = "REGISTRY_SUBGRAPH",
-        help = "Subgraph endpoint to the Graphcast Registry",
-        default_value = "https://api.thegraph.com/subgraphs/name/hopeyen/graphcast-registry-mainnet"
+        help = "Subgraph endpoint to the Graphcast Registry"
     )]
     pub registry_subgraph: String,
     #[clap(
         long,
         value_name = "SUBGRAPH",
         env = "NETWORK_SUBGRAPH",
-        help = "Subgraph endpoint to The Graph network subgraph",
-        default_value = "https://api.thegraph.com/subgraphs/name/graphprotocol/graph-network-mainnet"
+        help = "Subgraph endpoint to The Graph network subgraph"
     )]
     pub network_subgraph: String,
     #[clap(

@@ -23,6 +23,17 @@ Indexers running the subgraph radio and listening to that channel will in turn r
 
 Note that it is still at the subgraph developers' discretion to await for the indexers to sync upto chainhead, in which point they can publish the staged version without disrupting API usage.
 
+## Subgraph APIs
+
+Depending on your intended network, please pick the correct configurations and replace `[api-key]` with a valid api key for the decentralized network services.
+
+| Protocol Network | Graphcast Network | Registry Subgraph Endpoint                                                       | Network Subgraph Endpoint                                                             |
+| ---------------- | ----------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Arbitrum-One     | `mainnet`         | `https://gateway-arbitrum.network.thegraph.com/api/[api-key]/subgraphs/id/5tHgjCNF4XxAzp9ja8dU3j9JrqU7zctXj6DnxWpwAzc6`     | `https://gateway-arbitrum.network.thegraph.com/api/[api-key]/subgraphs/id/DZz4kDTdmzWLWsV373w2bSmoar3umKKH9y82SUKr5qmp`        |
+| Arbitrum-Sepolia  | `testnet`         | `https://gateway-arbitrum.network.thegraph.com/api/{api-key}/subgraphs/id/9bnkkKmSqX3FpoxnBVNFcQfmdSJt2Zc8PrsY1ek64jPr` | `https://gateway-arbitrum.network.thegraph.com/api/[api-key]/subgraphs/id/3xQHhMudr1oh69ut36G2mbzpYmYxwqCeU6wwqyCDCnqV` |
+| Ethereum Mainnet | `mainnet`         | `https://gateway-arbitrum.network.thegraph.com/api/[api-key]/subgraphs/id/rcKzonu5NGbKcxCDZoQWmcckRKJw8rnmMNJDV8UeDzJ`     | `https://gateway-arbitrum.network.thegraph.com/api/{api-key}/subgraphs/id/GgwLf9BTFBJi6Z5iYHssMAGEE4w5dR3Jox2dMLrBxnCT`         |
+
+
 ## 🧪 Testing
 
 To run unit tests for the Radio. We recommend using [nextest](https://nexte.st/) as your test runner. Once you have it installed you can run the tests using the following commands:
