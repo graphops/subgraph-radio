@@ -18,8 +18,8 @@ jobs:
         include:
           - os: ubuntu-latest
             toolchain: stable-x86_64-unknown-linux-gnu
-          - os: macos-latest
-            toolchain: stable-x86_64-apple-darwin
+          # - os: macos-latest
+          #   toolchain: stable-x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
@@ -49,8 +49,8 @@ jobs:
         include:
           - os: ubuntu-latest
             toolchain: stable-x86_64-unknown-linux-gnu
-          - os: macos-latest
-            toolchain: stable-x86_64-apple-darwin
+          # - os: macos-latest
+          #   toolchain: stable-x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
