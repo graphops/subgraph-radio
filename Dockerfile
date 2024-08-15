@@ -31,14 +31,13 @@ ENV RUSTFLAGS="-C link-arg=-lresolv"
 RUN cargo build --release -p subgraph-radio
 
 # Setup the runtime environment
-FROM alpine:3.17.3 as alpine
+FROM alpine:3.17.3 AS alpine
 RUN set -x \
     && apk update \
-    && apk add --no-cache upx dumb-init
+    && apk add --no-cache dumb-init
 COPY --from=build-image /subgraph-radio/target/release/subgraph-radio /subgraph-radio/target/release/subgraph-radio
-RUN upx --overlay=strip --best /subgraph-radio/target/release/subgraph-radio
 
-FROM debian:bullseye-slim as runtime
+FROM debian:bullseye-slim AS runtime
 COPY --from=build-image /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build-image /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build-image /etc/passwd /etc/passwd
