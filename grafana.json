@@ -5,8 +5,8 @@
       "label": "SubgraphRadioGraphQL",
       "description": "",
       "type": "datasource",
-      "pluginId": "fifemon-graphql-datasource",
-      "pluginName": "GraphQL Data Source"
+      "pluginId": "yesoreyeram-infinity-datasource",
+      "pluginName": "Infinity"
     },
     {
       "name": "DS_PROMETHEUS",
@@ -21,9 +21,9 @@
   "__requires": [
     {
       "type": "datasource",
-      "id": "fifemon-graphql-datasource",
-      "name": "GraphQL Data Source",
-      "version": "1.3.0"
+      "id": "yesoreyeram-infinity-datasource",
+      "name": "Infinity",
+      "version": "2.11.0"
     },
     {
       "type": "panel",
