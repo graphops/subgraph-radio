@@ -935,6 +935,6 @@
   "timezone": "browser",
   "title": "Graphcast Subgraph Radio",
   "uid": "graphcast-subgraph-radio",
-  "version": 6,
+  "version": 18,
   "weekStart": ""
 }
