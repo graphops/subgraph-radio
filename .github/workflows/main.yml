@@ -13,14 +13,7 @@ jobs:
   check:
     name: Check
     if: github.event.review.state == 'approved'
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            toolchain: stable-x86_64-unknown-linux-gnu
-          # - os: macos-latest
-          #   toolchain: stable-x86_64-apple-darwin
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -33,7 +26,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: 1.79.0
           default: true
           override: true
       - uses: actions-rs/cargo@v1
@@ -44,14 +37,7 @@ jobs:
   test:
     name: Test Suite
     if: github.event.review.state == 'approved'
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            toolchain: stable-x86_64-unknown-linux-gnu
-          # - os: macos-latest
-          #   toolchain: stable-x86_64-apple-darwin
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -64,7 +50,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: 1.79.0
           default: true
           override: true
       - uses: actions-rs/cargo@v1
@@ -92,7 +78,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.79.0
           override: true
           components: rustfmt, clippy
 
@@ -124,7 +110,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.79.0
           override: true
       - name: Run E2E Tests
         run: cargo run -p test-runner
