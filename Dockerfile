@@ -1,4 +1,4 @@
-FROM rust:1-bullseye AS build-image
+FROM rust:1.82-bullseye AS build-image
 
 # Update and install necessary packages, including libc6-dev for libresolv
 RUN apt-get update \
@@ -21,7 +21,7 @@ COPY . /subgraph-radio
 WORKDIR /subgraph-radio
 
 # Install Golang
-RUN sh install-golang.sh
+RUN ./scripts/install-go.sh
 ENV PATH=$PATH:/usr/local/go/bin
 
 # Set Rust flags to link against libresolv
