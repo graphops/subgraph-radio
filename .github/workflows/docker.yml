@@ -16,10 +16,7 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: write
-      metadata: write
+    permissions: write-all
 
     steps:
       - name: Checkout
