@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.8] - 2025-01-10
+
+### Miscellaneous Tasks
+
+- Fix Grafana Dashboard duplication bug
+
 ## [1.0.7] - 2024-11-15
 
 ### Miscellaneous Tasks
